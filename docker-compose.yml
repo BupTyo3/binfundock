@@ -1,0 +1,27 @@
+version: '3.7'
+
+services:
+  db:
+    image: postgres:12.3-alpine
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    environment:
+#    Init db. Just for order
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+  web:
+    build:
+      context: .
+    command:
+      - bash
+      - -c
+      - |
+          gunicorn \
+            --bind 0.0.0.0:8000 \
+            petauction.wsgi:application
+    ports:
+      - 8000:8000
+    depends_on:
+      - db
+

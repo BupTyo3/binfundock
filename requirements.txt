@@ -1,0 +1,13 @@
+Django==3.0.8
+django-filter==2.3.0
+django-model-utils==4.0.0
+djangorestframework==3.11.0
+drf-rw-serializers==1.0.3
+drf-yasg==1.17.1
+gunicorn==20.0.4
+psycopg2-binary==2.8.5
+python-dotenv==0.14.0
+python-binance==0.7.5
+
+
+
