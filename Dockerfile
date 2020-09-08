@@ -18,7 +18,10 @@ COPY . /binfun/
 RUN pip install -U pip && \
     pip install -r requirements.txt
 
+# static for admin panel
+RUN python manage.py collectstatic --noinput
+
 # Gunicorn logs
 RUN mkdir /var/log/gunicorn
 
-EXPOSE 8000
+EXPOSE 8100

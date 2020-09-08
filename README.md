@@ -52,9 +52,9 @@ python manage.py migrate
 docker exec -it binfundock_db_1 /bin/bash
 ```
 
-- Remove `web` and `db` DB containers
+- Remove `web`, `db` and `nginx` containers
 ```bash
-docker rm binfundock_web_1 binfundock_db_1
+docker rm binfundock_web_1 binfundock_db_1  binfundock_nginx_1
 ```
 
 - Remove `web` image
@@ -69,7 +69,7 @@ docker image rm binfundock_web:latest
 python manage.py createsuperuser
 ```
 
-##### Remove DB data completely
+##### Remove DB data completely. Be careful! Make a copy first! 
 ```bash
 rm -r pgdata
 ```
