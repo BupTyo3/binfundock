@@ -10,9 +10,9 @@ RUN apt-get update && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set work directory
-WORKDIR /pet
+WORKDIR /binfun
 # Copy project
-COPY . /pet/
+COPY . /binfun/
 
 # Install requirements
 RUN pip install -U pip && \

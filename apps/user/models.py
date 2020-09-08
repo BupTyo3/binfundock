@@ -57,7 +57,6 @@ class User(AbstractUser):
     """
 
     username = None
-    balance = models.PositiveIntegerField(default=0)
     email = models.EmailField(
         _('email address'), unique=True)
 

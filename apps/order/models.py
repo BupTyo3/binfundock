@@ -2,6 +2,8 @@ import logging
 
 from django.db import models
 from django.contrib.auth import get_user_model
+
+from utils.framework.models import SystemBaseModel
 from .base_model import Order
 from apps.order.utils import OrderStatus
 from typing import List, Optional, Union

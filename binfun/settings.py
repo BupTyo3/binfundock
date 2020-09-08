@@ -53,6 +53,9 @@ INSTALLED_APPS = [
     'apps.user',
     'apps.order',
     'apps.signal',
+    'apps.pair',
+    'apps.market',
+    'apps.strategy',
 ]
 
 MIDDLEWARE = [

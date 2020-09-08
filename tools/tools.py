@@ -1,9 +1,11 @@
+import logging
 import uuid
 from binance.exceptions import BinanceAPIException
 
 from functools import partial, wraps
 from typing import Callable, Optional
-from settings.settings import logger
+
+logger = logging.getLogger(__name__)
 
 
 def rou(value: float):

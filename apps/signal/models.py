@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import ugettext_lazy as _
 from typing import List
 
+from utils.framework.models import SystemBaseModel
 from apps.order.models import SellOrder, BuyOrder, BuyData, SellData
 from apps.market.base_model import Market
 from binfun.settings import conf_obj
@@ -13,15 +14,12 @@ from tools.tools import rounded_result, debug_input_and_returned
 logger = logging.getLogger(__name__)
 
 
-class SignalModel:
+class SignalModel(SystemBaseModel):
     conf = conf_obj
 
-    def __init__(self,
-                 pair: str,
-                 entry_points: List[float],
-                 take_profits: List[float],
-                 stop_loss: float,
-                 signal_id: int):
+    def __init__(self, pair: str, entry_points: List[float], take_profits: List[float], stop_loss: float,
+                 signal_id: int, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.pair = pair
         self.entry_points = entry_points
         self.take_profits = take_profits

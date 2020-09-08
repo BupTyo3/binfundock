@@ -7,7 +7,8 @@ class Command(BaseCommand):
     help = 'Closes the specified poll for voting'
 
     def add_arguments(self, parser):
-        parser.add_argument('poll_ids', nargs='+', type=int)
+        # parser.add_argument('poll_ids', nargs='+', type=int)
+        pass
 
     def handle(self, *args, **options):
         sm_obj = SignalModel('LTCUSDT', [110, 130, 150], [200, 250, 300, 350], 90, 1357)

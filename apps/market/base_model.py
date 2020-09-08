@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Dict
+
+from utils.framework.models import SystemBaseModel
+
 from apps.order.utils import OrderStatus
 from apps.pair.models import Pair
 from apps.pair.base_model import PairsData
 
 
-class Market(ABC):
+class Market(SystemBaseModel):
     price_: str = 'price'
     quantity_: str = 'quantity'
     executed_quantity_: str = 'executed_quantity'
@@ -15,7 +18,8 @@ class Market(ABC):
     pairs: PairsData
     pair_class: Pair
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.pairs: PairsData = dict()
 
     @abstractmethod

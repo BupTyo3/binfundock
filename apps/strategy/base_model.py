@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Dict
-from tools.tools import gen_short_uuid
+
+from utils.framework.models import SystemBaseModel
 
 
-class Strategy(ABC):
+class Strategy(SystemBaseModel):
     pass

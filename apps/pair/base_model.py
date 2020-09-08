@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Dict
 
+from utils.framework.models import SystemBaseModel
 
-class BasePair:
+
+class BasePair(SystemBaseModel):
     symbol: str
     min_price: float
     step_price: float
@@ -10,7 +12,8 @@ class BasePair:
     min_quantity: float
     min_amount: float
 
-    def __init__(self, symbol, min_price, step_price, step_quantity, min_quantity, min_amount):
+    def __init__(self, symbol, min_price, step_price, step_quantity, min_quantity, min_amount, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.symbol = symbol
         self.min_price = min_price
         self.step_price = step_price

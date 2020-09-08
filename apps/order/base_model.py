@@ -3,6 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Dict
 
+from utils.framework.models import SystemBaseModel
 from apps.order.utils import OrderStatus
 from apps.market.base_model import Market
 from tools.tools import gen_short_uuid
@@ -10,7 +11,7 @@ from tools.tools import gen_short_uuid
 logger = logging.getLogger(__name__)
 
 
-class Order(ABC):
+class Order(SystemBaseModel):
     order_id: Optional[str]
     market: Market
     symbol: str
@@ -21,7 +22,11 @@ class Order(ABC):
     stop_loss: Optional[float]
     status: OrderStatus
 
-    def __init__(self):
+    class Meta:
+        abstract = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._status = OrderStatus.NOT_SENT
         self.stop_loss = None
 

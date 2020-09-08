@@ -3,7 +3,6 @@ import logging
 from django.db import models
 from django.contrib.auth import get_user_model
 
-from utils.framework.models import SystemBaseModel
 from typing import Tuple, Optional
 
 from binance import client
