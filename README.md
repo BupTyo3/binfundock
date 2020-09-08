@@ -42,14 +42,34 @@ docker exec -it binfundock_web_1 /bin/bash
 docker exec -it binfundock_web_1 python manage.py shell
 ```
 
+- Apply migrations into the container
+```bash
+python manage.py migrate
+```
+
 - Connect to `db` DB container
 ```bash
 docker exec -it binfundock_db_1 /bin/bash
 ```
 
-- Apply migrations into the container
+- Remove `web` and `db` DB containers
 ```bash
-./manage.py migrate
+docker rm binfundock_web_1 binfundock_db_1
 ```
 
+- Remove `web` image
+```bash
+docker image rm binfundock_web:latest
+```
 
+##### Commands into `web` container
+
+- Create superuser
+```bash
+python manage.py createsuperuser
+```
+
+##### Remove DB data completely
+```bash
+rm -r pgdata
+```

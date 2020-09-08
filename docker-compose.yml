@@ -19,7 +19,7 @@ services:
       - |
           gunicorn \
             --bind 0.0.0.0:8000 \
-            binfundock.wsgi:application
+            binfun.wsgi:application
     ports:
       - 8000:8000
     depends_on:
