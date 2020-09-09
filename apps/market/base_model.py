@@ -18,9 +18,10 @@ class Market(SystemBaseModel):
     pairs: PairsData
     pair_class: Pair
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pairs: PairsData = dict()
+        self.name: str = name
 
     @abstractmethod
     def get_current_price(self, symbol: str) -> float:

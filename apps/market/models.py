@@ -38,11 +38,12 @@ logger = logging.getLogger(__name__)
 
 
 class TestMarket(Market):
+    name = 'Test'
     order_id_separator = 'tm'
     pair_class: Pair = Pair
 
     def __init__(self):
-        super().__init__()
+        super().__init__(self.name)
         self.fake_update_pairs_info()
 
     def get_current_price(self, symbol):
@@ -77,6 +78,7 @@ class TestMarket(Market):
 
 
 class BiMarket(Market):
+    name = 'Binance'
     symbol_ = 'symbol'
     bidPrice_ = 'bidPrice'
     askPrice_ = 'askPrice'
@@ -122,7 +124,7 @@ class BiMarket(Market):
     }
 
     def __init__(self, api_key: str, api_secret: str):
-        super().__init__()
+        super().__init__(self.name)
         self.my_client: client.Client = self.client_class(api_key, api_secret)
         self.update_pairs_info_api()
 
