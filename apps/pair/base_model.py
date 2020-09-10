@@ -12,15 +12,6 @@ class BasePair(SystemBaseModel):
     min_quantity: float
     min_amount: float
 
-    def __init__(self, symbol, min_price, step_price, step_quantity, min_quantity, min_amount, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.symbol = symbol
-        self.min_price = min_price
-        self.step_price = step_price
-        self.step_quantity = step_quantity
-        self.min_quantity = min_quantity
-        self.min_amount = min_amount
-
 
 # typing
 

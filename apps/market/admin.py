@@ -4,6 +4,6 @@ from .models import Market
 
 
 @admin.register(Market)
-class MarketAdmin(admin.ModelAdmin):
+class BiMarketAdmin(admin.ModelAdmin):
     pass
 

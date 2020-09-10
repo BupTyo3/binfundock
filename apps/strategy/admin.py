@@ -1,9 +1,9 @@
 from django.contrib import admin
 
-from .models import Strategy
+from .models import FirstStrategy
 
 
-@admin.register(Strategy)
-class StrategyAdmin(admin.ModelAdmin):
+@admin.register(FirstStrategy)
+class FirstStrategyAdmin(admin.ModelAdmin):
     pass
 

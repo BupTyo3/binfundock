@@ -1,8 +1,7 @@
-from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Dict
-
-from utils.framework.models import SystemBaseModel
+from utils.framework.models import SystemBaseModel, SingletonModel
 
 
-class Strategy(SystemBaseModel):
-    pass
+class Strategy(SingletonModel):
+
+    class Meta:
+        abstract = True

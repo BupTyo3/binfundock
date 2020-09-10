@@ -1,34 +1,29 @@
 import logging
 
-from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Dict
+from abc import abstractmethod
+from typing import Optional
+
+from django.db import models
 
 from utils.framework.models import SystemBaseModel
 from apps.order.utils import OrderStatus
-from apps.market.base_model import Market
 from tools.tools import gen_short_uuid
 
 logger = logging.getLogger(__name__)
 
 
 class Order(SystemBaseModel):
-    order_id: Optional[str]
-    market: Market
+    custom_order_id: Optional[str]
     symbol: str
     quantity: float
     price: float
-    signal_id: Optional[int]
-    index: Optional[int]
+    signal_id: Optional[models.PositiveIntegerField]
+    index: Optional[models.PositiveIntegerField]
     stop_loss: Optional[float]
     status: OrderStatus
 
     class Meta:
         abstract = True
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._status = OrderStatus.NOT_SENT
-        self.stop_loss = None
 
     @property
     def status(self):
@@ -48,7 +43,7 @@ class Order(SystemBaseModel):
     def form_order_id(self,
                       market_separator: str,
                       message_id: Optional[int],
-                      index: Optional[int]) -> str:
+                      index: Optional[models.PositiveIntegerField]) -> str:
         if not (message_id or index):
             return f'{market_separator}_{self.order_type_separator}_{gen_short_uuid()}'
         return f'{market_separator}_{str(message_id)}_{self.order_type_separator}_{index}'

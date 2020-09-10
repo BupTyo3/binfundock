@@ -1,38 +1,34 @@
 import logging
 
 from django.db import models
-from django.contrib.auth import get_user_model
-from django.utils.translation import ugettext_lazy as _
 from typing import List
 
 from utils.framework.models import SystemBaseModel
-from apps.order.models import SellOrder, BuyOrder, BuyData, SellData
-from apps.market.base_model import Market
+from apps.market.base_model import BaseMarket
 from binfun.settings import conf_obj
 from tools.tools import rounded_result, debug_input_and_returned
 
 logger = logging.getLogger(__name__)
 
 
-class SignalModel(SystemBaseModel):
+class Signal(SystemBaseModel):
     conf = conf_obj
-
-    def __init__(self, pair: str, entry_points: List[float], take_profits: List[float], stop_loss: float,
-                 signal_id: int, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.pair = pair
-        self.entry_points = entry_points
-        self.take_profits = take_profits
-        self.stop_loss = stop_loss
-        self.signal_id = signal_id
-        self.buy_orders: BuyData = []
-        self.sell_orders: SellData = []
-        self._bought_quantity: float = 0
-        self.main_coin = self._get_first_coin(pair)
-        logger.debug(self)
+    symbol = models.CharField(max_length=16)
+    signal_id = models.PositiveIntegerField(unique=True)
+    main_coin = models.CharField(max_length=16)
+    stop_loss = models.FloatField()
+    _bought_quantity = models.FloatField(db_column='bought_quantity',
+                                         help_text='Fullness of buy_orders',
+                                         default=0)
+    income = models.FloatField(help_text='Profit or Loss', default=0)
 
     def __str__(self):
-        return f"Signal:{self.pair}:{self.entry_points}:{self.take_profits}:{self.stop_loss}:{self.signal_id}"
+        return f"Signal:{self.symbol}:{self.signal_id}"
+
+    def save(self, *args, **kwargs):
+        self.main_coin = self._get_first_coin(self.symbol)
+        super().save(*args, **kwargs)
+        logger.debug(self)
 
     def _get_first_coin(self, symbol) -> str:
         for main_coin in self.conf.accessible_main_coins:
@@ -50,13 +46,13 @@ class SignalModel(SystemBaseModel):
         self._bought_quantity = value
 
     def __get_buy_distribution(self):
-        return len(self.entry_points)
+        return self.entry_points.count()
 
     def __get_sell_distribution(self):
-        return len(self.take_profits)
+        return self.take_profits.count()
 
     @rounded_result
-    def __get_turnover_by_coin_pair(self, market: Market) -> float:
+    def __get_turnover_by_coin_pair(self, market: BaseMarket) -> float:
         """Оборот на одну пару.
         Сколько выделяем денег на ставку на пару
         Если баланс 1000 долларов, 10% - конфигурационный параметр на одну пару, то будет
@@ -72,71 +68,103 @@ class SignalModel(SystemBaseModel):
         return (quantity // step_quantity) * step_quantity
 
     @rounded_result
-    def _get_distributed_toc_quantity(self, market: Market):
-        step_quantity = market.pairs[self.pair].step_quantity
+    def _get_distributed_toc_quantity(self, market: BaseMarket):
+        from apps.pair.models import Pair
+        pair = Pair.objects.filter(symbol=self.symbol, market=market.id).first()
+        step_quantity = pair.step_quantity
         quantity = self.__get_turnover_by_coin_pair(market) / self.__get_buy_distribution()
         return self.__find_not_fractional_by_step_quantity(quantity, step_quantity)
 
     @debug_input_and_returned
-    def __form_buy_order(self, market, distributed_toc, entry_point, index):
-        return BuyOrder(market=market,
-                        symbol=self.pair,
-                        quantity=distributed_toc,
-                        price=entry_point,
-                        signal_id=self.signal_id,
-                        index=index)
+    def __form_buy_order(self, market: BaseMarket, distributed_toc: float,
+                         entry_point: 'EntryPoint', index: int):
+        from apps.order.models import BuyOrder
+        order, created = BuyOrder.objects.get_or_create(
+            market=market,
+            symbol=self.symbol,
+            quantity=distributed_toc,
+            price=entry_point.value,
+            signal=self,
+            index=index)
+        return order
 
     @debug_input_and_returned
-    def __form_sell_order(self, market, distributed_quantity, take_profit, index):
-        return SellOrder(market=market,
-                         symbol=self.pair,
-                         quantity=distributed_quantity,
-                         price=take_profit,
-                         stop_loss=self.stop_loss,
-                         signal_id=self.signal_id,
-                         index=index)
+    def __form_sell_order(self, market: BaseMarket, distributed_quantity: float,
+                          take_profit: 'TakeProfit', index: int):
+        from apps.order.models import SellOrder
+        order, created = SellOrder.objects.get_or_create(
+            market=market,
+            symbol=self.symbol,
+            quantity=distributed_quantity,
+            price=take_profit.value,
+            stop_loss=self.stop_loss,
+            signal=self,
+            index=index)
+        return order
 
-    def _formation_buy_orders(self, market: Market) -> None:
+    def _formation_buy_orders(self, market: BaseMarket) -> None:
         """Функция расчёта данных для создания ордеров на покупку"""
         quantity = self._get_distributed_toc_quantity(market)
-        for index, entry_point in enumerate(self.entry_points):
-            # todo добавить проверку нет ли такого ордера в self.buy_orders -> continue
-            self.buy_orders.append(self.__form_buy_order(market, quantity, entry_point, index))
+        for index, entry_point in enumerate(self.entry_points.all()):
+            self.__form_buy_order(market, quantity, entry_point, index)
 
-    def _formation_sell_orders(self, market: Market) -> None:
+    def _formation_sell_orders(self, market: BaseMarket) -> None:
         """Функция расчёта данных для создания ордеров на продажу"""
         sell_quantity = self.bought_quantity
         distributed_quantity = sell_quantity / self.__get_sell_distribution()
-        for index, take_profit in enumerate(self.take_profits):
-            # todo добавить проверку нет ли такого ордера в self.sell_orders -> continue
-            self.sell_orders.append(self.__form_sell_order(market, distributed_quantity, take_profit, index))
+        for index, take_profit in enumerate(self.take_profits.all()):
+            self.__form_sell_order(market, distributed_quantity, take_profit, index)
 
     @debug_input_and_returned
     def _update_bought_quantity(self):
         bought_quantity: float = 0
-        for buy_order in self.buy_orders:
+        for buy_order in self.buy_orders.all():
             buy_order.update_info_by_api()
             bought_quantity += buy_order.bought_quantity
         self._bought_quantity = bought_quantity
 
     def _create_buy_orders(self):
-        for buy_order in self.buy_orders:
+        for buy_order in self.buy_orders.all():
             buy_order.create_real()
 
     def _create_sell_orders(self):
-        for sell_order in self.sell_orders:
+        for sell_order in self.sell_orders.all():
             sell_order.create_real()
 
-    def create_buy_orders(self, market: Market):
+    def create_buy_orders(self, market: BaseMarket):
         # TODO добавить проверок
         # не были ли ещё созданы ордера
         self._formation_buy_orders(market)
         self._create_buy_orders()
 
-    def create_sell_orders(self, market: Market):
+    def create_sell_orders(self, market: BaseMarket):
         # TODO добавить проверок
         # не были ли ещё созданы ордера
         self._formation_sell_orders(market)
         self._create_sell_orders()
 
 
+class EntryPoint(SystemBaseModel):
+    signal = models.ForeignKey(to=Signal,
+                               related_name='entry_points',
+                               on_delete=models.CASCADE)
+    value = models.FloatField()
+
+    class Meta:
+        unique_together = ['signal', 'value']
+
+    def __str__(self):
+        return f"{self.signal.symbol}:{self.value}"
+
+
+class TakeProfit(SystemBaseModel):
+    signal = models.ForeignKey(to=Signal,
+                               related_name='take_profits',
+                               on_delete=models.CASCADE)
+    value = models.FloatField()
+
+    class Meta:
+        unique_together = ['signal', 'value']
+
+    def __str__(self):
+        return f"{self.signal.symbol}:{self.value}"

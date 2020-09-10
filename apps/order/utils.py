@@ -9,4 +9,7 @@ class OrderStatus(Enum):
     SENT = 'sent'
     UNKNOWN = 'unknown'
 
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
 
