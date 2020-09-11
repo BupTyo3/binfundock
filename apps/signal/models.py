@@ -68,12 +68,14 @@ class Signal(SystemBaseModel):
         return (quantity // step_quantity) * step_quantity
 
     @rounded_result
-    def _get_distributed_toc_quantity(self, market: BaseMarket):
+    def _get_distributed_toc_quantity(self, market: BaseMarket, entry_point_price):
+        from tools.tools import calculate_coin_quantity
         from apps.pair.models import Pair
         pair = Pair.objects.filter(symbol=self.symbol, market=market.id).first()
         step_quantity = pair.step_quantity
         quantity = self.__get_turnover_by_coin_pair(market) / self.__get_buy_distribution()
-        return self.__find_not_fractional_by_step_quantity(quantity, step_quantity)
+        coin_quantity = calculate_coin_quantity(quantity, entry_point_price)
+        return self.__find_not_fractional_by_step_quantity(coin_quantity, step_quantity)
 
     @debug_input_and_returned
     def __form_buy_order(self, market: BaseMarket, distributed_toc: float,
@@ -104,9 +106,9 @@ class Signal(SystemBaseModel):
 
     def _formation_buy_orders(self, market: BaseMarket) -> None:
         """Функция расчёта данных для создания ордеров на покупку"""
-        quantity = self._get_distributed_toc_quantity(market)
         for index, entry_point in enumerate(self.entry_points.all()):
-            self.__form_buy_order(market, quantity, entry_point, index)
+            coin_quantity = self._get_distributed_toc_quantity(market, entry_point.value)
+            self.__form_buy_order(market, coin_quantity, entry_point, index)
 
     def _formation_sell_orders(self, market: BaseMarket) -> None:
         """Функция расчёта данных для создания ордеров на продажу"""

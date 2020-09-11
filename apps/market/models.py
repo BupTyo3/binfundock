@@ -124,9 +124,9 @@ class Market(BaseMarket):
     def create_buy_limit_order(self, order):
         from apps.pair.models import Pair
 
-        # logger.debug(f"ОГРАНИЧЕНИЯ по {order.symbol}: {self.pairs[order.symbol].__dict__}")
+        # logger.debug(f"LIMITATION BY COIN по {order.symbol}: {self.pairs[order.symbol].__dict__}")
         pair = Pair.objects.filter(symbol=order.symbol, market=self).first()
-        logger.debug(f"ОГРАНИЧЕНИЯ по {order.symbol}: {pair.__dict__}")
+        logger.debug(f"LIMITATION BY COIN {order.symbol}: {pair.__dict__}")
         res = self._create_buy_limit_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
         return res
