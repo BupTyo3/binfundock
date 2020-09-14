@@ -13,6 +13,14 @@ class SystemBaseModel(TimeStampedModel):
         abstract = True
 
 
+class SystemBaseModelWithoutModified(TimeStampedModel):
+    """Base model for models"""
+    modified = None
+
+    class Meta:
+        abstract = True
+
+
 class SystemCommand(BaseCommand, ABC):
     def log_success(self, message):
         self.stdout.write(self.style.SUCCESS(message))

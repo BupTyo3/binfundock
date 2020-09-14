@@ -116,3 +116,7 @@ def catch_exception(f=None, *, code: int, alternative: dict):
                 return alternative
     return func
 
+
+@rounded_result
+def convert_to_coin_quantity(quantity, value):
+    return quantity / value
