@@ -20,6 +20,8 @@ class Pair(BasePair):
     min_quantity = models.FloatField()
     min_amount = models.FloatField()
 
+    objects = models.Manager()
+
     def __str__(self):
         return f"{self.symbol}"
 

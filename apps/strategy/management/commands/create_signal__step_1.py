@@ -17,12 +17,12 @@ class Command(SystemCommand):
         parser.add_argument('--entry_points', nargs='+', type=float, required=True, help='Entry points values')
         parser.add_argument('--take_profits', nargs='+', type=float, required=True, help='Take profits values')
         parser.add_argument('--stop_loss', type=float, required=True, help='Stop loss value')
-        parser.add_argument('--signal_id', type=int, required=True)
+        parser.add_argument('--outer_signal_id', type=int, required=True)
         parser.add_argument('--market_name', type=str, help='Market name')
         parser.add_argument('--without_checking', action='store_true')
 
     def check_signal_input(self, symbol: str, entry_points: List[float],
-                           take_profits: List[float], stop_loss: float, signal_id: int):
+                           take_profits: List[float], stop_loss: float, outer_signal_id: int):
         error_flag = False
         if sorted(entry_points) != entry_points:
             self.log_error('Wrong order of entry_points')
@@ -48,12 +48,12 @@ class Command(SystemCommand):
         entry_points = options['entry_points']
         take_profits = options['take_profits']
         stop_loss = options['stop_loss']
-        signal_id = options['signal_id']
+        outer_signal_id = options['outer_signal_id']
 
-        self.check_signal_input(symbol, entry_points, take_profits, stop_loss, signal_id)
+        self.check_signal_input(symbol, entry_points, take_profits, stop_loss, outer_signal_id)
         logger.debug(f"Market:{market_name}:Signal:{symbol}:EntryPoints:{entry_points}:"
                      f"TakeProfits:{take_profits}:StopLoss:{stop_loss}"
-                     f":SignalId:{signal_id}")
+                     f":SignalId:{outer_signal_id}")
         if not options['without_checking']:
             key = input('y/n: ')
             if key.lower() in ['y', 'yes']:
@@ -61,20 +61,15 @@ class Command(SystemCommand):
             else:
                 logger.debug("You typed No - The End")
                 quit()
+        sm_obj = Signal.objects.filter(outer_signal_id=outer_signal_id).first()
+        if sm_obj:
+            self.log_error(f"Signal {outer_signal_id} already exists")
+            quit()
         sm_obj = Signal.objects.create(
-            symbol=symbol, stop_loss=stop_loss, signal_id=signal_id)
+            symbol=symbol, stop_loss=stop_loss, outer_signal_id=outer_signal_id)
         for entry_point in entry_points:
             ep = EntryPoint.objects.create(signal=sm_obj, value=entry_point)
         for take_profit in take_profits:
             tp = TakeProfit.objects.create(signal=sm_obj, value=take_profit)
 
-        if market_name == Market.default_name:
-            # market_obj = BiMarket(conf_obj.market_api_key, conf_obj.market_api_secret)
-            market_obj, created = Market.objects.get_or_create()
-        else:
-            quit()
-
-        sm_obj.create_buy_orders(market_obj)
-        sm_obj.create_sell_orders(market_obj)
-
-        self.log_success('The command is done')
+        self.log_success(f"Signal {outer_signal_id} created successfully")
