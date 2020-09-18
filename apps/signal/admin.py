@@ -32,9 +32,14 @@ class SignalAdmin(admin.ModelAdmin):
         '_status',
         OuterIDFilter,
     ]
-    actions = ['form_buy_orders', 'push_buy_orders',
-               'update_info_by_api', 'run_bought_worker',
-               'run_sold_worker', ]
+    actions = [
+        'form_buy_orders',
+        'push_buy_orders',
+        'push_sell_orders',
+        'run_bought_worker',
+        'run_sold_worker',
+        'update_info_by_api',
+    ]
 
     def notifications_handling(value):
         def decorate(f):
@@ -57,6 +62,10 @@ class SignalAdmin(admin.ModelAdmin):
         for signal in queryset:
             self._push_buy_one(request, signal)
 
+    def push_sell_orders(self, request, queryset):
+        for signal in queryset:
+            self._push_sell_one(request, signal)
+
     def update_info_by_api(self, request, queryset):
         for signal in queryset:
             self._update_by_api_one(request, signal)
@@ -67,6 +76,7 @@ class SignalAdmin(admin.ModelAdmin):
 
     def run_sold_worker(self, request, queryset):
         for signal in queryset:
+            self._run_sold_worker_one(request, signal)
             pass
 
     @notifications_handling('')
@@ -78,12 +88,20 @@ class SignalAdmin(admin.ModelAdmin):
         signal.push_buy_orders()
 
     @notifications_handling('')
+    def _push_sell_one(self, request, signal):
+        signal.push_sell_orders()
+
+    @notifications_handling('')
     def _update_by_api_one(self, request, signal):
         signal.update_info_by_api()
 
     @notifications_handling('')
     def _run_bought_worker_one(self, request, signal):
         signal.worker_for_bought_orders()
+
+    @notifications_handling('')
+    def _run_sold_worker_one(self, request, signal):
+        signal.worker_for_sold_orders()
 
 
 @admin.register(EntryPoint)

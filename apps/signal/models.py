@@ -1,16 +1,23 @@
 import logging
 
-from typing import Optional
+from typing import Optional, List, TYPE_CHECKING
 
 from django.db import models, transaction
 from django.db.models import QuerySet, Sum
+from django.utils import timezone
 
-from utils.framework.models import SystemBaseModel
+from utils.framework.models import (
+    SystemBaseModel,
+    generate_increment_name_after_suffix,
+)
 from .base_model import BaseSignal
 from .utils import SignalStatus
 from apps.market.base_model import BaseMarket
 from binfun.settings import conf_obj
 from tools.tools import rounded_result, debug_input_and_returned
+
+if TYPE_CHECKING:
+    from apps.order.models import SellOrder, BuyOrder
 
 logger = logging.getLogger(__name__)
 
@@ -115,15 +122,23 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     def __form_sell_order(self, market: BaseMarket, distributed_quantity: float,
-                          take_profit: 'TakeProfit', index: int):
+                          take_profit: float, index: int, stop_loss: Optional[float] = None,
+                          custom_order_id: Optional[str] = None) -> 'SellOrder':
         from apps.order.models import SellOrder
+        msg = f"Form SELL ORDER for signal {self}"
+        if stop_loss is not None:
+            msg += f" with UPDATED STOP_LOSS: '{stop_loss}'"
+        logger.debug(msg)
+        if stop_loss is not None:
+            logger.debug(f"Form SELL ORDER for signal {self}")
         order = SellOrder.objects.create(
             market=market,
             symbol=self.symbol,
             quantity=distributed_quantity,
-            price=take_profit.value,
-            stop_loss=self.stop_loss,
+            price=take_profit,
+            stop_loss=stop_loss if stop_loss is not None else self.stop_loss,
             signal=self,
+            custom_order_id=None if not custom_order_id else custom_order_id,
             index=index)
         return order
 
@@ -138,11 +153,69 @@ class Signal(BaseSignal):
             coin_quantity = self._get_distributed_toc_quantity(market, entry_point.value)
             self.__form_buy_order(market, coin_quantity, entry_point, index)
 
-    def _formation_sell_orders(self, market: BaseMarket, sell_quantity: Optional[float] = None) -> None:
+    def _formation_sell_orders(self, market: BaseMarket, sell_quantity: float) -> None:
         """Функция расчёта данных для создания ордеров на продажу"""
         distributed_quantity = self._get_distributed_sell_quantity(market, sell_quantity)
         for index, take_profit in enumerate(self.take_profits.all()):
-            self.__form_sell_order(market, distributed_quantity, take_profit, index)
+            self.__form_sell_order(
+                market=market, distributed_quantity=distributed_quantity,
+                take_profit=take_profit.value, index=index)
+
+    def _get_new_stop_loss(self, worked_sell_orders: QuerySet) -> float:
+        last_worked_sell_order = worked_sell_orders.order_by('price').last()
+        if last_worked_sell_order.index == 0:
+            # if the first sell order has worked, new stop_loss is a max of entry_points
+            return self.entry_points.order_by('value').last().value
+        else:
+            # get price of previous order as a new stop_loss
+            previous_order = self.sell_orders.filter(index=(last_worked_sell_order.index - 1)).last()
+            return previous_order.price
+
+    @debug_input_and_returned
+    def _formation_copied_sell_order(self,
+                                     original_order_id: int,
+                                     sell_quantity: Optional[float] = None,
+                                     new_stop_loss: Optional[float] = None):
+        max_number_of_copies = 300  # Max number of copies of Sell orders
+        copy_delimiter = '_copy_'
+        max_length_of_signal_id = 30
+        from apps.order.models import SellOrder
+
+        def check_if_that_name_already_exists_function(custom_order_id):
+            if SellOrder.objects.filter(custom_order_id=custom_order_id).exists():
+                return True
+        order = SellOrder.objects.filter(id=original_order_id).first()
+        new_custom_order_id = generate_increment_name_after_suffix(
+            order.custom_order_id,
+            check_if_that_name_already_exists_function,
+            copy_delimiter,
+            max_number_of_copies,
+            max_length_of_signal_id
+        )
+        logger.debug(f"New copied SELL order custom_order_id = '{new_custom_order_id}'")
+        new_sell_order = self.__form_sell_order(
+            market=order.market,
+            distributed_quantity=sell_quantity if sell_quantity is not None else order.quantity,
+            custom_order_id=new_custom_order_id,
+            take_profit=order.price,
+            index=order.index,
+            stop_loss=order.stop_loss if new_stop_loss is None else new_stop_loss)
+        return new_sell_order
+
+    @debug_input_and_returned
+    def _formation_copied_sell_orders(self,
+                                      original_orders_ids: List[int],
+                                      worked_sell_orders: QuerySet,
+                                      sell_quantity: Optional[float] = None,
+                                      new_stop_loss: Optional[float] = None) -> List['SellOrder']:
+        """Функция расчёта данных для создания ордеров на продажу"""
+        if new_stop_loss is None:
+            new_stop_loss = self._get_new_stop_loss(worked_sell_orders)
+        res = list()
+        for order_id in original_orders_ids:
+            res.append(self._formation_copied_sell_order(
+                original_order_id=order_id, new_stop_loss=new_stop_loss, sell_quantity=sell_quantity))
+        return res
 
     @debug_input_and_returned
     def _update_bought_quantity(self):
@@ -181,6 +254,7 @@ class Signal(BaseSignal):
         params = {
             'signal': self,
             'handled_worked': False,
+            'local_canceled': False,
             '_status': OrderStatus.COMPLETED.value
         }
         return BuyOrder.objects.filter(**params)
@@ -192,7 +266,34 @@ class Signal(BaseSignal):
         params = {
             'signal': self,
             'handled_worked': False,
+            'local_canceled': False,
             '_status': OrderStatus.COMPLETED.value
+        }
+        return SellOrder.objects.filter(**params)
+
+    @debug_input_and_returned
+    def __get_sent_buy_orders(self) -> QuerySet:
+        # TODO: maybe move to orders
+        # TODO: maybe _status__in: [SENT, NOT_SENT]
+        from apps.order.utils import OrderStatus
+        from apps.order.models import BuyOrder
+        params = {
+            'signal': self,
+            'local_canceled': False,
+            '_status__in': [OrderStatus.SENT.value, ]
+        }
+        return BuyOrder.objects.filter(**params)
+
+    @debug_input_and_returned
+    def __get_sent_sell_orders(self) -> QuerySet:
+        # TODO: maybe move to orders
+        # TODO: maybe _status__in: [SENT, NOT_SENT]
+        from apps.order.utils import OrderStatus
+        from apps.order.models import SellOrder
+        params = {
+            'signal': self,
+            'local_canceled': False,
+            '_status__in': [OrderStatus.SENT.value, ]
         }
         return SellOrder.objects.filter(**params)
 
@@ -203,11 +304,22 @@ class Signal(BaseSignal):
         worked_orders.update(handled_worked=True)
 
     @staticmethod
+    @debug_input_and_returned
+    def __cancel_sent_orders(sent_orders: QuerySet):
+        # TODO: move it
+        logger.debug(f"Updating Sent orders by local_canceled flag")
+        logger.debug(f"LOCAL CANCEL ORDERS: '{sent_orders.all()}'")
+        now_ = timezone.now()
+        sent_orders.update(local_canceled=True, local_canceled_time=now_)
+
+    @staticmethod
     def __get_bought_quantity(worked_orders: QuerySet):
         # TODO: move it
         res = worked_orders.aggregate(Sum('bought_quantity'))
         return res['bought_quantity__sum']
 
+    @transaction.atomic
+    @debug_input_and_returned
     def worker_for_bought_orders(self):
         """Worker для одного сигнала. Запускать когда сработал BUY order"""
         # TODO: Maybe add select_for_update - чтоб другой процесс не установил флаги
@@ -216,21 +328,46 @@ class Signal(BaseSignal):
         # TODO: Maybe add BOUGHT status
         _statuses = [SignalStatus.PUSHED.value, ]
         if self._status not in _statuses:
-            raise Exception(f'Not valid status: {self._status} : {_statuses}')
+            return
         worked_orders = self.__get_not_handled_worked_buy_orders()
+        if not worked_orders:
+            return
         if worked_orders:
             bought_quantity = self.__get_bought_quantity(worked_orders)
             logger.debug(f"Calculate quantity for Sell order: Bought_quantity = {bought_quantity}")
             self._formation_sell_orders(worked_orders.last().market, bought_quantity)
             self.__update_flag_handled_worked_orders(worked_orders)
 
+    @transaction.atomic
+    @debug_input_and_returned
     def worker_for_sold_orders(self):
-        """Worker для одного сигнала. Запускать когда сработал SELL order"""
+        """Worker для одного сигнала. Запускать когда сработал SELL order
+        1)Отмена всех BUY orders
+        2)Пересоздание оставшихся SELL orders с обновлённым stop_loss
+        3)Добавить прибыль или убыток в зависимости от срабатывания (stop_loss или в профит)"""
         # TODO: Maybe add select_for_update - чтоб другой процесс не установил флаги
         #  или ещё флаг добавить, что в обработке ордера или ничего, если один процесс
         # TODO: Check
+        _statuses = [SignalStatus.BOUGHT.value, ]
+        if self._status not in _statuses:
+            return
         worked_orders = self.__get_not_handled_worked_sell_orders()
-        # TODO: Add logic
+        if not worked_orders:
+            return
+        opened_buy_orders = self.__get_sent_buy_orders()
+        # Cancel all buy_orders
+        if opened_buy_orders:
+            self.__cancel_sent_orders(opened_buy_orders)
+        # TODO: Add logic of recreating sell orders with updated stop_loss
+        sent_sell_orders = self.__get_sent_sell_orders()
+        if sent_sell_orders:
+            copied_sent_sell_orders_ids = list(sent_sell_orders.all().values_list('id', flat=True))
+            self.__cancel_sent_orders(sent_sell_orders)
+            # TODO: change logic into getting stop loss into this method
+            self._formation_copied_sell_orders(original_orders_ids=copied_sent_sell_orders_ids,
+                                               worked_sell_orders=worked_orders)
+        self.__update_flag_handled_worked_orders(worked_orders)
+        # TODO: Add logic of calculate profit or loss
         pass
 
     @classmethod
@@ -274,6 +411,8 @@ class Signal(BaseSignal):
         for buy_order in self.buy_orders.all():
             buy_order.update_buy_order_info_by_api()
         # TODO Maybe Add the same for sell_orders?
+        for sell_order in self.sell_orders.all():
+            sell_order.update_sell_order_info_by_api()
 
     @classmethod
     def handle_pushed_signals(cls, outer_signal_id=None):

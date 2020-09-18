@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class BiClient(client.Client, BaseClient):
-    client = client.Client
+    api_client_class = client.Client
     api_key = conf_obj.market_api_key
     api_secret = conf_obj.market_api_secret
 

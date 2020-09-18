@@ -25,6 +25,9 @@ class BaseOrder(SystemBaseModel):
     handled_worked = models.BooleanField(
         help_text="Did something if the order has worked",
         default=False)
+    local_canceled = models.BooleanField(default=False)
+    local_canceled_time = models.DateTimeField(blank=True,
+                                               null=True)
 
     class Meta:
         abstract = True

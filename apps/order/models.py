@@ -22,6 +22,7 @@ class BuyOrder(BaseOrder):
     symbol = models.CharField(max_length=16)
     quantity = models.FloatField()
     price = models.FloatField()
+    # TODO: remove this field and _bought_quantity and setters, getters and others using
     bought_quantity = models.FloatField(default=0)
     custom_order_id = models.CharField(max_length=30)
     _status = models.CharField(max_length=32,
@@ -47,8 +48,9 @@ class BuyOrder(BaseOrder):
         return f"{self.pk}:{self.symbol}:{self.custom_order_id}"
 
     def save(self, *args, **kwargs):
-        self.custom_order_id = self.form_order_id(
-            self.market.order_id_separator, self.signal.outer_signal_id, self.index)
+        if not self.pk and not self.custom_order_id:
+            self.custom_order_id = self.form_order_id(
+                self.market.order_id_separator, self.signal.outer_signal_id, self.index)
         super().save(*args, **kwargs)
 
     def push_to_market(self):
@@ -109,8 +111,9 @@ class SellOrder(BaseOrder):
         return f"{self.pk}:{self.symbol}:{self.custom_order_id}"
 
     def save(self, *args, **kwargs):
-        self.custom_order_id = self.form_order_id(
-            self.market.order_id_separator, self.signal.outer_signal_id, self.index)
+        if not self.pk and not self.custom_order_id:
+            self.custom_order_id = self.form_order_id(
+                self.market.order_id_separator, self.signal.outer_signal_id, self.index)
         super().save(*args, **kwargs)
 
     def push_to_market(self):

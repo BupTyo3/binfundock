@@ -38,11 +38,19 @@ class CustomOrderIDFilter(InputFilter):
 
 @admin.register(BuyOrder)
 class BuyOrderAdmin(admin.ModelAdmin):
-    list_display = ['id', 'symbol', 'market', 'price',
-                    'status', 'quantity',
+    list_display = ['id',
+                    'symbol',
+                    'signal_status',
+                    'price',
+                    'quantity',
                     'bought_quantity',
-                    'custom_order_id', 'index', 'signal_status',
+                    # 'stop_loss',
+                    'custom_order_id',
+                    'index',
+                    'status',
                     'handled_worked',
+                    'local_canceled',
+                    'local_canceled_time',
                     'last_updated_by_api',
                     ]
     select_related_fields = ['signal', ]
@@ -59,11 +67,19 @@ class BuyOrderAdmin(admin.ModelAdmin):
 
 @admin.register(SellOrder)
 class SellOrderAdmin(admin.ModelAdmin):
-    list_display = ['id', 'symbol', 'market', 'price',
-                    'status', 'quantity',
+    list_display = ['id',
+                    'symbol',
+                    'signal_status',
+                    'price',
+                    'quantity',
                     'sold_quantity',
-                    'custom_order_id', 'index', 'signal_status',
+                    'stop_loss',
+                    'custom_order_id',
+                    'index',
+                    'status',
                     'handled_worked',
+                    'local_canceled',
+                    'local_canceled_time',
                     'last_updated_by_api',
                     ]
     select_related_fields = ['signal', ]
