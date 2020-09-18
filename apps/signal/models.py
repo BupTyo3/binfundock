@@ -226,25 +226,17 @@ class Signal(BaseSignal):
             bought_quantity += buy_order.bought_quantity
         self._bought_quantity = bought_quantity
 
-    def push_buy_orders(self):
+    def push_orders(self):
         from apps.order.utils import OrderStatus
-        _statuses = [SignalStatus.FORMED.value, ]
-        if self._status not in _statuses:
-            raise Exception(f'Not valid status: {self._status} : {SignalStatus.FORMED.value}')
+        # push not_sent SELL orders
+        for sell_order in self.sell_orders.filter(_status=OrderStatus.NOT_SENT.value):
+            sell_order.push_to_market()
+        # push not_sent BUY orders
         for buy_order in self.buy_orders.filter(_status=OrderStatus.NOT_SENT.value):
             buy_order.push_to_market()
             # set status if at least one order has created
-            if self.status != SignalStatus.PUSHED.value:
+            if self.status not in [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]:
                 self.status = SignalStatus.PUSHED.value
-                self.save()
-
-    def push_sell_orders(self):
-        from apps.order.utils import OrderStatus
-        for sell_order in self.sell_orders.filter(_status=OrderStatus.NOT_SENT.value):
-            sell_order.push_to_market()
-            # set status if at least one order has created
-            if self.status != SignalStatus.BOUGHT.value:
-                self.status = SignalStatus.BOUGHT.value
                 self.save()
 
     def __get_not_handled_worked_buy_orders(self) -> QuerySet:
@@ -326,17 +318,21 @@ class Signal(BaseSignal):
         #  или ещё флаг добавить, что в обработке ордера или ничего, если один процесс
         # TODO: Check
         # TODO: Maybe add BOUGHT status
-        _statuses = [SignalStatus.PUSHED.value, ]
+        _statuses = [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]
         if self._status not in _statuses:
             return
         worked_orders = self.__get_not_handled_worked_buy_orders()
         if not worked_orders:
             return
-        if worked_orders:
-            bought_quantity = self.__get_bought_quantity(worked_orders)
-            logger.debug(f"Calculate quantity for Sell order: Bought_quantity = {bought_quantity}")
-            self._formation_sell_orders(worked_orders.last().market, bought_quantity)
-            self.__update_flag_handled_worked_orders(worked_orders)
+        bought_quantity = self.__get_bought_quantity(worked_orders)
+        logger.debug(f"Calculate quantity for Sell order: Bought_quantity = {bought_quantity}")
+        # TODO: Add logic recreating existing sell orders with updated quantity
+        self._formation_sell_orders(worked_orders.last().market, bought_quantity)
+        self.__update_flag_handled_worked_orders(worked_orders)
+        # Change status
+        if self.status not in [SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]:
+            self.status = SignalStatus.BOUGHT.value
+            self.save()
 
     @transaction.atomic
     @debug_input_and_returned
@@ -348,7 +344,7 @@ class Signal(BaseSignal):
         # TODO: Maybe add select_for_update - чтоб другой процесс не установил флаги
         #  или ещё флаг добавить, что в обработке ордера или ничего, если один процесс
         # TODO: Check
-        _statuses = [SignalStatus.BOUGHT.value, ]
+        _statuses = [SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]
         if self._status not in _statuses:
             return
         worked_orders = self.__get_not_handled_worked_sell_orders()
@@ -358,14 +354,17 @@ class Signal(BaseSignal):
         # Cancel all buy_orders
         if opened_buy_orders:
             self.__cancel_sent_orders(opened_buy_orders)
-        # TODO: Add logic of recreating sell orders with updated stop_loss
+        # Recreating opened sent sell orders with new stop_loss
         sent_sell_orders = self.__get_sent_sell_orders()
         if sent_sell_orders:
             copied_sent_sell_orders_ids = list(sent_sell_orders.all().values_list('id', flat=True))
             self.__cancel_sent_orders(sent_sell_orders)
-            # TODO: change logic into getting stop loss into this method
             self._formation_copied_sell_orders(original_orders_ids=copied_sent_sell_orders_ids,
                                                worked_sell_orders=worked_orders)
+        # Change status
+        if self.status not in [SignalStatus.SOLD.value, ]:
+            self.status = SignalStatus.SOLD.value
+            self.save()
         self.__update_flag_handled_worked_orders(worked_orders)
         # TODO: Add logic of calculate profit or loss
         pass
@@ -389,7 +388,7 @@ class Signal(BaseSignal):
             params.update({'outer_signal_id': outer_signal_id})
         formed_signals = Signal.objects.filter(**params)
         for signal in formed_signals:
-            signal.push_buy_orders()
+            signal.push_orders()
         # TODO: Maybe add the same for sell orders?
 
     @classmethod

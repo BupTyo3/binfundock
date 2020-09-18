@@ -34,8 +34,7 @@ class SignalAdmin(admin.ModelAdmin):
     ]
     actions = [
         'form_buy_orders',
-        'push_buy_orders',
-        'push_sell_orders',
+        'push_orders',
         'run_bought_worker',
         'run_sold_worker',
         'update_info_by_api',
@@ -58,13 +57,9 @@ class SignalAdmin(admin.ModelAdmin):
         for signal in queryset:
             self._form_one(request, signal)
 
-    def push_buy_orders(self, request, queryset):
+    def push_orders(self, request, queryset):
         for signal in queryset:
-            self._push_buy_one(request, signal)
-
-    def push_sell_orders(self, request, queryset):
-        for signal in queryset:
-            self._push_sell_one(request, signal)
+            self._push_order_one(request, signal)
 
     def update_info_by_api(self, request, queryset):
         for signal in queryset:
@@ -84,12 +79,8 @@ class SignalAdmin(admin.ModelAdmin):
         signal.formation_buy_orders(get_or_create_market())
 
     @notifications_handling('')
-    def _push_buy_one(self, request, signal):
-        signal.push_buy_orders()
-
-    @notifications_handling('')
-    def _push_sell_one(self, request, signal):
-        signal.push_sell_orders()
+    def _push_order_one(self, request, signal):
+        signal.push_orders()
 
     @notifications_handling('')
     def _update_by_api_one(self, request, signal):

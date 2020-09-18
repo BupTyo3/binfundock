@@ -6,6 +6,7 @@ class SignalStatus(Enum):
     FORMED = 'formed'  # form_buy_orders
     PUSHED = 'pushed'
     BOUGHT = 'bought'
+    SOLD = 'sold'
     CLOSED = 'closed'
 
     @classmethod
