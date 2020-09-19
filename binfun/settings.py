@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'apps.pair',
     'apps.market',
     'apps.strategy',
+    'apps.telegram',
 ]
 
 MIDDLEWARE = [
@@ -259,6 +260,8 @@ class Config:
         self.api_id = telegram.get('api_id', None)
         self.api_hash = telegram.get('api_hash', None)
         self.chat_china_id = telegram.get('chat_china_id', None)
+        self.crypto_angel_id = telegram.get('crypto_angel_id', None)
+        self.x_y = telegram.get('x_y', None)
 
 
 conf_obj = Config()

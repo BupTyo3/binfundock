@@ -2,34 +2,25 @@ import regex
 import os
 import time
 import shutil
-import datetime
+from datetime import datetime, timedelta
 import pytesseract
+import json
+import urllib.request
+import pytz
 
+
+from .base_model import BaseTelegram
 from .init_client import ShtClient
 from pytesseract import image_to_string
 from PIL import Image
-from telethon import TelegramClient, events
 from binfun.settings import conf_obj
-import json
-import urllib.request
+
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-directory = 'D:/Frameworks/LucrativeTrend'
+directory = 'D:/Frameworks/binfundock/'
 regexp_numbers = '\d+\.?\d+'
 regexp_stop = '\d+\.?\d+$'
 file_name = 'apps/telegram/message_id.txt'
-
-
-def main():
-    client = TelegramClient('lucrativetrend', conf_obj.api_id, conf_obj.api_hash)
-    client.start()
-    telegram = Telegram(client, conf_obj.chat_china_id)
-    with client:
-        client.loop.run_until_complete(telegram.main(client))
-
-
-main()
-
 
 class SignalModel:
     def __init__(self, pair, current_price, is_margin, position, leverage, entry_points, take_profits, stop_loss,
@@ -56,50 +47,48 @@ class PairModel:
         self.message_id = message_id
 
 
-class Telegram:
+class Telegram(BaseTelegram):
+    def __init__(self, client, *args, **kwargs):
+        self.client = client
+        super().__init__(*args, **kwargs)
     """
     Model of Telegram entity
     """
     name = 'Telegram'
 
-    def __init__(self, client, chat_id):
-        self.client = client
-        self.chat_id = chat_id
-
-    async def main(self, client):
+    async def parse_china_channel(self):
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
-
-        async for message in client.iter_messages(self.chat_id, limit=2):
+        chat_id = int(conf_obj.chat_china_id)
+        async for message in self.client.iter_messages(chat_id, limit=2):
             should_handle_msg = False
-            info_from_file = open(file_name).read()
-            if ',{},'.format(message.id) not in info_from_file:
-                should_handle_msg = True
+            # info_from_file = open(file_name).read()
+            # print(message.id, message.text)
+            # if ',{},'.format(message.id) not in info_from_file:
+            should_handle_msg = True
             if should_handle_msg and message.photo:
                 print(message.id, message.text)
-                # print(message.)
                 await message.download_media()
                 pairs = info_getter.iterate_files(message.id)
                 verify_signal.get_active_pairs_info(pairs)
-                # if is_signal_obtained:
-                file = open(file_name, 'a+')
-                file.write(',{},'.format(message.id))
-                file.close()
-
-    # send messages to yourself...
-    async def send_message_to_yourself(self):
-        await self.client.send_message('me', 'Hello, myself!')
-
-    # @client.on(events.NewMessage)
-    # async def my_event_handler(event):
-    #     if 'hello' in event.raw_text:
-    #         await event.reply('hi!')
-
-    # async def handler(event):
-    #     chat = await event.get_chat()
-    #     sender = await event.get_sender()
-    #     chat_id = event.chat_id
-    #     sender_id = event.sender_id
+                # file = open(file_name, 'a+')
+                # file.write(',{},'.format(message.id))
+                # file.close()
+#
+#     # send messages to yourself...
+#     async def send_message_to_yourself(self):
+#         await self.client.send_message('me', 'Hello, myself!')
+#
+#     # @client.on(events.NewMessage)
+#     # async def my_event_handler(event):
+#     #     if 'hello' in event.raw_text:
+#     #         await event.reply('hi!')
+#
+#     # async def handler(event):
+#     #     chat = await event.get_chat()
+#     #     sender = await event.get_sender()
+#     #     chat_id = event.chat_id
+#     #     sender_id = event.sender_id
 
 
 class ChinaImageToSignal:
@@ -206,10 +195,10 @@ class ChinaImageToSignal:
             if filename.endswith(".jpg"):
                 pair_info = self.get_parsed(filename, message_id)
                 pairs.append(pair_info)
-                now = str(datetime.datetime.now())[:19]
+                now = str(datetime.now())[:19]
                 now = now.replace(":", "_")
-                shutil.move("D:/Frameworks/LucrativeTrend/{}".format(filename),
-                            "D:/Frameworks/LucrativeTrend/archive/" + str(now) + ".jpg")
+                shutil.move("D:/Frameworks/binfundock/{}".format(filename),
+                            "D:/Frameworks/binfundock/apps/telegram/media/" + str(now) + ".jpg")
         return pairs
 
     def is_locked(self, filepath):
@@ -236,7 +225,7 @@ class ChinaImageToSignal:
 
 
 class SignalVerification:
-    client = ShtClient(api_key=conf_obj.api_key, api_secret=conf_obj.api_secret)
+    client = ShtClient(api_key=conf_obj.market_api_key, api_secret=conf_obj.market_api_secret)
 
     def get_active_pairs_info(self, pairs):
         pairs_info = []
@@ -319,4 +308,3 @@ class SignalVerification:
             else:
                 stop_loss = pair_object.stop_loss
         return stop_loss
-
