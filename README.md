@@ -62,7 +62,13 @@ docker rm binfundock_web_1 binfundock_db_1  binfundock_nginx_1
 docker image rm binfundock_web:latest
 ```
 
+
 ##### Commands into `web` container
+
+- To work with django web you need to run server 
+```bash
+ python manage.py runserver
+```
 
 - Create superuser
 ```bash

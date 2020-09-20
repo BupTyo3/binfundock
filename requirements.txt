@@ -8,6 +8,7 @@ gunicorn==20.0.4
 psycopg2-binary==2.8.5
 python-dotenv==0.14.0
 python-binance==0.7.5
-
+pytesseract
+telethon
 
 

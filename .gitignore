@@ -132,3 +132,6 @@ dmypy.json
 # Project
 pgdata/
 .idea/
+*.session
+apps/telegram/media/
+*.session-journal

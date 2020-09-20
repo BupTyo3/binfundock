@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'apps.pair',
     'apps.market',
     'apps.strategy',
+    'apps.telegram',
 ]
 
 MIDDLEWARE = [
@@ -241,6 +242,9 @@ class Config:
     # Market API
     market_api_key: Optional[str]
     market_api_secret: Optional[str]
+    # Telegram
+    api_id: Optional[str]
+    api_hash: Optional[str]
 
     def __init__(self):
         config = configparser.ConfigParser()
@@ -252,6 +256,12 @@ class Config:
         self.how_percent_for_one_signal = float(logic['how_percent_for_one_signal'])
         signal = config['Signal']
         self.accessible_main_coins: List[str] = signal['accessible_main_coins'].split(',')
+        telegram = config['Telegram']
+        self.api_id = telegram.get('api_id', None)
+        self.api_hash = telegram.get('api_hash', None)
+        self.chat_china_id = telegram.get('chat_china_id', None)
+        self.crypto_angel_id = telegram.get('crypto_angel_id', None)
+        self.x_y = telegram.get('x_y', None)
 
 
 conf_obj = Config()
