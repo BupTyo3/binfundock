@@ -319,16 +319,16 @@ class SignalVerification:
             profits = self.verify_profits(pair_object, current_pair)
             stop_loss = self.verify_stop(pair_object, current_pair)
 
-            print('Pair: {}'.format(current_pair['symbol']))
-            print('Margin allowed: {}'.format(pair_info_object['isMarginTradingAllowed']))
-            print('Current price: {}'.format(current_pair['price']))
-            print('Position: {}'.format(pair_object.action))
+            logger.debug(f"Pair: {current_pair['symbol']}")
+            logger.debug(f"Margin allowed: {pair_info_object['isMarginTradingAllowed']}")
+            logger.debug(f"Current price: {current_pair['price']}")
+            logger.debug(f"Position: {pair_object.action}")
             if pair_object.leverage:
-                print('Leverage: {}'.format(pair_object.leverage))
-            print('Entries: {}'.format(entries))
-            print('Take profits: {}'.format(profits))
-            print('Stop-loss: {}'.format(stop_loss))
-            print('==========================================')
+                logger.debug(f"Leverage: {pair_object.leverage}")
+            logger.debug(f"Entries: {entries}")
+            logger.debug(f"Take profits: {profits}")
+            logger.debug(f"Stop-loss: {stop_loss}")
+            logger.debug('==========================================')
             signals.append(
                 SignalModel(current_pair['symbol'], pair_info_object['isMarginTradingAllowed'], current_pair['price'],
                             pair_object.action, pair_object.leverage, entries, profits, stop_loss,
