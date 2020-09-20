@@ -7,20 +7,26 @@ import pytesseract
 import json
 import urllib.request
 import pytz
+import logging
 
+from asgiref.sync import sync_to_async
 
+from apps.signal.models import Signal, EntryPoint, TakeProfit
 from .base_model import BaseTelegram
 from .init_client import ShtClient
 from pytesseract import image_to_string
 from PIL import Image
 from binfun.settings import conf_obj
+from utils.framework.models import SystemCommand
 
+logger = logging.getLogger(__name__)
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 directory = 'D:/Frameworks/binfundock/'
 regexp_numbers = '\d+\.?\d+'
 regexp_stop = '\d+\.?\d+$'
 file_name = 'apps/telegram/message_id.txt'
+
 
 class SignalModel:
     def __init__(self, pair, current_price, is_margin, position, leverage, entry_points, take_profits, stop_loss,
@@ -36,21 +42,11 @@ class SignalModel:
         self.msg_id = msg_id
 
 
-class PairModel:
-    def __init__(self, pair, action, leverage, entry_points, take_profits, stop_loss, message_id):
-        self.action = action
-        self.pair = pair
-        self.leverage = leverage
-        self.entry_points = entry_points
-        self.take_profits = take_profits
-        self.stop_loss = stop_loss
-        self.message_id = message_id
-
-
 class Telegram(BaseTelegram):
     def __init__(self, client, *args, **kwargs):
         self.client = client
         super().__init__(*args, **kwargs)
+
     """
     Model of Telegram entity
     """
@@ -60,20 +56,86 @@ class Telegram(BaseTelegram):
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
         chat_id = int(conf_obj.chat_china_id)
-        async for message in self.client.iter_messages(chat_id, limit=2):
+        async for message in self.client.iter_messages(chat_id, limit=3):
             should_handle_msg = False
-            # info_from_file = open(file_name).read()
-            # print(message.id, message.text)
-            # if ',{},'.format(message.id) not in info_from_file:
+            # TODO: Read from DB message id to skip handled messages
             should_handle_msg = True
             if should_handle_msg and message.photo:
                 print(message.id, message.text)
                 await message.download_media()
                 pairs = info_getter.iterate_files(message.id)
-                verify_signal.get_active_pairs_info(pairs)
-                # file = open(file_name, 'a+')
-                # file.write(',{},'.format(message.id))
-                # file.close()
+                signal = verify_signal.get_active_pairs_info(pairs)
+                await self.write_signal_to_db(signal, message.id)
+
+    @sync_to_async
+    def write_signal_to_db(self, signal, message_id):
+        sm_obj = Signal.objects.filter(outer_signal_id=message_id).first()
+        if sm_obj:
+            logger.debug(f"Signal {message_id} already exists")
+            quit()
+        sm_obj = Signal.objects.create(
+            symbol=signal[0].pair, stop_loss=signal[0].stop_loss, outer_signal_id=message_id)
+        for entry_point in signal[0].entry_points:
+            ep = EntryPoint.objects.create(signal=sm_obj, value=entry_point)
+        for take_profit in signal[0].take_profits:
+            tp = TakeProfit.objects.create(signal=sm_obj, value=take_profit)
+
+        logger.debug(f"Signal {message_id} created successfully")
+
+    async def parse_crypto_angel_channel(self):
+        chat_id = int(conf_obj.crypto_angel_id)
+        async for message in self.client.iter_messages(chat_id, limit=4):
+            should_handle_msg = False
+            # TODO: Read from DB message id to skip the handled ones
+            should_handle_msg = True
+            if message.text and should_handle_msg:
+                # print(message.id, message.text)
+                signal = self.parse_angel_message(message.text, message.id)
+                if signal[0].pair:
+                    await self.write_signal_to_db(signal, message.id)
+
+    def parse_angel_message(self, message_text, message_id):
+        signals = []
+        splitted_info = message_text.splitlines()
+        buy_label = 'Покупаем по цене: '
+        goals_label = 'Цели: '
+        stop_label = 'Sl: '
+        pair = ''
+        current_price = ''
+        is_margin = False
+        position = None
+        leverage = None
+        entries = ''
+        profits = ''
+        stop_loss = ''
+        for item in splitted_info:
+            if item.startswith(buy_label):
+                position = 'Buy'
+                pair = ''.join(filter(str.isalpha, splitted_info[0]))
+                print(pair)
+        for line in splitted_info:
+            if line.startswith(buy_label):
+                fake_entries = line[18:]
+                splitted_entries = fake_entries.split('-')
+                key_numbers = len(splitted_entries[-1])
+                prefix = splitted_entries[0][:-key_numbers]
+                entries = [f'{prefix}{n}' for n in splitted_entries][1:]
+                entries.insert(0, splitted_entries[0])
+            if line.startswith(goals_label):
+                fake_profits = line[6:]
+                splitted_profits = fake_profits.split('-')
+                key_numbers = len(splitted_profits[-1])
+                prefix = splitted_profits[0][:-key_numbers]
+                profits = [f'{prefix}{n}' for n in splitted_profits][1:]
+                profits.insert(0, splitted_profits[0])
+            if line.startswith(stop_label):
+                stop_loss = line[4:]
+        signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        return signals
+
+
+
 #
 #     # send messages to yourself...
 #     async def send_message_to_yourself(self):
@@ -180,14 +242,14 @@ class ChinaImageToSignal:
 
     def get_parsed(self, image_name, message_id):
         array = self.read_image(image_name)
-        action = self.get_action(array)
+        position = self.get_action(array)
         leverage = self.get_leverage(array)
 
         pair = self.find_pair(array)
-        entry_points = self.find_entry_points(array, action, leverage)
+        entry_points = self.find_entry_points(array, position, leverage)
         profits = self.find_profits(array)
         stop_loss = self.find_stop(array)
-        return PairModel(pair, action, leverage, entry_points, profits, stop_loss, message_id)
+        return SignalModel(pair, None, None, position, leverage, entry_points, profits, stop_loss, message_id)
 
     def iterate_files(self, message_id):
         pairs = []
@@ -239,7 +301,8 @@ class SignalVerification:
             try:
                 pair_info_object = self.client.get_symbol_info(pair_object.pair)
                 # pair_info_object = self.client.get_avg_price(symbol=pair_object.pair)
-                price_json = urllib.request.urlopen('https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_object.pair))
+                price_json = urllib.request.urlopen(
+                    'https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_object.pair))
             except:
                 usdt_position = pair_object.pair.rfind('USDT')
                 btc_position = pair_object.pair.rfind('BTC')
@@ -272,15 +335,21 @@ class SignalVerification:
             print('Take profits: {}'.format(profits))
             print('Stop-loss: {}'.format(stop_loss))
             print('==========================================')
-            signals.append(SignalModel(current_pair['symbol'], pair_info_object['isMarginTradingAllowed'], current_pair['price'], pair_object.action, pair_object.leverage, entries, profits, stop_loss, pair_object.message_id))
+            signals.append(
+                SignalModel(current_pair['symbol'], pair_info_object['isMarginTradingAllowed'], current_pair['price'],
+                            pair_object.action, pair_object.leverage, entries, profits, stop_loss,
+                            pair_object.message_id))
         return signals
 
     def verify_entry(self, pair_object, current_pair_info):
+        import math
+
         verified_entries = []
         dot_position = current_pair_info['price'].index('.')
         if dot_position:
             for price in pair_object.entry_points:
-                if price.find('.') > 0 and price.find('.') != dot_position:
+                # frac, whole = math.modf(int(price))
+                if price.startswith('0') and price.find('.') != dot_position:
                     price = price[:dot_position] + "." + price[dot_position:]
                     verified_entries.append(price)
                 else:
