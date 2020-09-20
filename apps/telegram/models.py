@@ -60,7 +60,6 @@ class Telegram(BaseTelegram):
             # TODO: Read from DB message id to skip handled messages
             should_handle_msg = True
             if should_handle_msg and message.photo:
-                print(message.id, message.text)
                 await message.download_media()
                 pairs = info_getter.iterate_files(message.id)
                 signal = verify_signal.get_active_pairs_info(pairs)
@@ -88,7 +87,6 @@ class Telegram(BaseTelegram):
             # TODO: Read from DB message id to skip the handled ones
             should_handle_msg = True
             if message.text and should_handle_msg:
-                # print(message.id, message.text)
                 signal = self.parse_angel_message(message.text, message.id)
                 if signal[0].pair:
                     await self.write_signal_to_db(signal, message.id)
@@ -111,7 +109,6 @@ class Telegram(BaseTelegram):
             if item.startswith(buy_label):
                 position = 'Buy'
                 pair = ''.join(filter(str.isalpha, splitted_info[0]))
-                print(pair)
         for line in splitted_info:
             if line.startswith(buy_label):
                 fake_entries = line[18:]
@@ -132,8 +129,6 @@ class Telegram(BaseTelegram):
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
-
-
 
 #
 #     # send messages to yourself...
