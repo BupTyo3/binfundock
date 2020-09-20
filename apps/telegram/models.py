@@ -25,7 +25,6 @@ pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tessera
 directory = 'D:/Frameworks/binfundock/'
 regexp_numbers = '\d+\.?\d+'
 regexp_stop = '\d+\.?\d+$'
-file_name = 'apps/telegram/message_id.txt'
 
 
 class SignalModel:
