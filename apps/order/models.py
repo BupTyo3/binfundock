@@ -119,7 +119,7 @@ class SellOrder(BaseOrder):
     def push_to_market(self):
         logger.debug(f"Push sell order! {self}")
         # todo послать запрос на размещение ордера
-        self.market.create_sell_limit_order(self)
+        self.market.create_sell_stop_loss_limit_order(self)
 
     def update_sell_order_info_by_api(self):
         logger.debug(f"Get info about SELL order by API: {self}")

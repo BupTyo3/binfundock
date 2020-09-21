@@ -144,23 +144,27 @@ class Market(BaseMarket):
         return response
 
     @api_logging
-    def _create_sell_limit_order(self, symbol: str, quantity: float, price: float,
-                                 stop_loss: float, custom_order_id: str):
-        response = self.my_client.order_limit_sell(
+    def _create_sell_stop_loss_limit_order(self, symbol: str,
+                                           quantity: float, price: float,
+                                           stop_loss: float, custom_order_id: str):
+        response = self.my_client.create_order(
+            timeInForce=self.my_client.TIME_IN_FORCE_GTC,
+            side=self.my_client.SIDE_SELL, type=self.my_client.ORDER_TYPE_STOP_LOSS_LIMIT,
             symbol=symbol, quantity=quantity, price=price,
             newClientOrderId=custom_order_id, stopPrice=stop_loss)
         return response
 
-    def create_sell_limit_order(self, order: 'SellOrder'):
+    def create_sell_stop_loss_limit_order(self, order: 'SellOrder'):
         from apps.pair.models import Pair
         pair = Pair.objects.filter(symbol=order.symbol, market=self).first()
         logger.debug(f"ОГРАНИЧЕНИЯ по {order.symbol}: {pair.__dict__}")
         # TODO: change to sell order
-        response = self._create_sell_limit_order(
+        response = self._create_sell_stop_loss_limit_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price,
             custom_order_id=order.custom_order_id, stop_loss=order.stop_loss)
-        status, executed_quantity = self._get_partially_order_data_from_response(response)
-        order.update_order_api_history(status, executed_quantity)
+        default_executed_quantity = 0.0
+        default_status = OrderStatus.SENT.value
+        order.update_order_api_history(default_status, default_executed_quantity)
         return response
 
     # @api_logging

@@ -103,7 +103,8 @@ class Signal(BaseSignal):
     def _get_distributed_sell_quantity(self, market: BaseMarket, all_quantity: float):
         from apps.pair.models import Pair
         pair = Pair.objects.filter(symbol=self.symbol, market=market.id).first()
-        step_quantity = pair.step_price
+        # TODO: Check, may be should change to step_quantity = pair.step_price
+        step_quantity = pair.step_quantity
         quantity = all_quantity / self.__get_sell_distribution()
         return self.__find_not_fractional_by_step_quantity(quantity, step_quantity)
 
@@ -146,7 +147,9 @@ class Signal(BaseSignal):
     def formation_buy_orders(self, market: BaseMarket) -> None:
         """Функция расчёта данных для создания ордеров на покупку"""
         if self._status != SignalStatus.NEW.value:
-            raise Exception(f'Not valid status: {self._status} : {SignalStatus.NEW.value}')
+            logger.warning(f'Not valid Signal status for formation BUY order: '
+                           f'{self._status} : {SignalStatus.NEW.value}')
+            return
         self.status = SignalStatus.FORMED.value
         self.save()
         for index, entry_point in enumerate(self.entry_points.all()):
@@ -404,9 +407,9 @@ class Signal(BaseSignal):
             signal.update_info_by_api()
 
     def update_info_by_api(self):
-        _statuses = [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value]
+        _statuses = [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]
         if self._status not in _statuses:
-            raise Exception(f'Not valid status: {self._status} : {_statuses}')
+            return
         for buy_order in self.buy_orders.all():
             buy_order.update_buy_order_info_by_api()
         # TODO Maybe Add the same for sell_orders?
