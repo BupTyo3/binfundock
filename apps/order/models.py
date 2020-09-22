@@ -1,5 +1,7 @@
 import logging
 
+from typing import TYPE_CHECKING
+
 from django.db import models, transaction
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -8,6 +10,9 @@ from apps.order.utils import OrderStatus
 from apps.market.models import Market
 from apps.signal.models import Signal
 from .base_model import BaseOrder, HistoryApiBaseOrder
+
+if TYPE_CHECKING:
+    from apps.market.base_model import BaseMarket
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -19,9 +24,6 @@ class BuyOrder(BaseOrder):
     market = models.ForeignKey(to=Market,
                                related_name='buy_orders',
                                on_delete=models.DO_NOTHING)
-    symbol = models.CharField(max_length=16)
-    quantity = models.FloatField()
-    price = models.FloatField()
     # TODO: remove this field and _bought_quantity and setters, getters and others using
     bought_quantity = models.FloatField(default=0)
     custom_order_id = models.CharField(max_length=30)
@@ -33,14 +35,13 @@ class BuyOrder(BaseOrder):
     signal = models.ForeignKey(to=Signal,
                                related_name='buy_orders',
                                on_delete=models.DO_NOTHING)
-    last_updated_by_api = models.DateTimeField(blank=True,
-                                               null=True)
     handled_worked = models.BooleanField(
         help_text="Did something if the order has worked",
         default=False)
 
     market: Market
     signal: Signal
+    index: int
 
     objects = models.Manager()
 
@@ -56,6 +57,10 @@ class BuyOrder(BaseOrder):
     def push_to_market(self):
         logger.debug(f"Push buy order! {self}")
         self.market.create_buy_limit_order(self)
+
+    def cancel_into_market(self):
+        logger.debug(f"Cancel BUY order! {self}")
+        self.market.cancel_order(self)
 
     def update_buy_order_info_by_api(self):
         logger.debug(f"Get info about BUY order by API: {self}")
@@ -80,15 +85,14 @@ class BuyOrder(BaseOrder):
 
 
 class SellOrder(BaseOrder):
+    SL_APPEND_INDEX = 500
     type_: str = 'sell'
     order_type_separator: str = 's'
+
     market = models.ForeignKey(to=Market,
                                related_name='sell_orders',
                                on_delete=models.DO_NOTHING)
-    symbol = models.CharField(max_length=16)
-    quantity = models.FloatField()
-    price = models.FloatField()
-    stop_loss = models.FloatField()
+    stop_loss = models.FloatField(default=0)
     sold_quantity = models.FloatField(default=0)
     custom_order_id = models.CharField(max_length=30)
     _status = models.CharField(max_length=32,
@@ -99,11 +103,17 @@ class SellOrder(BaseOrder):
     signal = models.ForeignKey(to=Signal,
                                related_name='sell_orders',
                                on_delete=models.DO_NOTHING)
-    last_updated_by_api = models.DateTimeField(blank=True,
-                                               null=True)
+    tp_order = models.OneToOneField(to='self',
+                                    related_name='sl_order',
+                                    null=True,
+                                    blank=True,
+                                    on_delete=models.DO_NOTHING)
 
     market: Market
     signal: Signal
+    index: int
+    tp_order: 'SellOrder.objects'
+    stop_loss: float
 
     objects = models.Manager()
 
@@ -116,10 +126,48 @@ class SellOrder(BaseOrder):
                 self.market.order_id_separator, self.signal.outer_signal_id, self.index)
         super().save(*args, **kwargs)
 
+    @classmethod
+    def create_sell_stop_loss_order(cls, tp_order: 'SellOrder'):
+        calculated_real_stop_loss = tp_order.signal.get_real_stop_price(tp_order.stop_loss, tp_order.market)
+        custom_sl_order_id = cls.form_sl_order_id(tp_order)
+        order = SellOrder.objects.create(
+            market=tp_order.market,
+            symbol=tp_order.symbol,
+            quantity=tp_order.quantity,
+            price=calculated_real_stop_loss,
+            stop_loss=0,
+            tp_order=tp_order,
+            no_need_push=True,
+            signal=tp_order.signal,
+            custom_order_id=custom_sl_order_id,
+            index=tp_order.index + cls.SL_APPEND_INDEX)
+        return order
+
+    @classmethod
+    def create_sell_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
+                          take_profit: float, stop_loss: float,
+                          custom_order_id: str, index: int):
+        order = SellOrder.objects.create(
+            market=market,
+            symbol=signal.symbol,
+            quantity=quantity,
+            price=take_profit,
+            stop_loss=stop_loss if stop_loss is not None else signal.stop_loss,
+            signal=signal,
+            custom_order_id=None if not custom_order_id else custom_order_id,
+            index=index)
+        cls.create_sell_stop_loss_order(tp_order=order)
+        return order
+
     def push_to_market(self):
+        if self.no_need_push:
+            return
         logger.debug(f"Push sell order! {self}")
-        # todo послать запрос на размещение ордера
         self.market.create_sell_stop_loss_limit_order(self)
+
+    def cancel_into_market(self):
+        logger.debug(f"Cancel SELL order! {self}")
+        self.market.cancel_order(self)
 
     def update_sell_order_info_by_api(self):
         logger.debug(f"Get info about SELL order by API: {self}")

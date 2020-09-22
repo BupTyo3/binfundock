@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class BaseOrder(SystemBaseModel):
+    stop_loss_separator: str = '_sl_'
     custom_order_id: Optional[str]
     symbol: str
     quantity: float
@@ -22,11 +23,19 @@ class BaseOrder(SystemBaseModel):
     stop_loss: Optional[float]
     status: OrderStatus
 
+    symbol = models.CharField(max_length=16)
+    quantity = models.FloatField()
+    price = models.FloatField()
     handled_worked = models.BooleanField(
         help_text="Did something if the order has worked",
         default=False)
     local_canceled = models.BooleanField(default=False)
     local_canceled_time = models.DateTimeField(blank=True,
+                                               null=True)
+    no_need_push = models.BooleanField(
+        help_text="No need push the order to the market",
+        default=False)
+    last_updated_by_api = models.DateTimeField(blank=True,
                                                null=True)
 
     class Meta:
@@ -49,10 +58,14 @@ class BaseOrder(SystemBaseModel):
     def form_order_id(self,
                       market_separator: str,
                       message_id: Optional[int],
-                      index: Optional[models.PositiveIntegerField]) -> str:
+                      index: Optional[int]) -> str:
         if not (message_id or index):
             return f'{market_separator}_{self.order_type_separator}_{gen_short_uuid()}'
         return f'{market_separator}_{str(message_id)}_{self.order_type_separator}_{index}'
+
+    @classmethod
+    def form_sl_order_id(cls, main_order: 'BaseOrder') -> str:
+        return f"{main_order.custom_order_id}_{cls.stop_loss_separator}"
 
 
 class HistoryApiBaseOrder(SystemBaseModelWithoutModified):

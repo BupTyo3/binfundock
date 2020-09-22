@@ -3,7 +3,7 @@ import logging
 from django.db import models
 from django.contrib.auth import get_user_model
 
-from typing import Tuple
+from typing import Tuple, TYPE_CHECKING
 
 from binance import client
 from apps.order.utils import OrderStatus
@@ -17,6 +17,9 @@ from tools.tools import (
 )
 from binfun.settings import conf_obj
 
+if TYPE_CHECKING:
+    from apps.order.base_model import BaseOrder
+    from apps.order.models import SellOrder, BuyOrder
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -89,18 +92,9 @@ class Market(BaseMarket):
         super().save(*args, **kwargs)
         self.update_pairs_info_api()
 
-    @floated_result
-    def get_current_price(self, symbol):
-        response = self.my_client.get_avg_price(symbol=symbol)
-        return response[self.price_]
-
     @api_logging
     def _get_balance_api(self, coin):
         return self.my_client.get_asset_balance(coin)
-
-    @floated_result
-    def get_current_balance(self, coin) -> float:
-        return self._get_balance_api(coin)[self.free_]
 
     @floated_result
     def _get_executed_quantity(self, response) -> float:
@@ -111,11 +105,6 @@ class Market(BaseMarket):
     @api_logging(text="Getting info by CustomOrderId")
     def _get_order_info_api(self, symbol, custom_order_id):
         return self.my_client.get_order(symbol=symbol, origClientOrderId=custom_order_id)
-
-    @debug_input_and_returned
-    def get_order_info(self, symbol, custom_order_id) -> Tuple[OrderStatus, float]:
-        response = self._get_order_info_api(symbol, custom_order_id)
-        return self._get_partially_order_data_from_response(response)
 
     def _get_partially_order_data_from_response(self, response) -> Tuple[OrderStatus, float]:
         order_status, updated = self._convert_to_our_order_status(response[self.status_])
@@ -133,39 +122,23 @@ class Market(BaseMarket):
             symbol=symbol, quantity=quantity, price=price, newClientOrderId=custom_order_id)
         return response
 
-    def create_buy_limit_order(self, order: 'BuyOrder'):
-        from apps.pair.models import Pair
-        pair = Pair.objects.filter(symbol=order.symbol, market=self).first()
-        logger.debug(f"ОГРАНИЧЕНИЯ по {order.symbol}: {pair.__dict__}")
-        response = self._create_buy_limit_order(
-            symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
-        status, executed_quantity = self._get_partially_order_data_from_response(response)
-        order.update_order_api_history(status, executed_quantity)
-        return response
-
     @api_logging
     def _create_sell_stop_loss_limit_order(self, symbol: str,
                                            quantity: float, price: float,
-                                           stop_loss: float, custom_order_id: str):
-        response = self.my_client.create_order(
-            timeInForce=self.my_client.TIME_IN_FORCE_GTC,
-            side=self.my_client.SIDE_SELL, type=self.my_client.ORDER_TYPE_STOP_LOSS_LIMIT,
+                                           stop_loss: float, custom_order_id: str,
+                                           custom_sl_order_id: str,
+                                           stop_limit_price: float):
+        response = self.my_client.order_oco_sell(
             symbol=symbol, quantity=quantity, price=price,
-            newClientOrderId=custom_order_id, stopPrice=stop_loss)
+            limitClientOrderId=custom_order_id,
+            stopClientOrderId=custom_sl_order_id, stopPrice=stop_loss,
+            stopLimitPrice=stop_limit_price,
+            stopLimitTimeInForce=self.my_client.TIME_IN_FORCE_GTC)
         return response
 
-    def create_sell_stop_loss_limit_order(self, order: 'SellOrder'):
-        from apps.pair.models import Pair
-        pair = Pair.objects.filter(symbol=order.symbol, market=self).first()
-        logger.debug(f"ОГРАНИЧЕНИЯ по {order.symbol}: {pair.__dict__}")
-        # TODO: change to sell order
-        response = self._create_sell_stop_loss_limit_order(
-            symbol=order.symbol, quantity=order.quantity, price=order.price,
-            custom_order_id=order.custom_order_id, stop_loss=order.stop_loss)
-        default_executed_quantity = 0.0
-        default_status = OrderStatus.SENT.value
-        order.update_order_api_history(default_status, default_executed_quantity)
-        return response
+    @api_logging
+    def _cancel_order(self, symbol: str, custom_order_id: str):
+        return self.my_client.cancel_order(symbol=symbol, origClientOrderId=custom_order_id)
 
     # @api_logging
     def _get_rules_api(self):
@@ -174,6 +147,47 @@ class Market(BaseMarket):
     @floated_result
     def __get_pair_rule(self, data: dict, first: str, order: int, second: str):
         return data[first][order][second]
+
+    @floated_result
+    def get_current_balance(self, coin) -> float:
+        return self._get_balance_api(coin)[self.free_]
+
+    @floated_result
+    def get_current_price(self, symbol):
+        response = self.my_client.get_avg_price(symbol=symbol)
+        return response[self.price_]
+
+    @debug_input_and_returned
+    def get_order_info(self, symbol, custom_order_id) -> Tuple[OrderStatus, float]:
+        response = self._get_order_info_api(symbol, custom_order_id)
+        return self._get_partially_order_data_from_response(response)
+
+    def create_buy_limit_order(self, order: 'BuyOrder'):
+        from apps.pair.models import Pair
+        pair = Pair.objects.filter(symbol=order.symbol, market=self).first()
+        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
+        response = self._create_buy_limit_order(
+            symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
+        status, executed_quantity = self._get_partially_order_data_from_response(response)
+        order.update_order_api_history(status, executed_quantity)
+        return response
+
+    def create_sell_stop_loss_limit_order(self, order: 'SellOrder'):
+        from apps.pair.models import Pair
+        pair = Pair.objects.filter(symbol=order.symbol, market=self).first()
+        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
+        # TODO: change to sell order
+        response = self._create_sell_stop_loss_limit_order(
+            symbol=order.symbol, quantity=order.quantity, price=order.price,
+            custom_order_id=order.custom_order_id, custom_sl_order_id=order.sl_order.custom_order_id,
+            stop_loss=order.stop_loss, stop_limit_price=order.sl_order.price)
+        default_executed_quantity = 0.0
+        default_status = OrderStatus.SENT.value
+        order.update_order_api_history(default_status, default_executed_quantity)
+        return response
+
+    def cancel_order(self, order: 'BaseOrder'):
+        return self._cancel_order(order.symbol, order.custom_order_id)
 
     def update_pairs_info_api(self):
         from apps.pair.models import Pair
