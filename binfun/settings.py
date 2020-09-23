@@ -13,7 +13,7 @@ import configparser
 import os
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from dotenv import load_dotenv
 
 
@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'apps.pair',
     'apps.market',
     'apps.strategy',
+    'apps.techannel',
     'apps.telegram',
 ]
 

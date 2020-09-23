@@ -58,8 +58,9 @@ class BaseOrder(SystemBaseModel):
     def form_order_id(self,
                       market_separator: str,
                       message_id: Optional[int],
+                      techannel_abbr: str,
                       index: Optional[int]) -> str:
-        if not (message_id or index):
+        if not (message_id or index or techannel_abbr):
             return f'{market_separator}_{self.order_type_separator}_{gen_short_uuid()}'
         return f'{market_separator}_{str(message_id)}_{self.order_type_separator}_{index}'
 
