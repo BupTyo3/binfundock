@@ -13,6 +13,7 @@ from utils.framework.models import (
 from .base_model import BaseSignal
 from .utils import SignalStatus
 from apps.market.base_model import BaseMarket
+from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
 from tools.tools import rounded_result, debug_input_and_returned
 
@@ -24,8 +25,11 @@ logger = logging.getLogger(__name__)
 
 class Signal(BaseSignal):
     conf = conf_obj
+    techannel = models.ForeignKey(to=Techannel,
+                                  related_name='signals',
+                                  on_delete=models.DO_NOTHING)
     symbol = models.CharField(max_length=24)
-    outer_signal_id = models.PositiveIntegerField(unique=True)
+    outer_signal_id = models.PositiveIntegerField()
     main_coin = models.CharField(max_length=16)
     stop_loss = models.FloatField()
     _bought_quantity = models.FloatField(db_column='bought_quantity',
@@ -47,10 +51,35 @@ class Signal(BaseSignal):
     def __str__(self):
         return f"Signal:{self.symbol}:{self.outer_signal_id}"
 
+    class Meta:
+        unique_together = ['techannel', 'outer_signal_id', ]
+
     def save(self, *args, **kwargs):
         self.main_coin = self._get_first_coin(self.symbol)
         super().save(*args, **kwargs)
         logger.debug(self)
+
+    @classmethod
+    @transaction.atomic
+    def create_signal(cls, symbol: str, techannel_abbr: str,
+                      stop_loss: float, outer_signal_id: int,
+                      entry_points: List[float], take_profits: List[float]):
+        techannel, created = Techannel.objects.get_or_create(abbr=techannel_abbr)
+        sm_obj = Signal.objects.filter(outer_signal_id=outer_signal_id, techannel=techannel).first()
+        if created:
+            logger.debug(f"Telegram channel '{techannel}' was created")
+        if sm_obj:
+            logger.warning(f"Signal '{outer_signal_id}':'{techannel_abbr}' already exists")
+            return
+        sm_obj = Signal.objects.create(
+            techannel=techannel, symbol=symbol,
+            stop_loss=stop_loss, outer_signal_id=outer_signal_id)
+        for entry_point in entry_points:
+            EntryPoint.objects.create(signal=sm_obj, value=entry_point)
+        for take_profit in take_profits:
+            TakeProfit.objects.create(signal=sm_obj, value=take_profit)
+        logger.debug(f"Signal '{sm_obj}' has been created successfully")
+        return sm_obj
 
     def _get_first_coin(self, symbol) -> str:
         for main_coin in self.conf.accessible_main_coins:
@@ -490,7 +519,7 @@ class Signal(BaseSignal):
 
     @classmethod
     def sold_orders_worker(cls, outer_signal_id=None):
-        """Handle all BOUGHT signals. Buy orders worker"""
+        """Handle all BOUGHT signals. Sell orders worker"""
         # TODO: Возможно добавить BOUGHT сигналы
         params = {'_status': SignalStatus.BOUGHT.value}
         if outer_signal_id:

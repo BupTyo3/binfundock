@@ -20,17 +20,33 @@ class OuterIDFilter(InputFilter):
             return queryset.filter(outer_signal_id=outer_id)
 
 
+class TechannelFilter(InputFilter):
+    parameter_name = 'techannel_abbr'
+    title = _('Techannel_Abbr')
+
+    def queryset(self, request, queryset):
+        if self.value() is not None:
+            try:
+                techannel_abbr = self.value()
+            except ValueError:
+                return queryset
+            return queryset.filter(techannel__abbr=techannel_abbr)
+
+
 @admin.register(Signal)
 class SignalAdmin(admin.ModelAdmin):
     list_display = ['id', 'main_coin', 'symbol',
                     'stop_loss',
                     'outer_signal_id',
+                    'techannel',
                     'status',
                     ]
-    search_fields = ['id', 'outer_signal_id', 'symbol', ]
+    select_related_fields = ['techannel', ]
+    search_fields = ['id', 'outer_signal_id', 'symbol', 'techannel__abbr', ]
     list_filter = [
         '_status',
         OuterIDFilter,
+        TechannelFilter,
     ]
     actions = [
         'form_buy_orders',

@@ -17,6 +17,8 @@ class Command(SystemCommand):
         parser.add_argument('--entry_points', nargs='+', type=float, required=True, help='Entry points values')
         parser.add_argument('--take_profits', nargs='+', type=float, required=True, help='Take profits values')
         parser.add_argument('--stop_loss', type=float, required=True, help='Stop loss value')
+        parser.add_argument('--techannel', type=str, required=True,
+                            help='Unique abbreviation of Telegram channel in lowercase')
         parser.add_argument('--outer_signal_id', type=int, required=True)
         parser.add_argument('--market_name', type=str, help='Market name')
         parser.add_argument('--without_checking', action='store_true')
@@ -49,6 +51,7 @@ class Command(SystemCommand):
         take_profits = options['take_profits']
         stop_loss = options['stop_loss']
         outer_signal_id = options['outer_signal_id']
+        techannel = options['techannel']
 
         self.check_signal_input(symbol, entry_points, take_profits, stop_loss, outer_signal_id)
         logger.debug(f"Market:{market_name}:Signal:{symbol}:EntryPoints:{entry_points}:"
@@ -61,15 +64,14 @@ class Command(SystemCommand):
             else:
                 logger.debug("You typed No - The End")
                 quit()
-        sm_obj = Signal.objects.filter(outer_signal_id=outer_signal_id).first()
-        if sm_obj:
-            self.log_error(f"Signal {outer_signal_id} already exists")
-            quit()
-        sm_obj = Signal.objects.create(
-            symbol=symbol, stop_loss=stop_loss, outer_signal_id=outer_signal_id)
-        for entry_point in entry_points:
-            ep = EntryPoint.objects.create(signal=sm_obj, value=entry_point)
-        for take_profit in take_profits:
-            tp = TakeProfit.objects.create(signal=sm_obj, value=take_profit)
+        sm_obj = Signal.create_signal(techannel_abbr=techannel,
+                                      symbol=symbol,
+                                      stop_loss=stop_loss,
+                                      entry_points=entry_points,
+                                      take_profits=take_profits,
+                                      outer_signal_id=outer_signal_id)
 
-        self.log_success(f"Signal {outer_signal_id} created successfully")
+        if sm_obj:
+            self.log_success(f"Signal '{outer_signal_id}':'{techannel}' created successfully")
+        else:
+            self.log_error(f"Signal '{outer_signal_id}':'{techannel}' has not been created")
