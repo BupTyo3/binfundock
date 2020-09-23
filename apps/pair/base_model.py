@@ -9,3 +9,5 @@ class BasePair(SystemBaseModel):
     min_quantity: float
     min_amount: float
 
+    class Meta:
+        abstract = True

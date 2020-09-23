@@ -86,26 +86,39 @@ class Signal(BaseSignal):
         # return res / n_distribution  # эквивалент 33 долларов
 
     @staticmethod
-    def __find_not_fractional_by_step_quantity(quantity, step_quantity):
-        return (quantity // step_quantity) * step_quantity
+    def __find_not_fractional_by_step(quantity: float, step: float) -> float:
+        return (quantity // step) * step
+
+    def _get_pair(self, market: BaseMarket):
+        from apps.pair.models import Pair
+        return Pair.objects.filter(symbol=self.symbol, market=market.pk).first()
 
     @rounded_result
     def _get_distributed_toc_quantity(self, market: BaseMarket, entry_point_price):
         from tools.tools import convert_to_coin_quantity
-        from apps.pair.models import Pair
-        pair = Pair.objects.filter(symbol=self.symbol, market=market.id).first()
+        pair = self._get_pair(market)
         step_quantity = pair.step_quantity
         quantity = self.__get_turnover_by_coin_pair(market) / self.__get_buy_distribution()
         coin_quantity = convert_to_coin_quantity(quantity, entry_point_price)
-        return self.__find_not_fractional_by_step_quantity(coin_quantity, step_quantity)
+        return self.__find_not_fractional_by_step(coin_quantity, step_quantity)
+
+    def get_real_stop_price(self, price: float, market: BaseMarket):
+        pair = self._get_pair(market)
+        if self.conf.slip_delta_stop_loss_percentage:
+            real_stop_price = price - (
+                    price * self.conf.slip_delta_stop_loss_percentage /
+                    self.conf.one_hundred_percent)
+        else:
+            real_stop_price = price
+        return self.__find_not_fractional_by_step(real_stop_price, pair.step_price)
 
     @rounded_result
     def _get_distributed_sell_quantity(self, market: BaseMarket, all_quantity: float):
-        from apps.pair.models import Pair
-        pair = Pair.objects.filter(symbol=self.symbol, market=market.id).first()
-        step_quantity = pair.step_price
+        pair = self._get_pair(market)
+        # TODO: Check, may be should change to step_quantity = pair.step_price
+        step_quantity = pair.step_quantity
         quantity = all_quantity / self.__get_sell_distribution()
-        return self.__find_not_fractional_by_step_quantity(quantity, step_quantity)
+        return self.__find_not_fractional_by_step(quantity, step_quantity)
 
     @debug_input_and_returned
     def __form_buy_order(self, market: BaseMarket, distributed_toc: float,
@@ -131,22 +144,24 @@ class Signal(BaseSignal):
         logger.debug(msg)
         if stop_loss is not None:
             logger.debug(f"Form SELL ORDER for signal {self}")
-        order = SellOrder.objects.create(
+        order = SellOrder.create_sell_order(
             market=market,
-            symbol=self.symbol,
-            quantity=distributed_quantity,
-            price=take_profit,
-            stop_loss=stop_loss if stop_loss is not None else self.stop_loss,
             signal=self,
+            quantity=distributed_quantity,
+            take_profit=take_profit,
+            stop_loss=stop_loss,
             custom_order_id=None if not custom_order_id else custom_order_id,
-            index=index)
+            index=index
+        )
         return order
 
     @transaction.atomic
     def formation_buy_orders(self, market: BaseMarket) -> None:
         """Функция расчёта данных для создания ордеров на покупку"""
         if self._status != SignalStatus.NEW.value:
-            raise Exception(f'Not valid status: {self._status} : {SignalStatus.NEW.value}')
+            logger.warning(f'Not valid Signal status for formation BUY order: '
+                           f'{self._status} : {SignalStatus.NEW.value}')
+            return
         self.status = SignalStatus.FORMED.value
         self.save()
         for index, entry_point in enumerate(self.entry_points.all()):
@@ -228,6 +243,17 @@ class Signal(BaseSignal):
 
     def push_orders(self):
         from apps.order.utils import OrderStatus
+        statuses_not_for_cancel = [OrderStatus.CANCELED.value,
+                                   OrderStatus.NOT_EXISTS.value,
+                                   OrderStatus.NOT_SENT.value, ]
+        # cancel local_cancelled buy orders
+        for local_cancelled_order in self.buy_orders.filter(
+                local_canceled=True).exclude(_status__in=statuses_not_for_cancel):
+            local_cancelled_order.cancel_into_market()
+        # cancel local_cancelled sell orders
+        for local_cancelled_order in self.sell_orders.filter(
+                local_canceled=True).exclude(_status__in=statuses_not_for_cancel):
+            local_cancelled_order.cancel_into_market()
         # push not_sent SELL orders
         for sell_order in self.sell_orders.filter(_status=OrderStatus.NOT_SENT.value):
             sell_order.push_to_market()
@@ -404,9 +430,9 @@ class Signal(BaseSignal):
             signal.update_info_by_api()
 
     def update_info_by_api(self):
-        _statuses = [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value]
+        _statuses = [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]
         if self._status not in _statuses:
-            raise Exception(f'Not valid status: {self._status} : {_statuses}')
+            return
         for buy_order in self.buy_orders.all():
             buy_order.update_buy_order_info_by_api()
         # TODO Maybe Add the same for sell_orders?

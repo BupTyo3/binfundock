@@ -15,11 +15,17 @@ DB_PASSWORD=postgres
 ```ini
 [Logic]
 how_percent_for_one_signal=10
+slip_delta_stop_loss_percentage=0.2
 [Market]
 market_api_key=xxx
 market_api_secret=xxx
 [Signal]
 accessible_main_coins=USDT,
+[Telegram]
+api_id
+api_hash
+chat_china_id
+crypto_angel_id
 ```
 
 ### Logs
