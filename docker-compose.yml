@@ -28,8 +28,12 @@ services:
     volumes:
       - .:/binfun
       - static_volume:/binfun/static
+      - ./crontab:/etc/cron.d/cron-task
     depends_on:
       - db
+  cronjobs:
+    build: .
+    command: ["cron", "-f"]
   nginx:
     build: ./nginx
     volumes:

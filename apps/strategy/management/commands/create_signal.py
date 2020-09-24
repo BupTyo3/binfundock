@@ -23,8 +23,8 @@ class Command(SystemCommand):
         parser.add_argument('--market_name', type=str, help='Market name')
         parser.add_argument('--without_checking', action='store_true')
 
-    def check_signal_input(self, symbol: str, entry_points: List[float],
-                           take_profits: List[float], stop_loss: float, outer_signal_id: int):
+    def check_signal_input(self, entry_points: List[float],
+                           take_profits: List[float], stop_loss: float):
         error_flag = False
         if sorted(entry_points) != entry_points:
             self.log_error('Wrong order of entry_points')
@@ -46,15 +46,14 @@ class Command(SystemCommand):
         # sm_obj = SignalModel('LTCUSDT', [110, 130, 150], [200, 250, 300, 350], 90, 1357)
         # sm_obj = SignalModel('ZECETH', [0.1600, 0.1550, 0.1500], [0.17, 0.172, ], 0.166, 1357)
         symbol = options['symbol']
-        market_name = options['market_name']
         entry_points = options['entry_points']
         take_profits = options['take_profits']
         stop_loss = options['stop_loss']
         outer_signal_id = options['outer_signal_id']
         techannel = options['techannel']
 
-        self.check_signal_input(symbol, entry_points, take_profits, stop_loss, outer_signal_id)
-        logger.debug(f"Market:{market_name}:Signal:{symbol}:EntryPoints:{entry_points}:"
+        self.check_signal_input(entry_points, take_profits, stop_loss)
+        logger.debug(f"Signal:{symbol}:EntryPoints:{entry_points}:"
                      f"TakeProfits:{take_profits}:StopLoss:{stop_loss}"
                      f":SignalId:{outer_signal_id}")
         if not options['without_checking']:
