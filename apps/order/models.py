@@ -51,12 +51,15 @@ class BuyOrder(BaseOrder):
     def save(self, *args, **kwargs):
         if not self.pk and not self.custom_order_id:
             self.custom_order_id = self.form_order_id(
-                self.market.order_id_separator, self.signal.outer_signal_id, self.index)
+                self.market.order_id_separator,
+                self.signal.outer_signal_id,
+                self.signal.techannel.abbr,
+                self.index)
         super().save(*args, **kwargs)
 
     def push_to_market(self):
         logger.debug(f"Push buy order! {self}")
-        self.market.create_buy_limit_order(self)
+        self.market.push_buy_limit_order(self)
 
     def cancel_into_market(self):
         logger.debug(f"Cancel BUY order! {self}")
@@ -113,6 +116,7 @@ class SellOrder(BaseOrder):
     signal: Signal
     index: int
     tp_order: 'SellOrder.objects'
+    sl_order: 'SellOrder.objects'
     stop_loss: float
 
     objects = models.Manager()
@@ -123,11 +127,15 @@ class SellOrder(BaseOrder):
     def save(self, *args, **kwargs):
         if not self.pk and not self.custom_order_id:
             self.custom_order_id = self.form_order_id(
-                self.market.order_id_separator, self.signal.outer_signal_id, self.index)
+                self.market.order_id_separator,
+                self.signal.techannel.abbr,
+                self.signal.outer_signal_id,
+                self.index)
         super().save(*args, **kwargs)
 
     @classmethod
-    def create_sell_stop_loss_order(cls, tp_order: 'SellOrder'):
+    def _form_sell_stop_loss_order(cls, tp_order: 'SellOrder'):
+        """Form Stop Loss order by Take Profit order"""
         calculated_real_stop_loss = tp_order.signal.get_real_stop_price(tp_order.stop_loss, tp_order.market)
         custom_sl_order_id = cls.form_sl_order_id(tp_order)
         order = SellOrder.objects.create(
@@ -144,9 +152,10 @@ class SellOrder(BaseOrder):
         return order
 
     @classmethod
-    def create_sell_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
-                          take_profit: float, stop_loss: float,
-                          custom_order_id: str, index: int):
+    def _form_tp_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
+                       take_profit: float, stop_loss: float,
+                       custom_order_id: str, index: int):
+        """Form Take Profit order"""
         order = SellOrder.objects.create(
             market=market,
             symbol=signal.symbol,
@@ -156,14 +165,23 @@ class SellOrder(BaseOrder):
             signal=signal,
             custom_order_id=None if not custom_order_id else custom_order_id,
             index=index)
-        cls.create_sell_stop_loss_order(tp_order=order)
         return order
+
+    @classmethod
+    def form_sell_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
+                        take_profit: float, stop_loss: float,
+                        custom_order_id: str, index: int):
+        tp_order = cls._form_tp_order(
+            market=market, signal=signal, quantity=quantity, take_profit=take_profit,
+            stop_loss=stop_loss, custom_order_id=custom_order_id, index=index)
+        cls._form_sell_stop_loss_order(tp_order=tp_order)
+        return tp_order
 
     def push_to_market(self):
         if self.no_need_push:
             return
         logger.debug(f"Push sell order! {self}")
-        self.market.create_sell_stop_loss_limit_order(self)
+        self.market.push_sell_stop_loss_limit_order(self)
 
     def cancel_into_market(self):
         logger.debug(f"Cancel SELL order! {self}")

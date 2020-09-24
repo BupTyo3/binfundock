@@ -55,33 +55,34 @@ class Telegram(BaseTelegram):
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
         chat_id = int(conf_obj.chat_china_id)
+        channel_abbr = 'china'
         async for message in self.client.iter_messages(chat_id, limit=3):
             should_handle_msg = False
-            # TODO: Read from DB message id to skip handled messages
-            should_handle_msg = True
+            exists = Signal.objects.filter(outer_signal_id=message.id, techannel__abbr=channel_abbr).exists()
+            should_handle_msg = not exists
             if should_handle_msg and message.photo:
                 await message.download_media()
                 pairs = info_getter.iterate_files(message.id)
                 signal = verify_signal.get_active_pairs_info(pairs)
-                await self.write_signal_to_db(signal, message.id)
+                await self.write_signal_to_db(channel_abbr, signal, message.id)
 
     @sync_to_async
-    def write_signal_to_db(self, signal, message_id):
-        sm_obj = Signal.objects.filter(outer_signal_id=message_id).first()
+    def write_signal_to_db(self, channel_abbr: str, signal, message_id):
+        sm_obj = Signal.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).first()
         if sm_obj:
-            logger.debug(f"Signal {message_id} already exists")
+            logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists")
             quit()
-        sm_obj = Signal.objects.create(
-            symbol=signal[0].pair, stop_loss=signal[0].stop_loss, outer_signal_id=message_id)
-        for entry_point in signal[0].entry_points:
-            ep = EntryPoint.objects.create(signal=sm_obj, value=entry_point)
-        for take_profit in signal[0].take_profits:
-            tp = TakeProfit.objects.create(signal=sm_obj, value=take_profit)
-
-        logger.debug(f"Signal {message_id} created successfully")
+        sm_obj = Signal.create_signal(techannel_abbr=channel_abbr,
+                                      symbol=signal[0].pair,
+                                      stop_loss=signal[0].stop_loss,
+                                      entry_points=signal[0].entry_points,
+                                      take_profits=signal[0].take_profits,
+                                      outer_signal_id=message_id)
+        logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
 
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
+        channel_abbr = 'crypto_angel'
         async for message in self.client.iter_messages(chat_id, limit=4):
             should_handle_msg = False
             # TODO: Read from DB message id to skip the handled ones
@@ -89,7 +90,7 @@ class Telegram(BaseTelegram):
             if message.text and should_handle_msg:
                 signal = self.parse_angel_message(message.text, message.id)
                 if signal[0].pair:
-                    await self.write_signal_to_db(signal, message.id)
+                    await self.write_signal_to_db(channel_abbr, signal, message.id)
 
     def parse_angel_message(self, message_text, message_id):
         signals = []
