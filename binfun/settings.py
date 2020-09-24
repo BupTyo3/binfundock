@@ -264,7 +264,8 @@ class Config:
         self.api_hash = telegram.get('api_hash', None)
         self.chat_china_id = telegram.get('chat_china_id', None)
         self.crypto_angel_id = telegram.get('crypto_angel_id', None)
-        self.x_y = telegram.get('x_y', None)
+        self.tca_altcoin = telegram.get('TCA_Altcoin', None)
+        self.tca_leverage = telegram.get('TCA_Leverage', None)
 
 
 conf_obj = Config()

@@ -28,12 +28,26 @@ class Command(SystemCommand):
         with self.client:
             self.client.loop.run_until_complete(self.telegram.parse_crypto_angel_channel())
 
+    def collect_info_from_tca_altcoin_channel(self):
+        with self.client:
+            self.client.loop.run_until_complete(self.telegram.parse_tca_channel('altcoin'))
+
+    def collect_info_from_tca_leverage_channel(self):
+        with self.client:
+            self.client.loop.run_until_complete(self.telegram.parse_tca_channel('leverage'))
+
     def handle(self, *args, **options):
         channel = options['channel']
-        china_matches = ["China", "china", 'AI', 'ai']
-        angel_matches = ["angel", "Angel", 'cryptoangel', 'CryptoAngel']
+        china_matches = ["China", "china"]
+        angel_matches = ["angel", "Angel", 'cryptoangel', 'crypto_angel', 'CryptoAngel']
+        tca_altcoin_matches = ["tca_altcoin", "altcoin", "altcoins"]
+        tca_leverage_matches = ["tca_leverage", "leverage"]
         if any(x in channel for x in china_matches):
             self.collect_info_from_china_channel()
         if any(x in channel for x in angel_matches):
             self.collect_info_from_angel_channel()
+        if any(x in channel for x in tca_altcoin_matches):
+            self.collect_info_from_tca_altcoin_channel()
+        if any(x in channel for x in tca_leverage_matches):
+            self.collect_info_from_tca_leverage_channel()
 

@@ -57,8 +57,7 @@ class Telegram(BaseTelegram):
         chat_id = int(conf_obj.chat_china_id)
         channel_abbr = 'china'
         async for message in self.client.iter_messages(chat_id, limit=3):
-            should_handle_msg = False
-            exists = Signal.objects.filter(outer_signal_id=message.id, techannel__abbr=channel_abbr).exists()
+            exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg and message.photo:
                 await message.download_media()
@@ -66,27 +65,12 @@ class Telegram(BaseTelegram):
                 signal = verify_signal.get_active_pairs_info(pairs)
                 await self.write_signal_to_db(channel_abbr, signal, message.id)
 
-    @sync_to_async
-    def write_signal_to_db(self, channel_abbr: str, signal, message_id):
-        sm_obj = Signal.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).first()
-        if sm_obj:
-            logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists")
-            quit()
-        sm_obj = Signal.create_signal(techannel_abbr=channel_abbr,
-                                      symbol=signal[0].pair,
-                                      stop_loss=signal[0].stop_loss,
-                                      entry_points=signal[0].entry_points,
-                                      take_profits=signal[0].take_profits,
-                                      outer_signal_id=message_id)
-        logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
-
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
         channel_abbr = 'crypto_angel'
         async for message in self.client.iter_messages(chat_id, limit=4):
-            should_handle_msg = False
-            # TODO: Read from DB message id to skip the handled ones
-            should_handle_msg = True
+            exists = await self.is_signal_handled(message.id, channel_abbr)
+            should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_angel_message(message.text, message.id)
                 if signal[0].pair:
@@ -131,6 +115,75 @@ class Telegram(BaseTelegram):
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
 
+    async def parse_tca_channel(self, sub_type: str):
+        chat_id = int(conf_obj.tca_altcoin)
+        channel_abbr = ''
+        if sub_type == 'altcoin':
+            channel_abbr = 'tca_altcoin'
+        if sub_type == 'leverage':
+            channel_abbr = 'tca_leverage'
+        async for message in self.client.iter_messages(chat_id, limit=15):
+            exists = await self.is_signal_handled(message.id, channel_abbr)
+            should_handle_msg = not exists
+            if message.text and should_handle_msg:
+                signal = self.parse_tca_message(message.text, message.id)
+                if signal:
+                    await self.write_signal_to_db(channel_abbr, signal, message.id)
+
+    def parse_tca_message(self, message_text, message_id):
+        signals = []
+        splitted_info = message_text.splitlines()
+        buy_label = 'Entry at: '
+        goals_label = 'Sell at: '
+        stop_label = 'Stop Loss: '
+        pair = 'Coin: '
+        current_price = ''
+        is_margin = False
+        position = None
+        leverage = None
+        entries = ''
+        profits = ''
+        stop_loss = ''
+        signal_identification = ['Exchange: Binance', 'Exchange: Binance Futures', 'Exchange: ByBit']
+        is_signal = any(x in signal_identification for x in splitted_info)
+        if not is_signal:
+            return
+        for line in splitted_info:
+            if 'SHORT' in line:
+                position = 'Sell'
+            if 'LONG' in line:
+                position = 'Buy'
+            if line.startswith(pair):
+                pair = ''.join(filter(str.isalpha, line[6:]))
+            if line.startswith(buy_label):
+                fake_entries = line[10:]
+                entries = fake_entries.split('-')
+            if line.startswith(goals_label):
+                fake_profits = line[9:]
+                profits = fake_profits.split('-')
+            if line.startswith(stop_label):
+                stop_loss = line[11:]
+        signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        return signals
+
+    @sync_to_async
+    def is_signal_handled(self, message_id, channel_abbr):
+        return Signal.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).exists()
+
+    @sync_to_async
+    def write_signal_to_db(self, channel_abbr: str, signal, message_id):
+        sm_obj = Signal.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).first()
+        if sm_obj:
+            logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists")
+            quit()
+        sm_obj = Signal.create_signal(techannel_abbr=channel_abbr,
+                                      symbol=signal[0].pair,
+                                      stop_loss=signal[0].stop_loss,
+                                      entry_points=signal[0].entry_points,
+                                      take_profits=signal[0].take_profits,
+                                      outer_signal_id=message_id)
+        logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
 #
 #     # send messages to yourself...
 #     async def send_message_to_yourself(self):
@@ -323,7 +376,7 @@ class SignalVerification:
             logger.debug(f"Pair: {current_pair['symbol']}")
             logger.debug(f"Margin allowed: {pair_info_object['isMarginTradingAllowed']}")
             logger.debug(f"Current price: {current_pair['price']}")
-            logger.debug(f"Position: {pair_object.action}")
+            logger.debug(f"Position: {pair_object.position}")
             if pair_object.leverage:
                 logger.debug(f"Leverage: {pair_object.leverage}")
             logger.debug(f"Entries: {entries}")
@@ -332,8 +385,8 @@ class SignalVerification:
             logger.debug('==========================================')
             signals.append(
                 SignalModel(current_pair['symbol'], pair_info_object['isMarginTradingAllowed'], current_pair['price'],
-                            pair_object.action, pair_object.leverage, entries, profits, stop_loss,
-                            pair_object.message_id))
+                            pair_object.position, pair_object.leverage, entries, profits, stop_loss,
+                            pair_object.msg_id))
         return signals
 
     def verify_entry(self, pair_object, current_pair_info):
