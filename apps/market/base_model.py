@@ -52,5 +52,5 @@ class BaseMarket(SystemBaseModel):
         pass
 
     @abstractmethod
-    def create_buy_limit_order(self, order):
+    def push_buy_limit_order(self, order):
         pass

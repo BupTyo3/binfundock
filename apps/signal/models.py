@@ -173,7 +173,7 @@ class Signal(BaseSignal):
         logger.debug(msg)
         if stop_loss is not None:
             logger.debug(f"Form SELL ORDER for signal {self}")
-        order = SellOrder.create_sell_order(
+        order = SellOrder.form_sell_order(
             market=market,
             signal=self,
             quantity=distributed_quantity,
