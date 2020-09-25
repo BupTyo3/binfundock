@@ -1,10 +1,8 @@
 import logging
-from typing import List
 
+from apps.crontask.utils import get_or_create_crontask
 from apps.signal.models import Signal
 from apps.signal.utils import SignalStatus
-from apps.market.models import Market
-# from binfun.settings import conf_obj
 from utils.framework.models import SystemCommand
 
 logger = logging.getLogger(__name__)
@@ -35,6 +33,9 @@ class Command(SystemCommand):
             else:
                 logger.debug("You typed No - The End")
                 quit()
+
+        if not get_or_create_crontask().sold_worker_enabled:
+            return
 
         Signal.sold_orders_worker(
             outer_signal_id=outer_signal_id,

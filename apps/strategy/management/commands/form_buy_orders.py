@@ -1,6 +1,7 @@
 import logging
 from typing import List
 
+from apps.crontask.utils import get_or_create_crontask
 from apps.signal.models import Signal
 from apps.signal.utils import SignalStatus
 from apps.market.models import Market
@@ -39,6 +40,9 @@ class Command(SystemCommand):
                 quit()
 
         market_obj = get_or_create_market()
+
+        if not get_or_create_crontask().form_buy_orders_enabled:
+            return
 
         Signal.handle_new_signals(
             market_obj,

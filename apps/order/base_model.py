@@ -26,6 +26,7 @@ class BaseOrder(SystemBaseModel):
     symbol = models.CharField(max_length=16)
     quantity = models.FloatField()
     price = models.FloatField()
+    custom_order_id = models.CharField(max_length=50)
     handled_worked = models.BooleanField(
         help_text="Did something if the order has worked",
         default=False)
@@ -62,7 +63,8 @@ class BaseOrder(SystemBaseModel):
                       index: Optional[int]) -> str:
         if not (message_id or index or techannel_abbr):
             return f'{market_separator}_{self.order_type_separator}_{gen_short_uuid()}'
-        return f'{market_separator}_{str(message_id)}_{self.order_type_separator}_{index}'
+        return f'{market_separator}_{techannel_abbr}_{str(message_id)}' \
+               f'_{self.order_type_separator}_{index}'
 
     @classmethod
     def form_sl_order_id(cls, main_order: 'BaseOrder') -> str:
