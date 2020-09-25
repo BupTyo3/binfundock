@@ -12,6 +12,7 @@ import logging
 from asgiref.sync import sync_to_async
 
 from apps.signal.models import Signal, EntryPoint, TakeProfit
+from utils.parse_channels.str_parser import left_numbers
 from .base_model import BaseTelegram
 from .init_client import ShtClient
 from pytesseract import image_to_string
@@ -160,7 +161,8 @@ class Telegram(BaseTelegram):
                 entries = fake_entries.split('-')
             if line.startswith(goals_label):
                 fake_profits = line[9:]
-                profits = fake_profits.split('-')
+                possible_profits = fake_profits.split('-')
+                profits = left_numbers(possible_profits)
             if line.startswith(stop_label):
                 stop_loss = line[11:]
         signals.append(SignalModel(pair, current_price, is_margin, position,
@@ -184,7 +186,7 @@ class Telegram(BaseTelegram):
                                       take_profits=signal[0].take_profits,
                                       outer_signal_id=message_id)
         logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
-#
+
 #     # send messages to yourself...
 #     async def send_message_to_yourself(self):
 #         await self.client.send_message('me', 'Hello, myself!')
