@@ -26,7 +26,6 @@ class BuyOrder(BaseOrder):
                                on_delete=models.DO_NOTHING)
     # TODO: remove this field and _bought_quantity and setters, getters and others using
     bought_quantity = models.FloatField(default=0)
-    custom_order_id = models.CharField(max_length=30)
     _status = models.CharField(max_length=32,
                                choices=OrderStatus.choices(),
                                default=OrderStatus.NOT_SENT.value,
@@ -66,6 +65,9 @@ class BuyOrder(BaseOrder):
         self.market.cancel_order(self)
 
     def update_buy_order_info_by_api(self):
+        statuses_ = [OrderStatus.SENT.value, ]
+        if self.status not in statuses_:
+            return
         logger.debug(f"Get info about BUY order by API: {self}")
         status, bought_quantity = self.market.get_order_info(self.symbol, self.custom_order_id)
         self.update_order_api_history(status, bought_quantity)
@@ -97,7 +99,6 @@ class SellOrder(BaseOrder):
                                on_delete=models.DO_NOTHING)
     stop_loss = models.FloatField(default=0)
     sold_quantity = models.FloatField(default=0)
-    custom_order_id = models.CharField(max_length=30)
     _status = models.CharField(max_length=32,
                                choices=OrderStatus.choices(),
                                default=OrderStatus.NOT_SENT.value,
@@ -188,6 +189,9 @@ class SellOrder(BaseOrder):
         self.market.cancel_order(self)
 
     def update_sell_order_info_by_api(self):
+        statuses_ = [OrderStatus.SENT.value, ]
+        if self.status not in statuses_:
+            return
         logger.debug(f"Get info about SELL order by API: {self}")
         status, sold_quantity = self.market.get_order_info(self.symbol, self.custom_order_id)
         self.update_order_api_history(status, sold_quantity)

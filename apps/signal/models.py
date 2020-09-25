@@ -65,9 +65,9 @@ class Signal(BaseSignal):
                       stop_loss: float, outer_signal_id: int,
                       entry_points: List[float], take_profits: List[float]):
         techannel, created = Techannel.objects.get_or_create(abbr=techannel_abbr)
-        sm_obj = Signal.objects.filter(outer_signal_id=outer_signal_id, techannel=techannel).first()
         if created:
             logger.debug(f"Telegram channel '{techannel}' was created")
+        sm_obj = Signal.objects.filter(outer_signal_id=outer_signal_id, techannel=techannel).first()
         if sm_obj:
             logger.warning(f"Signal '{outer_signal_id}':'{techannel_abbr}' already exists")
             return
@@ -222,7 +222,7 @@ class Signal(BaseSignal):
                                      new_stop_loss: Optional[float] = None):
         max_number_of_copies = 300  # Max number of copies of Sell orders
         copy_delimiter = '_copy_'
-        max_length_of_signal_id = 30
+        max_length_of_signal_id = 50
         from apps.order.models import SellOrder
 
         def check_if_that_name_already_exists_function(custom_order_id):
@@ -425,107 +425,90 @@ class Signal(BaseSignal):
         pass
 
     @classmethod
-    def handle_new_signals(cls, market: BaseMarket, outer_signal_id=None):
+    def handle_new_signals(cls, market: BaseMarket,
+                           outer_signal_id: Optional[int] = None,
+                           techannel_abbr: Optional[str] = None):
         """Handle all NEW signals: Step 2"""
         params = {'_status': SignalStatus.NEW.value}
         if outer_signal_id:
-            params.update({'outer_signal_id': outer_signal_id})
+            params.update({'outer_signal_id': outer_signal_id,
+                           'techannel__abbr': techannel_abbr})
         new_signals = Signal.objects.filter(**params)
         # TODO add logic
         for signal in new_signals:
             signal.formation_buy_orders(market)
 
     @classmethod
-    def handle_formed_signals(cls, outer_signal_id=None):
+    def push_signals(cls,
+                     outer_signal_id: Optional[int] = None,
+                     techannel_abbr: Optional[str] = None):
         """Handle all FORMED signals: Step 3"""
-        params = {'_status': SignalStatus.FORMED.value}
-        if outer_signal_id:
-            params.update({'outer_signal_id': outer_signal_id})
-        formed_signals = Signal.objects.filter(**params)
-        for signal in formed_signals:
-            signal.push_orders()
-        # TODO: Maybe add the same for sell orders?
-
-    @classmethod
-    def update_signal_info_by_api(cls, outer_signal_id=None):
-        # TODO: Возможно убрать BOUGHT сигналы
-        _statuses = [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value]
+        _statuses = [SignalStatus.PUSHED.value,
+                     SignalStatus.BOUGHT.value,
+                     SignalStatus.SOLD.value, ]
         params = {'_status__in': _statuses}
         if outer_signal_id:
-            params.update({'outer_signal_id': outer_signal_id})
+            params.update({'outer_signal_id': outer_signal_id,
+                           'techannel__abbr': techannel_abbr})
+        ready_for_push_signals = Signal.objects.filter(**params)
+        for signal in ready_for_push_signals:
+            signal.push_orders()
+
+    @classmethod
+    def update_signals_info_by_api(cls,
+                                   outer_signal_id: Optional[int] = None,
+                                   techannel_abbr: Optional[str] = None):
+        _statuses = [SignalStatus.PUSHED.value,
+                     SignalStatus.BOUGHT.value,
+                     SignalStatus.SOLD.value, ]
+        params = {'_status__in': _statuses}
+        if outer_signal_id:
+            params.update({'outer_signal_id': outer_signal_id,
+                           'techannel__abbr': techannel_abbr})
         formed_signals = Signal.objects.filter(**params)
-        # TODO
         for signal in formed_signals:
             signal.update_info_by_api()
 
     def update_info_by_api(self):
-        _statuses = [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]
+        from apps.order.utils import OrderStatus
+        _statuses = [SignalStatus.PUSHED.value,
+                     SignalStatus.BOUGHT.value,
+                     SignalStatus.SOLD.value, ]
         if self._status not in _statuses:
             return
-        for buy_order in self.buy_orders.all():
+
+        _order_statuses = [OrderStatus.SENT.value, ]
+        params = {'_status__in': _order_statuses}
+        for buy_order in self.buy_orders.filter(**params):
             buy_order.update_buy_order_info_by_api()
-        # TODO Maybe Add the same for sell_orders?
-        for sell_order in self.sell_orders.all():
+        for sell_order in self.sell_orders.filter(**params):
             sell_order.update_sell_order_info_by_api()
 
     @classmethod
-    def handle_pushed_signals(cls, outer_signal_id=None):
-    # def gain_profit(self):
-        """Асинхронная функция для менеджера задач.
-        Разветвления:
-        1)Проверяет сработал ли Osell(с профитом):
-            - отменить все Obuy
-            - увеличить self.income (профит)
-            - пересоздание Osell (с новыми StopLoss)
-        2)Проверяет сработал ли Obuy:
-            - пересоздание Osell (с новыми quantity)
-        3)Проверяет сработал ли Osell (по StopLoss)
-            - уменьшить self.income (Loss)
-        """
-        params = {'_status': SignalStatus.PUSHED.value}
-        if outer_signal_id:
-            params.update({'outer_signal_id': outer_signal_id})
-        pushed_signals = Signal.objects.filter(**params)
-
-        for signal in pushed_signals:
-            if signal.check_if_order_sell_has_worked():
-                # TODO add logic
-                pass
-            if signal.check_if_order_buy_has_worked():
-                # TODO add logic
-                pass
-
-    def check_if_order_sell_has_worked(self):
-        """
-        получить данные из БД = self.sell_orders
-        получить данные по API по custom_id каждого из sell ордеров
-        """
-        pass
-
-    def check_if_order_buy_has_worked(self):
-        pass
-
-    @classmethod
-    def bought_orders_worker(cls, outer_signal_id=None):
+    def bought_orders_worker(cls,
+                             outer_signal_id: Optional[int] = None,
+                             techannel_abbr: Optional[str] = None):
         """Handle all PUSHED signals. Buy orders worker"""
         # TODO: Возможно добавить BOUGHT сигналы
         params = {'_status': SignalStatus.PUSHED.value}
         if outer_signal_id:
-            params.update({'outer_signal_id': outer_signal_id})
+            params.update({'outer_signal_id': outer_signal_id,
+                           'techannel__abbr': techannel_abbr})
         formed_signals = Signal.objects.filter(**params)
-        # TODO
         for signal in formed_signals:
             signal.worker_for_bought_orders()
 
     @classmethod
-    def sold_orders_worker(cls, outer_signal_id=None):
+    def sold_orders_worker(cls,
+                           outer_signal_id: Optional[int] = None,
+                           techannel_abbr: Optional[str] = None):
         """Handle all BOUGHT signals. Sell orders worker"""
         # TODO: Возможно добавить BOUGHT сигналы
         params = {'_status': SignalStatus.BOUGHT.value}
         if outer_signal_id:
-            params.update({'outer_signal_id': outer_signal_id})
+            params.update({'outer_signal_id': outer_signal_id,
+                           'techannel__abbr': techannel_abbr})
         formed_signals = Signal.objects.filter(**params)
-        # TODO
         for signal in formed_signals:
             signal.worker_for_sold_orders()
 
