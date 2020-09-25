@@ -2,7 +2,6 @@ import logging
 from typing import List
 
 from apps.signal.models import Signal, EntryPoint, TakeProfit
-from apps.market.models import Market
 # from binfun.settings import conf_obj
 from utils.framework.models import SystemCommand
 

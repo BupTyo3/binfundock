@@ -50,14 +50,15 @@ INSTALLED_APPS = [
     'drf_yasg',
 
     # Project apps
-    'apps.user',
-    'apps.order',
-    'apps.signal',
-    'apps.pair',
+    'apps.crontask',
     'apps.market',
+    'apps.order',
+    'apps.pair',
+    'apps.signal',
     'apps.strategy',
     'apps.techannel',
     'apps.telegram',
+    'apps.user',
 ]
 
 MIDDLEWARE = [
