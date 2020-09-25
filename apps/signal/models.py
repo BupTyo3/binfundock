@@ -222,7 +222,7 @@ class Signal(BaseSignal):
                                      new_stop_loss: Optional[float] = None):
         max_number_of_copies = 300  # Max number of copies of Sell orders
         copy_delimiter = '_copy_'
-        max_length_of_signal_id = 50
+        max_length_of_signal_id = 50  # length of custom_order_id field of BaseOrder model
         from apps.order.models import SellOrder
 
         def check_if_that_name_already_exists_function(custom_order_id):
@@ -252,8 +252,8 @@ class Signal(BaseSignal):
                                       worked_sell_orders: QuerySet,
                                       sell_quantity: Optional[float] = None,
                                       new_stop_loss: Optional[float] = None) -> List['SellOrder']:
-        """Функция расчёта данных для создания ордеров на продажу"""
-        if new_stop_loss is None:
+        """Form copied sell orders with new stop_loss or new sell_quantity"""
+        if new_stop_loss is None and not sell_quantity:
             new_stop_loss = self._get_new_stop_loss(worked_sell_orders)
         res = list()
         for order_id in original_orders_ids:
@@ -360,10 +360,25 @@ class Signal(BaseSignal):
         sent_orders.update(local_canceled=True, local_canceled_time=now_)
 
     @staticmethod
-    def __get_bought_quantity(worked_orders: QuerySet):
+    def __get_bought_quantity(worked_orders: QuerySet) -> float:
         # TODO: move it
         res = worked_orders.aggregate(Sum('bought_quantity'))
         return res['bought_quantity__sum']
+
+    @staticmethod
+    def __get_planned_sold_quantity(worked_orders: QuerySet) -> float:
+        # TODO: move it
+        res = worked_orders.aggregate(Sum('quantity'))
+        return res['quantity__sum']
+
+    @rounded_result
+    def __calculate_new_bought_quantity(self,
+                                        sent_sell_orders: QuerySet,
+                                        addition_quantity: float) -> float:
+        """Calculate new bought_quantity by sent_sell_orders and addition_quantity
+         (bought quantity of worked buy orders)"""
+        all_quantity = self.__get_planned_sold_quantity(sent_sell_orders) + addition_quantity
+        return all_quantity / sent_sell_orders.count()
 
     @transaction.atomic
     @debug_input_and_returned
@@ -382,7 +397,18 @@ class Signal(BaseSignal):
         bought_quantity = self.__get_bought_quantity(worked_orders)
         logger.debug(f"Calculate quantity for Sell order: Bought_quantity = {bought_quantity}")
         # TODO: Add logic recreating existing sell orders with updated quantity
-        self._formation_sell_orders(worked_orders.last().market, bought_quantity)
+        # Recreating opened sent sell orders with new quantity
+        sent_sell_orders = self.__get_sent_sell_orders()
+        if sent_sell_orders:
+            new_bought_quantity = self.__calculate_new_bought_quantity(sent_sell_orders, bought_quantity)
+            copied_sent_sell_orders_ids = list(sent_sell_orders.all().values_list('id', flat=True))
+            self.__cancel_sent_orders(sent_sell_orders)
+            self._formation_copied_sell_orders(original_orders_ids=copied_sent_sell_orders_ids,
+                                               worked_sell_orders=worked_orders,
+                                               sell_quantity=new_bought_quantity)
+        # Form sell orders if the signal doesn't have any
+        elif not self.sell_orders.exists():
+            self._formation_sell_orders(worked_orders.last().market, bought_quantity)
         self.__update_flag_handled_worked_orders(worked_orders)
         # Change status
         if self.status not in [SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]:

@@ -10,6 +10,9 @@ from apps.order.utils import OrderStatus
 from apps.market.models import Market
 from apps.signal.models import Signal
 from .base_model import BaseOrder, HistoryApiBaseOrder
+from utils.framework.models import (
+    generate_increment_name_after_suffix,
+)
 
 if TYPE_CHECKING:
     from apps.market.base_model import BaseMarket
