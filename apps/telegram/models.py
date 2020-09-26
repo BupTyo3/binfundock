@@ -181,22 +181,29 @@ class Telegram(BaseTelegram):
         if sm_obj:
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists")
             quit()
+        if signal[0].pair[-3:] == 'USD':
+            signal[0].pair = signal[0].pair.replace('USD', 'USDT')
+
         logger.debug(f"Attempt to write into DB the following signal: "
                      f"Pair: '{signal[0].pair} '"
                      f"Entry Points: '{signal[0].entry_points} '"
                      f"Take Profits: '{signal[0].take_profits} '"
                      f"Stop Loss: '{signal[0].stop_loss} '")
-        sm_obj = Signal.create_signal(techannel_abbr=channel_abbr,
-                                      symbol=signal[0].pair,
-                                      stop_loss=signal[0].stop_loss,
-                                      entry_points=signal[0].entry_points,
-                                      take_profits=signal[0].take_profits,
-                                      outer_signal_id=message_id)
-        logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
+        try:
+            Signal.create_signal(techannel_abbr=channel_abbr,
+                                 symbol=signal[0].pair,
+                                 stop_loss=signal[0].stop_loss,
+                                 entry_points=signal[0].entry_points,
+                                 take_profits=signal[0].take_profits,
+                                 outer_signal_id=message_id)
+            logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
+        except:
+            self.send_message_to_yourself(f"Error during processing the signal to DB,"
+                                          f"please check logs for {signal[0].pair}")
 
-#     # send messages to yourself...
-#     async def send_message_to_yourself(self):
-#         await self.client.send_message('me', 'Hello, myself!')
+    # send messages to yourself...
+    async def send_message_to_yourself(self, message):
+        await self.client.send_message('me', message)
 #
 #     # @client.on(events.NewMessage)
 #     # async def my_event_handler(event):
