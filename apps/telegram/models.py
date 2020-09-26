@@ -117,13 +117,15 @@ class Telegram(BaseTelegram):
         return signals
 
     async def parse_tca_channel(self, sub_type: str):
-        chat_id = int(conf_obj.tca_altcoin)
+        chat_id = int
         channel_abbr = ''
         if sub_type == 'altcoin':
             channel_abbr = 'tca_altcoin'
+            chat_id = int(conf_obj.tca_altcoin)
         if sub_type == 'leverage':
             channel_abbr = 'tca_leverage'
-        async for message in self.client.iter_messages(chat_id, limit=15):
+            chat_id = int(conf_obj.tca_leverage)
+        async for message in self.client.iter_messages(chat_id, limit=5):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
@@ -179,6 +181,11 @@ class Telegram(BaseTelegram):
         if sm_obj:
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists")
             quit()
+        logger.debug(f"Attempt to write into DB the following signal: "
+                     f"Pair: '{signal[0].pair} '"
+                     f"Entry Points: '{signal[0].entry_points} '"
+                     f"Take Profits: '{signal[0].take_profits} '"
+                     f"Stop Loss: '{signal[0].stop_loss} '")
         sm_obj = Signal.create_signal(techannel_abbr=channel_abbr,
                                       symbol=signal[0].pair,
                                       stop_loss=signal[0].stop_loss,
