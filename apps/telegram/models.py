@@ -8,8 +8,9 @@ import json
 import urllib.request
 import pytz
 import logging
-
 from asgiref.sync import sync_to_async
+
+from django.conf import settings
 
 from apps.signal.models import Signal, EntryPoint, TakeProfit
 from utils.parse_channels.str_parser import left_numbers
@@ -23,7 +24,7 @@ from utils.framework.models import SystemCommand
 logger = logging.getLogger(__name__)
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-directory = 'D:/Frameworks/binfundock/'
+directory = settings.BASE_DIR
 regexp_numbers = '\d+\.?\d+'
 regexp_stop = '\d+\.?\d+$'
 
@@ -329,8 +330,8 @@ class ChinaImageToSignal:
                 pairs.append(pair_info)
                 now = str(datetime.now())[:19]
                 now = now.replace(":", "_")
-                shutil.move("D:/Frameworks/binfundock/{}".format(filename),
-                            "D:/Frameworks/binfundock/apps/telegram/media/" + str(now) + ".jpg")
+                shutil.move(f"{directory}/{filename}",
+                            f"{settings.PARSED_IMAGES_STORAGE}/" + str(now) + ".jpg")
         return pairs
 
     def is_locked(self, filepath):

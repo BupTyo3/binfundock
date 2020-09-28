@@ -35,6 +35,13 @@ crypto_angel_id
 mkdir logs
 ```
 
+### Others
+
+- Create parsed-images folder
+```bash
+mkdir parsed-images
+```
+
 ### Docker 
 
 - Start `web` and `db` containers

@@ -174,6 +174,12 @@ PROJECT_TITLE = 'Pet signal'
 
 API_VERSION = 'v1'
 
+# Project
+
+## Project Telegram
+
+PARSED_IMAGES_STORAGE = f'{BASE_DIR}/parsed-images'
+
 # Logger
 
 LOGGING = {

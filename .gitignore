@@ -135,4 +135,5 @@ pgdata/
 .idea/
 *.session
 apps/telegram/media/
+parsed-images/
 *.session-journal
