@@ -64,6 +64,8 @@ class Telegram(BaseTelegram):
                 await message.download_media()
                 pairs = info_getter.iterate_files(message.id)
                 signal = verify_signal.get_active_pairs_info(pairs)
+                if not signal:
+                    return
                 await self.write_signal_to_db(channel_abbr, signal, message.id)
 
     async def parse_crypto_angel_channel(self):
@@ -198,12 +200,16 @@ class Telegram(BaseTelegram):
                                  outer_signal_id=message_id)
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
         except:
-            self.send_message_to_yourself(f"Error during processing the signal to DB,"
-                                          f"please check logs for {signal[0].pair}")
+            logger.error(f"Write into DB failed")
+            # await self.send_message_to_yourself(f"Error during processing the signal to DB,"
+            #                                     f"please check logs for '{signal[0].pair}'"
+            #                                     f"related to the '{channel_abbr}' algorithm")
 
     # send messages to yourself...
     async def send_message_to_yourself(self, message):
         await self.client.send_message('me', message)
+
+
 #
 #     # @client.on(events.NewMessage)
 #     # async def my_event_handler(event):
@@ -359,7 +365,6 @@ class SignalVerification:
         for pair_object in pairs:
             if pair_object.entry_points is None or pair_object.take_profits is None:
                 return False
-            # TODO: Futures https: // binanceapitest.github.io / Binance - Futures - API - doc / market_data /  # symbol-price-ticker-market_data
             price_json = ''
             pair_info_object = ''
             try:
@@ -400,7 +405,7 @@ class SignalVerification:
             logger.debug(f"Stop-loss: {stop_loss}")
             logger.debug('==========================================')
             signals.append(
-                SignalModel(current_pair['symbol'], pair_info_object['isMarginTradingAllowed'], current_pair['price'],
+                SignalModel(current_pair['symbol'], current_pair['price'], pair_info_object['isMarginTradingAllowed'],
                             pair_object.position, pair_object.leverage, entries, profits, stop_loss,
                             pair_object.msg_id))
         return signals
@@ -413,7 +418,8 @@ class SignalVerification:
         if dot_position:
             for price in pair_object.entry_points:
                 # frac, whole = math.modf(int(price))
-                if price.startswith('0') and price.find('.') != dot_position:
+                # if price.startswith('0') and price.find('.') != dot_position:
+                if price.find('.') != dot_position:
                     price = price[:dot_position] + "." + price[dot_position:]
                     verified_entries.append(price)
                 else:
@@ -425,7 +431,8 @@ class SignalVerification:
         dot_position = current_pair_info['price'].index('.')
         if dot_position:
             for price in pair_object.take_profits:
-                if price.find('.') > 0 and price.find('.') != dot_position:
+                # if price.find('.') > 0 and price.find('.') != dot_position:
+                if price.find('.') != dot_position:
                     price = price[:dot_position] + "." + price[dot_position:]
                     verified_profits.append(price)
                 else:
