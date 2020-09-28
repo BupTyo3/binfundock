@@ -489,7 +489,8 @@ class Signal(BaseSignal):
                      outer_signal_id: Optional[int] = None,
                      techannel_abbr: Optional[str] = None):
         """Handle all FORMED signals: Step 3"""
-        _statuses = [SignalStatus.PUSHED.value,
+        _statuses = [SignalStatus.FORMED.value,
+                     SignalStatus.PUSHED.value,
                      SignalStatus.BOUGHT.value,
                      SignalStatus.SOLD.value, ]
         params = {'_status__in': _statuses}
