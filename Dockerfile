@@ -18,8 +18,8 @@ WORKDIR /binfun
 COPY . /binfun/
 
 # Creating necessary folders
-RUN mkdir logs
-RUN mkdir parsed-images
+RUN mkdir -p logs
+RUN mkdir -p parsed-images
 
 # Install requirements
 RUN pip install -U pip && \
