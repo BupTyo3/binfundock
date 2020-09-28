@@ -200,8 +200,8 @@ class Telegram(BaseTelegram):
                                  take_profits=signal[0].take_profits,
                                  outer_signal_id=message_id)
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
-        except:
-            logger.error(f"Write into DB failed")
+        except Exception as e:
+            logger.error(f"Write into DB failed: {e}")
             # await self.send_message_to_yourself(f"Error during processing the signal to DB,"
             #                                     f"please check logs for '{signal[0].pair}'"
             #                                     f"related to the '{channel_abbr}' algorithm")
