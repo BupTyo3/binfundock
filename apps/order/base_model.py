@@ -26,7 +26,7 @@ class BaseOrder(SystemBaseModel):
     symbol = models.CharField(max_length=16)
     quantity = models.FloatField()
     price = models.FloatField()
-    custom_order_id = models.CharField(max_length=50)
+    custom_order_id = models.CharField(max_length=55)
     handled_worked = models.BooleanField(
         help_text="Did something if the order has worked",
         default=False)
