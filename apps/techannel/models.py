@@ -10,7 +10,7 @@ class Techannel(TechannelBase):
     """
     Model of Telegram channel entity
     """
-    abbr = models.CharField(max_length=10,
+    abbr = models.CharField(max_length=15,
                             unique=True,
                             help_text='unique abbreviation')
     name = models.CharField(max_length=100,
