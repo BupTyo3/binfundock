@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import pytesseract
 import json
 import urllib.request
-import pytz
 import logging
 from asgiref.sync import sync_to_async
 
@@ -19,12 +18,13 @@ from .init_client import ShtClient
 from pytesseract import image_to_string
 from PIL import Image
 from binfun.settings import conf_obj
-from utils.framework.models import SystemCommand
+from sys import platform
 
 logger = logging.getLogger(__name__)
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-directory = settings.BASE_DIR
+if platform == "win32":
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
 regexp_numbers = '\d+\.?\d+'
 regexp_stop = '\d+\.?\d+$'
 
@@ -324,6 +324,7 @@ class ChinaImageToSignal:
 
     def iterate_files(self, message_id):
         pairs = []
+        directory = settings.BASE_DIR
         for filename in os.listdir(directory):
             if filename.endswith(".jpg"):
                 pair_info = self.get_parsed(filename, message_id)
