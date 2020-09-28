@@ -104,10 +104,10 @@ class Signal(BaseSignal):
 
     @rounded_result
     def __get_turnover_by_coin_pair(self, market: BaseMarket) -> float:
-        """Оборот на одну пару.
-        Сколько выделяем денег на ставку на пару
-        Если баланс 1000 долларов, 10% - конфигурационный параметр на одну пару, то будет
-         эквивалент 100 долларов"""
+        """Turnover for one Signal.
+        How much money we allocate for one Signal
+        If free_balance 1000 usd, 10% - config parameter, so
+         result will be 100 usd"""
         res = (market.get_current_balance(self.main_coin) *
                self.conf.how_percent_for_one_signal /
                self.conf.one_hundred_percent)
@@ -184,12 +184,32 @@ class Signal(BaseSignal):
         )
         return order
 
+    def _check_if_balance_enough_for_signal(self, market: BaseMarket):
+        # TODO check
+        from tools.tools import convert_to_coin_quantity
+        pair = self._get_pair(market)
+        amount_quantity = self.__get_turnover_by_coin_pair(market) / (
+            self.__get_buy_distribution() + self.__get_sell_distribution())
+        if amount_quantity < pair.min_amount:
+            logger.debug(f"Bad Check: amount_quantity < min_amount: {amount_quantity} < {pair.min_amount}!")
+            return False
+        entry_point_price = self.entry_points.last().value
+        coin_quantity = convert_to_coin_quantity(amount_quantity, entry_point_price)
+        if coin_quantity > pair.min_quantity:
+            return True
+        logger.debug(f"Bad Check: coin_quantity < min_quantity: {coin_quantity} < {pair.min_quantity}!")
+        return False
+
     @transaction.atomic
     def formation_buy_orders(self, market: BaseMarket) -> None:
-        """Функция расчёта данных для создания ордеров на покупку"""
+        """Function for forming Buy orders for NEW signal"""
         if self._status != SignalStatus.NEW.value:
             logger.warning(f'Not valid Signal status for formation BUY order: '
                            f'{self._status} : {SignalStatus.NEW.value}')
+            return
+        if not self._check_if_balance_enough_for_signal(market):
+            # TODO: Add sent message to yourself telegram
+            logger.debug(f"Not enough money for Signal '{self}'")
             return
         self.status = SignalStatus.FORMED.value
         self.save()
@@ -198,7 +218,7 @@ class Signal(BaseSignal):
             self.__form_buy_order(market, coin_quantity, entry_point, index)
 
     def _formation_sell_orders(self, market: BaseMarket, sell_quantity: float) -> None:
-        """Функция расчёта данных для создания ордеров на продажу"""
+        """Function for creating Sell orders"""
         distributed_quantity = self._get_distributed_sell_quantity(market, sell_quantity)
         for index, take_profit in enumerate(self.take_profits.all()):
             self.__form_sell_order(
@@ -383,9 +403,9 @@ class Signal(BaseSignal):
     @transaction.atomic
     @debug_input_and_returned
     def worker_for_bought_orders(self):
-        """Worker для одного сигнала. Запускать когда сработал BUY order"""
-        # TODO: Maybe add select_for_update - чтоб другой процесс не установил флаги
-        #  или ещё флаг добавить, что в обработке ордера или ничего, если один процесс
+        """Worker for one signal. Run if at least one Buy order was worked"""
+        # TODO: Maybe add select_for_update - to avoid setting the flag by another process
+        #  or add another flag now_being_processed
         # TODO: Check
         # TODO: Maybe add BOUGHT status
         _statuses = [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]
@@ -418,12 +438,13 @@ class Signal(BaseSignal):
     @transaction.atomic
     @debug_input_and_returned
     def worker_for_sold_orders(self):
-        """Worker для одного сигнала. Запускать когда сработал SELL order
-        1)Отмена всех BUY orders
-        2)Пересоздание оставшихся SELL orders с обновлённым stop_loss
-        3)Добавить прибыль или убыток в зависимости от срабатывания (stop_loss или в профит)"""
-        # TODO: Maybe add select_for_update - чтоб другой процесс не установил флаги
-        #  или ещё флаг добавить, что в обработке ордера или ничего, если один процесс
+        """Worker for one signal. Run if at least one Buy order was worked"""
+        """Worker for one signal. Запускать когда сработал SELL order
+        1)Cancel BUY orders
+        2)Recreating opened (sent) SELL orders with updated stop_loss
+        3)Calculate profit (stop_loss or take_profit)"""
+        # TODO: Maybe add select_for_update - to avoid setting the flag by another process
+        #  or add another flag now_being_processed
         # TODO: Check
         _statuses = [SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]
         if self._status not in _statuses:
@@ -460,7 +481,6 @@ class Signal(BaseSignal):
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
         new_signals = Signal.objects.filter(**params)
-        # TODO add logic
         for signal in new_signals:
             signal.formation_buy_orders(market)
 
@@ -515,7 +535,7 @@ class Signal(BaseSignal):
                              outer_signal_id: Optional[int] = None,
                              techannel_abbr: Optional[str] = None):
         """Handle all PUSHED signals. Buy orders worker"""
-        # TODO: Возможно добавить BOUGHT сигналы
+        # TODO: Maybe add BOUGHT Signals
         params = {'_status': SignalStatus.PUSHED.value}
         if outer_signal_id:
             params.update({'outer_signal_id': outer_signal_id,
@@ -529,7 +549,7 @@ class Signal(BaseSignal):
                            outer_signal_id: Optional[int] = None,
                            techannel_abbr: Optional[str] = None):
         """Handle all BOUGHT signals. Sell orders worker"""
-        # TODO: Возможно добавить BOUGHT сигналы
+        # TODO: Maybe add BOUGHT Signals
         params = {'_status': SignalStatus.BOUGHT.value}
         if outer_signal_id:
             params.update({'outer_signal_id': outer_signal_id,
