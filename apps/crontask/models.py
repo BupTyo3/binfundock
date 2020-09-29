@@ -14,6 +14,10 @@ class CronTask(CronTaskBase):
     pull_job_enabled = models.BooleanField(default=False)
     bought_worker_enabled = models.BooleanField(default=False)
     sold_worker_enabled = models.BooleanField(default=False)
+    china_channel_enabled = models.BooleanField(default=False)
+    crypto_channel_enabled = models.BooleanField(default=False)
+    tca_leverage_enabled = models.BooleanField(default=False)
+    tca_altcoin_enabled = models.BooleanField(default=False)
 
     objects = models.Manager()
 

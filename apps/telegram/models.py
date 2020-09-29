@@ -53,12 +53,69 @@ class Telegram(BaseTelegram):
     """
     name = 'Telegram'
 
+    async def parse_bulls_channel(self):
+        chat_id = int(conf_obj.chat_china_id)
+        channel_abbr = 'bulls'
+        async for message in self.client.iter_messages(chat_id, limit=10):
+            exists = await self.is_signal_handled(message.id, channel_abbr)
+            # TODO: if message contains close/closing/closed
+            #  find previous signal to close. Maybe iterate through previous msges which
+            #  are in db related to this channel
+            Signal.objects.filter(outer_signal_id=message.id, techannel__abbr=channel_abbr)
+
+            should_handle_msg = not exists
+            if message.text and should_handle_msg:
+                signal = self.parse_bulls_message(message.text, message.id)
+                if not signal:
+                    return
+                await self.write_signal_to_db(channel_abbr, signal, message.id)
+
+    def parse_bulls_message(self, message_text, message_id):
+        signals = []
+        splitted_info = message_text.splitlines()
+        signal_identification = ['Get in', 'Entry zone', 'BUY ADOUND']
+        is_signal = any(x in signal_identification for x in splitted_info)
+        buy_label = 'Entry at: '
+        goals_label = 'Sell at: '
+        stop_label = 'Stop Loss: '
+        pair = 'Coin: '
+        current_price = ''
+        is_margin = False
+        position = None
+        leverage = None
+        entries = ''
+        profits = ''
+        stop_loss = ''
+        signal_identification = ['Exchange: Binance', 'Exchange: Binance Futures', 'Exchange: ByBit']
+        is_signal = any(x in signal_identification for x in splitted_info)
+        if not is_signal:
+            return
+        for line in splitted_info:
+            if 'SHORT' in line:
+                position = 'Sell'
+            if 'LONG' in line:
+                position = 'Buy'
+            if line.startswith(pair):
+                pair = ''.join(filter(str.isalpha, line[6:]))
+            if line.startswith(buy_label):
+                fake_entries = line[10:]
+                entries = fake_entries.split('-')
+            if line.startswith(goals_label):
+                fake_profits = line[9:]
+                possible_profits = fake_profits.split('-')
+                profits = left_numbers(possible_profits)
+            if line.startswith(stop_label):
+                stop_loss = line[11:]
+        signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        return signals
+
     async def parse_china_channel(self):
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
         chat_id = int(conf_obj.chat_china_id)
         channel_abbr = 'china'
-        async for message in self.client.iter_messages(chat_id, limit=3):
+        async for message in self.client.iter_messages(chat_id, limit=10):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg and message.photo:
@@ -72,7 +129,7 @@ class Telegram(BaseTelegram):
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
         channel_abbr = 'crypto_angel'
-        async for message in self.client.iter_messages(chat_id, limit=4):
+        async for message in self.client.iter_messages(chat_id, limit=10):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
@@ -101,23 +158,25 @@ class Telegram(BaseTelegram):
         for line in splitted_info:
             if line.startswith(buy_label):
                 fake_entries = line[18:]
-                splitted_entries = fake_entries.split('-')
-                key_numbers = len(splitted_entries[-1])
-                prefix = splitted_entries[0][:-key_numbers]
-                entries = [f'{prefix}{n}' for n in splitted_entries][1:]
-                entries.insert(0, splitted_entries[0])
+                entries = self.handle_ca_recommend_to_array(fake_entries)
             if line.startswith(goals_label):
                 fake_profits = line[6:]
-                splitted_profits = fake_profits.split('-')
-                key_numbers = len(splitted_profits[-1])
-                prefix = splitted_profits[0][:-key_numbers]
-                profits = [f'{prefix}{n}' for n in splitted_profits][1:]
-                profits.insert(0, splitted_profits[0])
+                profits = self.handle_ca_recommend_to_array(fake_profits)
             if line.startswith(stop_label):
                 stop_loss = line[4:]
+                stop_loss = self.handle_ca_recommend_to_array(stop_loss)
+                stop_loss = min(float(s) for s in stop_loss)
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
+
+    def handle_ca_recommend_to_array(self, message_line):
+        splitted_info = message_line.split('-')
+        key_numbers = len(splitted_info[-1])
+        prefix = splitted_info[0][:-key_numbers]
+        array = [f'{prefix}{n}' for n in splitted_info][1:]
+        array.insert(0, splitted_info[0])
+        return array
 
     async def parse_tca_channel(self, sub_type: str):
         chat_id = int
@@ -128,7 +187,7 @@ class Telegram(BaseTelegram):
         if sub_type == 'leverage':
             channel_abbr = 'tca_leverage'
             chat_id = int(conf_obj.tca_leverage)
-        async for message in self.client.iter_messages(chat_id, limit=5):
+        async for message in self.client.iter_messages(chat_id, limit=10):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
