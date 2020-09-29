@@ -120,3 +120,13 @@ def catch_exception(f=None, *, code: int, alternative: dict):
 @rounded_result
 def convert_to_coin_quantity(quantity, value):
     return quantity / value
+
+
+@rounded_result
+def get_percent(value: float, percentage) -> float:
+    return (value * percentage) / 100
+
+
+@rounded_result
+def subtract_fee(quantity: float, fee: float) -> float:
+    return quantity - get_percent(quantity, fee)

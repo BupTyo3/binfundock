@@ -19,6 +19,7 @@ slip_delta_stop_loss_percentage=0.2
 [Market]
 market_api_key=xxx
 market_api_secret=xxx
+market_fee=0.1
 [Signal]
 accessible_main_coins=USDT,
 [Telegram]

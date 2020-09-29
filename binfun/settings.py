@@ -176,7 +176,7 @@ API_VERSION = 'v1'
 
 # Project
 
-## Project Telegram
+# Project Telegram
 
 PARSED_IMAGES_STORAGE = f'{BASE_DIR}/parsed-images'
 
@@ -261,9 +261,10 @@ class Config:
         market = config['Market']
         self.market_api_key = market.get('market_api_key', None)
         self.market_api_secret = market.get('market_api_secret', None)
+        self.market_fee: float = market.getfloat('market_fee')
         logic = config['Logic']
-        self.how_percent_for_one_signal = float(logic['how_percent_for_one_signal'])
-        self.slip_delta_stop_loss_percentage = float(logic['slip_delta_stop_loss_percentage'])
+        self.how_percent_for_one_signal: float = logic.getfloat('how_percent_for_one_signal')
+        self.slip_delta_stop_loss_percentage: float = logic.getfloat('slip_delta_stop_loss_percentage')
         signal = config['Signal']
         self.accessible_main_coins: List[str] = signal['accessible_main_coins'].split(',')
         telegram = config['Telegram']
