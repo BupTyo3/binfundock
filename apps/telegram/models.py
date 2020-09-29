@@ -211,6 +211,7 @@ class Telegram(BaseTelegram):
         stop_loss = ''
         signal_identification = ['Exchange: Binance', 'Exchange: Binance Futures', 'Exchange: ByBit']
         is_signal = any(x in signal_identification for x in splitted_info)
+        possible_take_profits = ['Sell at: ', 'Targets: ']
         if not is_signal:
             return
         for line in splitted_info:
@@ -223,7 +224,7 @@ class Telegram(BaseTelegram):
             if line.startswith(buy_label):
                 fake_entries = line[10:]
                 entries = fake_entries.split('-')
-            if line.startswith(goals_label):
+            if line.startswith(possible_take_profits[0]) or line.startswith(possible_take_profits[1]):
                 fake_profits = line[9:]
                 possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
