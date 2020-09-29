@@ -15,11 +15,13 @@ class Techannel(TechannelBase):
                             help_text='unique abbreviation')
     name = models.CharField(max_length=100,
                             blank=True)
+
+    objects = models.Manager()
     abbr: str
     name: str
 
     def __str__(self):
-        return f"{self.pk}:{self.name}:{self.abbr}"
+        return f"{self.pk}:{self.abbr}"
 
     def save(self, *args, **kwargs):
         self.abbr = self.abbr.lower()

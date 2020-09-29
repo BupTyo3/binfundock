@@ -18,6 +18,7 @@ class BaseMarket(SystemBaseModel):
     quantity_: str = 'quantity'
     executed_quantity_: str = 'executed_quantity'
     status_: str = 'status'
+    market_fee: float
 
     order_statuses: OrderStatus = OrderStatus
 
