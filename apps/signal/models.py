@@ -131,6 +131,7 @@ class Signal(BaseSignal):
         coin_quantity = convert_to_coin_quantity(quantity, entry_point_price)
         return self.__find_not_fractional_by_step(coin_quantity, step_quantity)
 
+    @rounded_result
     def get_real_stop_price(self, price: float, market: BaseMarket):
         pair = self._get_pair(market)
         if self.conf.slip_delta_stop_loss_percentage:
