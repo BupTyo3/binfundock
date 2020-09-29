@@ -15,7 +15,11 @@ from .utils import SignalStatus
 from apps.market.base_model import BaseMarket
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
-from tools.tools import rounded_result, debug_input_and_returned
+from tools.tools import (
+    rounded_result,
+    debug_input_and_returned,
+    subtract_fee,
+)
 
 if TYPE_CHECKING:
     from apps.order.models import SellOrder, BuyOrder
@@ -384,7 +388,8 @@ class Signal(BaseSignal):
     def __get_bought_quantity(worked_orders: QuerySet) -> float:
         # TODO: move it
         res = worked_orders.aggregate(Sum('bought_quantity'))
-        return res['bought_quantity__sum']
+        bought_quantity = res['bought_quantity__sum']
+        return subtract_fee(bought_quantity, worked_orders.last().market.market_fee)
 
     @staticmethod
     def __get_planned_sold_quantity(worked_orders: QuerySet) -> float:

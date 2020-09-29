@@ -33,6 +33,7 @@ class BiClient(client.Client, BaseClient):
 
 class Market(BaseMarket):
     default_name = 'Binance'
+    market_fee = conf_obj.market_fee
     name = models.CharField(max_length=32,
                             unique=True,
                             default=default_name)
