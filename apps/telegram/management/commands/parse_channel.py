@@ -6,6 +6,7 @@ from apps.signal.models import Signal
 from apps.telegram.models import Telegram
 from binfun.settings import conf_obj
 from utils.framework.models import SystemCommand
+from apps.crontask.utils import get_or_create_crontask
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,14 @@ class Command(SystemCommand):
         angel_matches = ["angel", "Angel", 'cryptoangel', 'crypto_angel', 'CryptoAngel']
         tca_altcoin_matches = ["tca_altcoin", "altcoin", "altcoins"]
         tca_leverage_matches = ["tca_leverage", "leverage"]
+        if not get_or_create_crontask().china_channel_enabled:
+            return
+        if not get_or_create_crontask().crypto_channel_enabled:
+            return
+        if not get_or_create_crontask().tca_altcoin_enabled:
+            return
+        if not get_or_create_crontask().tca_leverage_enabled:
+            return
         if any(x in channel for x in china_matches):
             self.collect_info_from_china_channel()
         if any(x in channel for x in angel_matches):
