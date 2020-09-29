@@ -408,8 +408,9 @@ class Signal(BaseSignal):
         # TODO: Maybe add select_for_update - to avoid setting the flag by another process
         #  or add another flag now_being_processed
         # TODO: Check
-        # TODO: Maybe add BOUGHT status
-        _statuses = [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]
+        _statuses = [SignalStatus.PUSHED.value,
+                     SignalStatus.BOUGHT.value,
+                     SignalStatus.SOLD.value, ]
         if self._status not in _statuses:
             return
         worked_orders = self.__get_not_handled_worked_buy_orders()
@@ -447,7 +448,8 @@ class Signal(BaseSignal):
         # TODO: Maybe add select_for_update - to avoid setting the flag by another process
         #  or add another flag now_being_processed
         # TODO: Check
-        _statuses = [SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]
+        _statuses = [SignalStatus.BOUGHT.value,
+                     SignalStatus.SOLD.value, ]
         if self._status not in _statuses:
             return
         worked_orders = self.__get_not_handled_worked_sell_orders()
@@ -537,8 +539,10 @@ class Signal(BaseSignal):
                              outer_signal_id: Optional[int] = None,
                              techannel_abbr: Optional[str] = None):
         """Handle all PUSHED signals. Buy orders worker"""
-        # TODO: Maybe add BOUGHT Signals
-        params = {'_status': SignalStatus.PUSHED.value}
+        _statuses = [SignalStatus.PUSHED.value,
+                     SignalStatus.BOUGHT.value,
+                     SignalStatus.SOLD.value, ]
+        params = {'_status__in': _statuses}
         if outer_signal_id:
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
@@ -551,8 +555,9 @@ class Signal(BaseSignal):
                            outer_signal_id: Optional[int] = None,
                            techannel_abbr: Optional[str] = None):
         """Handle all BOUGHT signals. Sell orders worker"""
-        # TODO: Maybe add BOUGHT Signals
-        params = {'_status': SignalStatus.BOUGHT.value}
+        _statuses = [SignalStatus.BOUGHT.value,
+                     SignalStatus.SOLD.value, ]
+        params = {'_status__in': _statuses}
         if outer_signal_id:
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
