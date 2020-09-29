@@ -44,19 +44,19 @@ class Command(SystemCommand):
         tca_altcoin_matches = ["tca_altcoin", "altcoin", "altcoins"]
         tca_leverage_matches = ["tca_leverage", "leverage"]
         if not get_or_create_crontask().china_channel_enabled:
-            return
-        if not get_or_create_crontask().crypto_channel_enabled:
-            return
-        if not get_or_create_crontask().tca_altcoin_enabled:
-            return
-        if not get_or_create_crontask().tca_leverage_enabled:
-            return
-        if any(x in channel for x in china_matches):
+            pass
+        elif any(x in channel for x in china_matches):
             self.collect_info_from_china_channel()
-        if any(x in channel for x in angel_matches):
+        if not get_or_create_crontask().crypto_channel_enabled:
+            pass
+        elif any(x in channel for x in angel_matches):
             self.collect_info_from_angel_channel()
-        if any(x in channel for x in tca_altcoin_matches):
+        if not get_or_create_crontask().tca_altcoin_enabled:
+            pass
+        elif any(x in channel for x in tca_altcoin_matches):
             self.collect_info_from_tca_altcoin_channel()
-        if any(x in channel for x in tca_leverage_matches):
+        if not get_or_create_crontask().tca_leverage_enabled:
+            pass
+        elif any(x in channel for x in tca_leverage_matches):
             self.collect_info_from_tca_leverage_channel()
 
