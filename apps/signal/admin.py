@@ -35,13 +35,16 @@ class TechannelFilter(InputFilter):
 
 @admin.register(Signal)
 class SignalAdmin(admin.ModelAdmin):
-    list_display = ['id', 'main_coin', 'symbol',
+    list_display = ['id',
+                    'symbol',
+                    'entry_points',
+                    'take_profits',
                     'stop_loss',
-                    'outer_signal_id',
                     'techannel',
+                    'outer_signal_id',
                     'status',
                     ]
-    select_related_fields = ['techannel', ]
+    select_related_fields = ['techannel', 'entry_points', 'take_profits', ]
     search_fields = ['id', 'outer_signal_id', 'symbol', 'techannel__abbr', ]
     list_filter = [
         '_status',
@@ -68,6 +71,14 @@ class SignalAdmin(admin.ModelAdmin):
                     messages.success(request, msg)
             return applicator
         return decorate
+
+    @staticmethod
+    def take_profits(signal):
+        return '::'.join([str(i.value) for i in signal.take_profits.all()])
+
+    @staticmethod
+    def entry_points(signal):
+        return '::'.join([str(i.value) for i in signal.entry_points.all()])
 
     def form_buy_orders(self, request, queryset):
         for signal in queryset:
@@ -111,12 +122,82 @@ class SignalAdmin(admin.ModelAdmin):
         signal.worker_for_sold_orders()
 
 
+class PointOuterIDFilter(InputFilter):
+    parameter_name = 'outer_id'
+    title = _('Outer_ID')
+
+    def queryset(self, request, queryset):
+        if self.value() is not None:
+            try:
+                outer_id = self.value()
+            except ValueError:
+                return queryset
+            return queryset.filter(signal__outer_signal_id=outer_id)
+
+
+class PointTechannelFilter(InputFilter):
+    parameter_name = 'techannel_abbr'
+    title = _('Techannel_Abbr')
+
+    def queryset(self, request, queryset):
+        if self.value() is not None:
+            try:
+                techannel_abbr = self.value()
+            except ValueError:
+                return queryset
+            return queryset.filter(signal__techannel__abbr=techannel_abbr)
+
+
+class SignalIDFilter(InputFilter):
+    parameter_name = 'signal_id'
+    title = _('Signal_id')
+
+    def queryset(self, request, queryset):
+        if self.value() is not None:
+            try:
+                signal_id = self.value()
+            except ValueError:
+                return queryset
+            return queryset.filter(signal__id=signal_id)
+
+
 @admin.register(EntryPoint)
 class EntryPointAdmin(admin.ModelAdmin):
-    pass
+    list_display = ['id',
+                    'signal',
+                    'signal_status',
+                    'value',
+                    ]
+    select_related_fields = ['signal', 'signal__techannel', ]
+    search_fields = ['id', 'signal__outer_signal_id', 'signal__symbol', 'signal__techannel__abbr', ]
+    list_filter = [
+        'signal___status',
+        SignalIDFilter,
+        PointOuterIDFilter,
+        PointTechannelFilter,
+    ]
+
+    @staticmethod
+    def signal_status(order):
+        return order.signal.status
 
 
 @admin.register(TakeProfit)
 class TakeProfitAdmin(admin.ModelAdmin):
-    pass
+    list_display = ['id',
+                    'signal',
+                    'signal_status',
+                    'value',
+                    ]
+    select_related_fields = ['signal', 'signal__techannel', ]
+    search_fields = ['id', 'signal__outer_signal_id', 'signal__symbol', 'signal__techannel__abbr', ]
+    list_filter = [
+        'signal___status',
+        SignalIDFilter,
+        PointOuterIDFilter,
+        PointTechannelFilter,
+    ]
 
+    @staticmethod
+    def signal_status(order):
+        return order.signal.status

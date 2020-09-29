@@ -51,9 +51,10 @@ class Signal(BaseSignal):
     take_profits: 'TakeProfit.objects'
     buy_orders: 'BuyOrder.objects'
     sell_orders: 'SellOrder.objects'
+    techannel: Techannel
 
     def __str__(self):
-        return f"Signal:{self.symbol}:{self.outer_signal_id}"
+        return f"Signal:{self.pk}:{self.symbol}:{self.techannel.abbr}:{self.outer_signal_id}"
 
     class Meta:
         unique_together = ['techannel', 'outer_signal_id', ]
@@ -106,6 +107,7 @@ class Signal(BaseSignal):
     def __get_sell_distribution(self):
         return self.take_profits.count()
 
+    @debug_input_and_returned
     @rounded_result
     def __get_turnover_by_coin_pair(self, market: BaseMarket) -> float:
         """Turnover for one Signal.
@@ -189,17 +191,27 @@ class Signal(BaseSignal):
         )
         return order
 
-    def _check_if_balance_enough_for_signal(self, market: BaseMarket):
+    @debug_input_and_returned
+    @rounded_result
+    def __get_amount_quantity(self, market: BaseMarket) -> float:
+        toc_quantity = self.__get_turnover_by_coin_pair(market)
+        return toc_quantity / (self.__get_buy_distribution() * self.__get_sell_distribution())
+
+    @debug_input_and_returned
+    def _check_if_balance_enough_for_signal(self, market: BaseMarket) -> bool:
         # TODO check
         from tools.tools import convert_to_coin_quantity
         pair = self._get_pair(market)
-        amount_quantity = self.__get_turnover_by_coin_pair(market) / (
-            self.__get_buy_distribution() + self.__get_sell_distribution())
+        # get amount and subtract fee for buy orders
+        amount_quantity = subtract_fee(self.__get_amount_quantity(market),
+                                       market.market_fee * self.__get_buy_distribution())
+        logger.debug(f"'{self}':amount_quantity_subtracted_fee={amount_quantity}")
         if amount_quantity < pair.min_amount:
             logger.debug(f"Bad Check: amount_quantity < min_amount: {amount_quantity} < {pair.min_amount}!")
             return False
         entry_point_price = self.entry_points.last().value
         coin_quantity = convert_to_coin_quantity(amount_quantity, entry_point_price)
+        logger.debug(f"'{self}':coin_quantity={coin_quantity}")
         if coin_quantity > pair.min_quantity:
             return True
         logger.debug(f"Bad Check: coin_quantity < min_quantity: {coin_quantity} < {pair.min_quantity}!")
