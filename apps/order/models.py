@@ -53,10 +53,10 @@ class BuyOrder(BaseOrder):
     def save(self, *args, **kwargs):
         if not self.pk and not self.custom_order_id:
             self.custom_order_id = self.form_order_id(
-                self.market.order_id_separator,
-                self.signal.outer_signal_id,
-                self.signal.techannel.abbr,
-                self.index)
+                market_separator=self.market.order_id_separator,
+                message_id=self.signal.outer_signal_id,
+                techannel_abbr=self.signal.techannel.abbr,
+                index=self.index)
         super().save(*args, **kwargs)
 
     def push_to_market(self):
@@ -131,10 +131,10 @@ class SellOrder(BaseOrder):
     def save(self, *args, **kwargs):
         if not self.pk and not self.custom_order_id:
             self.custom_order_id = self.form_order_id(
-                self.market.order_id_separator,
-                self.signal.techannel.abbr,
-                self.signal.outer_signal_id,
-                self.index)
+                market_separator=self.market.order_id_separator,
+                message_id=self.signal.outer_signal_id,
+                techannel_abbr=self.signal.techannel.abbr,
+                index=self.index)
         super().save(*args, **kwargs)
 
     @classmethod
