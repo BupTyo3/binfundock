@@ -4,6 +4,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from django.db import models
+from django.db.models import F
 
 from utils.framework.models import SystemBaseModel, SystemBaseModelWithoutModified
 from apps.order.utils import OrderStatus
@@ -26,6 +27,7 @@ class BaseOrder(SystemBaseModel):
     symbol = models.CharField(max_length=16)
     quantity = models.FloatField()
     price = models.FloatField()
+    push_count = models.PositiveIntegerField(default=0)
     custom_order_id = models.CharField(max_length=55)
     handled_worked = models.BooleanField(
         help_text="Did something if the order has worked",
@@ -69,6 +71,10 @@ class BaseOrder(SystemBaseModel):
     @classmethod
     def form_sl_order_id(cls, main_order: 'BaseOrder') -> str:
         return f"{main_order.custom_order_id}_{cls.stop_loss_separator}"
+
+    def push_count_increase(self):
+        self.push_count = F('push_count') + 1
+        self.save()
 
 
 class HistoryApiBaseOrder(SystemBaseModelWithoutModified):
