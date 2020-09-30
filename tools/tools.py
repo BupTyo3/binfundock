@@ -130,3 +130,8 @@ def get_percent(value: float, percentage) -> float:
 @rounded_result
 def subtract_fee(quantity: float, fee: float) -> float:
     return quantity - get_percent(quantity, fee)
+
+
+def price_to_str(price: float) -> str:
+    precision = 8
+    return '{:0.0{}f}'.format(price, precision)
