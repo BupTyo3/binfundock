@@ -14,6 +14,7 @@ from tools.tools import (
     api_logging,
     debug_input_and_returned,
     catch_exception,
+    price_to_str,
 )
 from binfun.settings import conf_obj
 
@@ -120,7 +121,7 @@ class Market(BaseMarket):
     @api_logging
     def _push_buy_limit_order(self, symbol: str, quantity: float, price: float, custom_order_id: str):
         response = self.my_client.order_limit_buy(
-            symbol=symbol, quantity=quantity, price=price, newClientOrderId=custom_order_id)
+            symbol=symbol, quantity=quantity, price=price_to_str(price), newClientOrderId=custom_order_id)
         return response
 
     @api_logging
@@ -130,10 +131,10 @@ class Market(BaseMarket):
                                          custom_sl_order_id: str,
                                          stop_limit_price: float):
         response = self.my_client.order_oco_sell(
-            symbol=symbol, quantity=quantity, price=price,
+            symbol=symbol, quantity=quantity, price=price_to_str(price),
             limitClientOrderId=custom_order_id,
             stopClientOrderId=custom_sl_order_id, stopPrice=stop_loss,
-            stopLimitPrice=stop_limit_price,
+            stopLimitPrice=price_to_str(stop_limit_price),
             stopLimitTimeInForce=self.my_client.TIME_IN_FORCE_GTC)
         return response
 
