@@ -43,6 +43,7 @@ class SignalAdmin(admin.ModelAdmin):
                     'techannel',
                     'outer_signal_id',
                     'status',
+                    'created',
                     ]
     select_related_fields = ['techannel', 'entry_points', 'take_profits', ]
     search_fields = ['id', 'outer_signal_id', 'symbol', 'techannel__abbr', ]
