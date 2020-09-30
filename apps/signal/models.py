@@ -60,7 +60,7 @@ class Signal(BaseSignal):
         unique_together = ['techannel', 'outer_signal_id', ]
 
     def save(self, *args, **kwargs):
-        self.main_coin = self._get_first_coin(self.symbol)
+        self.main_coin = self._get_main_coin(self.symbol)
         super().save(*args, **kwargs)
         logger.debug(self)
 
@@ -69,6 +69,9 @@ class Signal(BaseSignal):
     def create_signal(cls, symbol: str, techannel_abbr: str,
                       stop_loss: float, outer_signal_id: int,
                       entry_points: List[float], take_profits: List[float]):
+        """
+        Create signal
+        """
         techannel, created = Techannel.objects.get_or_create(abbr=techannel_abbr)
         if created:
             logger.debug(f"Telegram channel '{techannel}' was created")
@@ -86,7 +89,13 @@ class Signal(BaseSignal):
         logger.debug(f"Signal '{sm_obj}' has been created successfully")
         return sm_obj
 
-    def _get_first_coin(self, symbol) -> str:
+    def _get_main_coin(self, symbol) -> str:
+        """
+        Example:
+        symbol = LTCBTC
+        if BTC in [conf.accessible_main_coins]:
+        main_coin = BTC
+        """
         for main_coin in self.conf.accessible_main_coins:
             if symbol[-len(main_coin):] == main_coin:
                 return main_coin
@@ -121,8 +130,15 @@ class Signal(BaseSignal):
         # return res / n_distribution  # эквивалент 33 долларов
 
     @staticmethod
-    def __find_not_fractional_by_step(quantity: float, step: float) -> float:
-        return (quantity // step) * step
+    def __find_not_fractional_by_step(value: float, step: float) -> float:
+        """
+        Round by Market rules
+        Example:
+        value = 0.123456
+        pair.step_price = 0.001
+        res = 0.123
+        """
+        return (value // step) * step
 
     def _get_pair(self, market: BaseMarket):
         from apps.pair.models import Pair
@@ -130,6 +146,10 @@ class Signal(BaseSignal):
 
     @rounded_result
     def _get_distributed_toc_quantity(self, market: BaseMarket, entry_point_price):
+        """
+        Calculate quantity for one coin
+        Fraction by step
+        """
         from tools.tools import convert_to_coin_quantity
         pair = self._get_pair(market)
         step_quantity = pair.step_quantity
@@ -139,6 +159,10 @@ class Signal(BaseSignal):
 
     @rounded_result
     def get_real_stop_price(self, price: float, market: BaseMarket):
+        """
+        Calculate stop price with slip_delta_stop_loss_percentage parameter.
+        Fraction by step
+        """
         pair = self._get_pair(market)
         if self.conf.slip_delta_stop_loss_percentage:
             real_stop_price = price - (
@@ -150,6 +174,10 @@ class Signal(BaseSignal):
 
     @rounded_result
     def _get_distributed_sell_quantity(self, market: BaseMarket, all_quantity: float):
+        """
+        Get distributed sell quantity.
+        Fraction by step
+        """
         pair = self._get_pair(market)
         # TODO: Check, may be should change to step_quantity = pair.step_price
         step_quantity = pair.step_quantity
@@ -173,6 +201,9 @@ class Signal(BaseSignal):
     def __form_sell_order(self, market: BaseMarket, distributed_quantity: float,
                           take_profit: float, index: int, stop_loss: Optional[float] = None,
                           custom_order_id: Optional[str] = None) -> 'SellOrder':
+        """
+        Form sell order for the signal
+        """
         from apps.order.models import SellOrder
         msg = f"Form SELL ORDER for signal {self}"
         if stop_loss is not None:
@@ -199,6 +230,10 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     def _check_if_balance_enough_for_signal(self, market: BaseMarket) -> bool:
+        """
+        Check if balance enough for Signal.
+        Enough for create buy orders and then (after one buy order has worked) - sell orders
+        """
         # TODO check
         from tools.tools import convert_to_coin_quantity
         pair = self._get_pair(market)
@@ -219,7 +254,9 @@ class Signal(BaseSignal):
 
     @transaction.atomic
     def formation_buy_orders(self, market: BaseMarket) -> None:
-        """Function for forming Buy orders for NEW signal"""
+        """
+        Function for forming Buy orders for NEW signal
+        """
         if self._status != SignalStatus.NEW.value:
             logger.warning(f'Not valid Signal status for formation BUY order: '
                            f'{self._status} : {SignalStatus.NEW.value}')
@@ -235,7 +272,9 @@ class Signal(BaseSignal):
             self.__form_buy_order(market, coin_quantity, entry_point, index)
 
     def _formation_sell_orders(self, market: BaseMarket, sell_quantity: float) -> None:
-        """Function for creating Sell orders"""
+        """
+        Function for creating Sell orders
+        """
         distributed_quantity = self._get_distributed_sell_quantity(market, sell_quantity)
         for index, take_profit in enumerate(self.take_profits.all()):
             self.__form_sell_order(
@@ -243,20 +282,29 @@ class Signal(BaseSignal):
                 take_profit=take_profit.value, index=index)
 
     def _get_new_stop_loss(self, worked_sell_orders: QuerySet) -> float:
+        """
+        Business logic
+        Fraction by step
+        """
         last_worked_sell_order = worked_sell_orders.order_by('price').last()
         if last_worked_sell_order.index == 0:
             # if the first sell order has worked, new stop_loss is a max of entry_points
-            return self.entry_points.order_by('value').last().value
+            res = self.entry_points.order_by('value').last().value
         else:
             # get price of previous order as a new stop_loss
             previous_order = self.sell_orders.filter(index=(last_worked_sell_order.index - 1)).last()
-            return previous_order.price
+            res = previous_order.price
+        pair = self._get_pair(worked_sell_orders.last().market)
+        return self.__find_not_fractional_by_step(res, pair.step_price)
 
     @debug_input_and_returned
     def _formation_copied_sell_order(self,
                                      original_order_id: int,
                                      sell_quantity: Optional[float] = None,
                                      new_stop_loss: Optional[float] = None):
+        """
+        Form one copied Sell order by original Sell order (with updated quantity or stop_loss)
+        """
         max_number_of_copies = 300  # Max number of copies of Sell orders
         copy_delimiter = '_copy_'
         max_length_of_signal_id = 50  # length of custom_order_id field of BaseOrder model
@@ -289,7 +337,9 @@ class Signal(BaseSignal):
                                       worked_sell_orders: QuerySet,
                                       sell_quantity: Optional[float] = None,
                                       new_stop_loss: Optional[float] = None) -> List['SellOrder']:
-        """Form copied sell orders with new stop_loss or new sell_quantity"""
+        """
+        Form copied Sell orders with new stop_loss or new sell_quantity
+        """
         if new_stop_loss is None and not sell_quantity:
             new_stop_loss = self._get_new_stop_loss(worked_sell_orders)
         res = list()
@@ -300,6 +350,9 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     def _update_bought_quantity(self):
+        """
+        Outdated
+        """
         bought_quantity: float = 0
         for buy_order in self.buy_orders.all():
             # TODO change the logic
@@ -308,6 +361,15 @@ class Signal(BaseSignal):
         self._bought_quantity = bought_quantity
 
     def push_orders(self):
+        """
+        Function for interaction with the Real Market
+        1)Sent request for local_cancelled Buy orders
+        2)Sent request for local_cancelled Sell orders
+        3)Sent request to create real NOT_SENT Sell orders (NOT_SENT -> SENT)
+        4)Sent request to create real NOT_SENT Buy orders (NOT_SENT -> SENT)
+        5)Change Signal status (NEW -> PUSHED) if this is the first launch
+
+        """
         from apps.order.utils import OrderStatus
         statuses_not_for_cancel = [OrderStatus.CANCELED.value,
                                    OrderStatus.NOT_EXISTS.value,
@@ -332,6 +394,9 @@ class Signal(BaseSignal):
                 self.save()
 
     def __get_not_handled_worked_buy_orders(self) -> QuerySet:
+        """
+        Function to get not handled worked Buy orders
+        """
         # TODO: maybe move to orders
         from apps.order.utils import OrderStatus
         from apps.order.models import BuyOrder
@@ -344,6 +409,9 @@ class Signal(BaseSignal):
         return BuyOrder.objects.filter(**params)
 
     def __get_not_handled_worked_sell_orders(self) -> QuerySet:
+        """
+        Function to get not handled worked Sell orders
+        """
         # TODO: maybe move to orders
         from apps.order.utils import OrderStatus
         from apps.order.models import SellOrder
@@ -357,6 +425,9 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     def __get_sent_buy_orders(self) -> QuerySet:
+        """
+        Function to get sent Buy orders
+        """
         # TODO: maybe move to orders
         # TODO: maybe _status__in: [SENT, NOT_SENT]
         from apps.order.utils import OrderStatus
@@ -370,6 +441,9 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     def __get_sent_sell_orders(self) -> QuerySet:
+        """
+        Function to get sent Sell orders
+        """
         # TODO: maybe move to orders
         # TODO: maybe _status__in: [SENT, NOT_SENT]
         from apps.order.utils import OrderStatus
@@ -383,6 +457,9 @@ class Signal(BaseSignal):
 
     @staticmethod
     def __update_flag_handled_worked_orders(worked_orders: QuerySet):
+        """
+        Set flag handled_worked
+        """
         # TODO: move it
         logger.debug(f"Updating Worked orders by handled_worked flag")
         worked_orders.update(handled_worked=True)
@@ -390,38 +467,59 @@ class Signal(BaseSignal):
     @staticmethod
     @debug_input_and_returned
     def __cancel_sent_orders(sent_orders: QuerySet):
+        """
+        Set flag local_cancelled for orders.
+        The orders are ready to cancel
+        """
         # TODO: move it
         logger.debug(f"Updating Sent orders by local_canceled flag")
         logger.debug(f"LOCAL CANCEL ORDERS: '{sent_orders.all()}'")
         now_ = timezone.now()
         sent_orders.update(local_canceled=True, local_canceled_time=now_)
 
-    @staticmethod
-    def __get_bought_quantity(worked_orders: QuerySet) -> float:
+    @debug_input_and_returned
+    def __get_bought_quantity(self, worked_orders: QuerySet) -> float:
+        """
+        Get Sum of bought_quantity of worked Buy orders
+        """
         # TODO: move it
         res = worked_orders.aggregate(Sum('bought_quantity'))
         bought_quantity = res['bought_quantity__sum']
-        return subtract_fee(bought_quantity, worked_orders.last().market.market_fee)
+        res = subtract_fee(bought_quantity, worked_orders.last().market.market_fee)
+        pair = self._get_pair(worked_orders.last().market)
+        return self.__find_not_fractional_by_step(res, pair.step_quantity)
 
     @staticmethod
     def __get_planned_sold_quantity(worked_orders: QuerySet) -> float:
+        """
+        Get Sum of quantity of orders
+        """
         # TODO: move it
         res = worked_orders.aggregate(Sum('quantity'))
         return res['quantity__sum']
 
-    @rounded_result
+    @debug_input_and_returned
     def __calculate_new_bought_quantity(self,
                                         sent_sell_orders: QuerySet,
                                         addition_quantity: float) -> float:
         """Calculate new bought_quantity by sent_sell_orders and addition_quantity
-         (bought quantity of worked buy orders)"""
+         (bought quantity of worked buy orders).
+        Fraction by step
+         """
         all_quantity = self.__get_planned_sold_quantity(sent_sell_orders) + addition_quantity
-        return all_quantity / sent_sell_orders.count()
+        res = all_quantity / sent_sell_orders.count()
+        pair = self._get_pair(sent_sell_orders.last().market)
+        return self.__find_not_fractional_by_step(res, pair.step_quantity)
 
     @transaction.atomic
     @debug_input_and_returned
     def worker_for_bought_orders(self):
-        """Worker for one signal. Run if at least one Buy order was worked"""
+        """
+        Worker for one signal.
+        Run if at least one Buy order has worked.
+        1)Create Sell orders if no one exists
+        2)Recreate Sent Sell orders with updated quantity
+        """
         # TODO: Maybe add select_for_update - to avoid setting the flag by another process
         #  or add another flag now_being_processed
         # TODO: Check
@@ -457,11 +555,13 @@ class Signal(BaseSignal):
     @transaction.atomic
     @debug_input_and_returned
     def worker_for_sold_orders(self):
-        """Worker for one signal. Run if at least one Buy order was worked"""
-        """Worker for one signal. Запускать когда сработал SELL order
+        """
+        Worker for one signal.
+        Run if at least one Sell order has worked.
         1)Cancel BUY orders
         2)Recreating opened (sent) SELL orders with updated stop_loss
-        3)Calculate profit (stop_loss or take_profit)"""
+        3)Calculate profit (stop_loss or take_profit)
+        """
         # TODO: Maybe add select_for_update - to avoid setting the flag by another process
         #  or add another flag now_being_processed
         # TODO: Check
@@ -525,6 +625,9 @@ class Signal(BaseSignal):
     def update_signals_info_by_api(cls,
                                    outer_signal_id: Optional[int] = None,
                                    techannel_abbr: Optional[str] = None):
+        """
+        Get info for one Signal from Real Market by SENT orders
+        """
         _statuses = [SignalStatus.PUSHED.value,
                      SignalStatus.BOUGHT.value,
                      SignalStatus.SOLD.value, ]
@@ -537,6 +640,9 @@ class Signal(BaseSignal):
             signal.update_info_by_api()
 
     def update_info_by_api(self):
+        """
+        Get info for all Signals (except NEW) from Real Market by SENT orders
+        """
         from apps.order.utils import OrderStatus
         _statuses = [SignalStatus.PUSHED.value,
                      SignalStatus.BOUGHT.value,
