@@ -61,6 +61,7 @@ class BuyOrder(BaseOrder):
 
     def push_to_market(self):
         logger.debug(f"Push buy order! {self}")
+        self.push_count_increase()
         self.market.push_buy_limit_order(self)
 
     def cancel_into_market(self):
@@ -185,6 +186,7 @@ class SellOrder(BaseOrder):
         if self.no_need_push:
             return
         logger.debug(f"Push sell order! {self}")
+        self.push_count_increase()
         self.market.push_sell_stop_loss_limit_order(self)
 
     def cancel_into_market(self):
