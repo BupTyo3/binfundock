@@ -53,22 +53,34 @@ class Telegram(BaseTelegram):
     """
     name = 'Telegram'
 
+    def is_urgent_close_position(self, message, channel_abbr):
+        should_close_label = ['closing', 'closed', 'close']
+        should_close = any(x in should_close_label for x in message)
+        if should_close:
+            if 'BTC' in message.text:
+                obj = Signal.objects.filter(
+                    symbol='BTCUSDT', techannel__abbr=channel_abbr).order_by('id').last()
+                if obj:
+                    logger.debug(f'please close the position: {obj}')
+            if 'ETH' in message.text:
+                obj = Signal.objects.filter(
+                    symbol='ETHUSDT', techannel__abbr=channel_abbr).order_by('id').last()
+                if obj:
+                    logger.debug(f'please close the position: {obj}')
+            return True
+        return False
+
     async def parse_tca_origin_channel(self):
         chat_name = conf_obj.tca_origin
         chat_entity = await self.client.get_entity(chat_name)
         channel_abbr = 'tca_origin'
         async for message in self.client.iter_messages(entity=chat_entity, limit=15):
             exists = await self.is_signal_handled(message.id, channel_abbr)
-            # TODO: if message contains close/closing/closed
-            #  find previous signal to close. Maybe iterate through previous msges which
-            #  are in db related to this channel
-            should_close = ['closing', 'closed', 'close']
-            Signal.objects.filter(outer_signal_id=message.id, techannel__abbr=channel_abbr)
-
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_tca_origin_message(message.text, message.id)
                 if not signal[0].pair:
+                    self.is_urgent_close_position(message.text, channel_abbr)
                     return
                 await self.write_signal_to_db(channel_abbr, signal, message.id)
 
