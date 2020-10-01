@@ -244,10 +244,6 @@ class Config:
     btc_: str = 'BTC'
     one_hundred_percent: float = 100.0
     conf_file = "config.ini"
-    # процентов. На какое кол-во от общего моего баланса
-    # на бирже играем на одну пару (один сигнал)
-    how_percent_for_one_signal: Optional[float]
-    slip_delta_stop_loss_percentage: Optional[float]
     # Market API
     market_api_key: Optional[str]
     market_api_secret: Optional[str]
@@ -263,8 +259,6 @@ class Config:
         self.market_api_secret = market.get('market_api_secret', None)
         self.market_fee: float = market.getfloat('market_fee')
         logic = config['Logic']
-        self.how_percent_for_one_signal: float = logic.getfloat('how_percent_for_one_signal')
-        self.slip_delta_stop_loss_percentage: float = logic.getfloat('slip_delta_stop_loss_percentage')
         signal = config['Signal']
         self.accessible_main_coins: List[str] = signal['accessible_main_coins'].split(',')
         telegram = config['Telegram']

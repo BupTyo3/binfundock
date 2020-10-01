@@ -7,8 +7,9 @@ import pytesseract
 import json
 import urllib.request
 import logging
+import asyncio
+import random
 from asgiref.sync import sync_to_async
-
 from django.conf import settings
 
 from apps.signal.models import Signal, EntryPoint, TakeProfit
@@ -71,6 +72,7 @@ class Telegram(BaseTelegram):
         return False
 
     async def parse_tca_origin_channel(self):
+        await asyncio.sleep(random.random())
         chat_name = conf_obj.tca_origin
         chat_entity = await self.client.get_entity(chat_name)
         channel_abbr = 'tca_origin'
@@ -126,6 +128,7 @@ class Telegram(BaseTelegram):
         return signals
 
     async def parse_china_channel(self):
+        await asyncio.sleep(random.random())
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
         chat_id = int(conf_obj.chat_china_id)
@@ -142,6 +145,7 @@ class Telegram(BaseTelegram):
                 await self.write_signal_to_db(channel_abbr, signal, message.id)
 
     async def parse_crypto_angel_channel(self):
+        await asyncio.sleep(random.random())
         chat_id = int(conf_obj.crypto_angel_id)
         channel_abbr = 'crypto_angel'
         async for message in self.client.iter_messages(chat_id, limit=10):
@@ -197,6 +201,7 @@ class Telegram(BaseTelegram):
         return array
 
     async def parse_tca_channel(self, sub_type: str):
+        await asyncio.sleep(random.random())
         chat_id = int
         channel_abbr = ''
         if sub_type == 'altcoin':

@@ -12,6 +12,7 @@ from utils.framework.models import (
 )
 from .base_model import BaseSignal
 from .utils import SignalStatus
+from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
@@ -124,7 +125,7 @@ class Signal(BaseSignal):
         If free_balance 1000 usd, 10% - config parameter, so
          result will be 100 usd"""
         res = (market.get_current_balance(self.main_coin) *
-               self.conf.how_percent_for_one_signal /
+               get_or_create_crontask().balance_to_signal_perc /
                self.conf.one_hundred_percent)
         return res
         # return res / n_distribution  # эквивалент 33 долларов
@@ -164,9 +165,9 @@ class Signal(BaseSignal):
         Fraction by step
         """
         pair = self._get_pair(market)
-        if self.conf.slip_delta_stop_loss_percentage:
+        if get_or_create_crontask().slip_delta_sl_perc:
             real_stop_price = price - (
-                    price * self.conf.slip_delta_stop_loss_percentage /
+                    price * get_or_create_crontask().slip_delta_sl_perc /
                     self.conf.one_hundred_percent)
         else:
             real_stop_price = price
