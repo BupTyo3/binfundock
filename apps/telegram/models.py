@@ -53,59 +53,62 @@ class Telegram(BaseTelegram):
     """
     name = 'Telegram'
 
-    async def parse_bulls_channel(self):
-        chat_id = int(conf_obj.chat_china_id)
-        channel_abbr = 'bulls'
-        async for message in self.client.iter_messages(chat_id, limit=10):
+    async def parse_tca_origin_channel(self):
+        chat_name = conf_obj.tca_origin
+        chat_entity = await self.client.get_entity(chat_name)
+        channel_abbr = 'tca_origin'
+        async for message in self.client.iter_messages(entity=chat_entity, limit=15):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             # TODO: if message contains close/closing/closed
             #  find previous signal to close. Maybe iterate through previous msges which
             #  are in db related to this channel
+            should_close = ['closing', 'closed', 'close']
             Signal.objects.filter(outer_signal_id=message.id, techannel__abbr=channel_abbr)
 
             should_handle_msg = not exists
             if message.text and should_handle_msg:
-                signal = self.parse_bulls_message(message.text, message.id)
-                if not signal:
+                signal = self.parse_tca_origin_message(message.text, message.id)
+                if not signal[0].pair:
                     return
                 await self.write_signal_to_db(channel_abbr, signal, message.id)
 
-    def parse_bulls_message(self, message_text, message_id):
+    def parse_tca_origin_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
-        signal_identification = ['Get in', 'Entry zone', 'BUY ADOUND']
-        is_signal = any(x in signal_identification for x in splitted_info)
-        buy_label = 'Entry at: '
-        goals_label = 'Sell at: '
-        stop_label = 'Stop Loss: '
-        pair = 'Coin: '
+        possible_entry_label = ['Entry at: ', 'Get in : ', 'Get  in : ']
+        possible_take_profits_label = ['Sell at: ', 'Targets: ']
+        'Targets: 0..980 - 0.990 - 1..020 - 1..050'
+        'Get  in : 0.960 - 0.970'
+        stop_label = 'SL: '
+        pair_label = ['Pair: ', 'Рair: ']
+        pair = ''
         current_price = ''
         is_margin = False
         position = None
-        leverage = None
+        leverage = 'Leverage:'
         entries = ''
         profits = ''
         stop_loss = ''
-        signal_identification = ['Exchange: Binance', 'Exchange: Binance Futures', 'Exchange: ByBit']
-        is_signal = any(x in signal_identification for x in splitted_info)
-        if not is_signal:
-            return
+        signal_identification = 'CF Leverage  Trading Signal'
         for line in splitted_info:
-            if 'SHORT' in line:
-                position = 'Sell'
-            if 'LONG' in line:
-                position = 'Buy'
-            if line.startswith(pair):
-                pair = ''.join(filter(str.isalpha, line[6:]))
-            if line.startswith(buy_label):
-                fake_entries = line[10:]
+            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]):
+                position_info = line.split(' ')
+                pair = ''.join(filter(str.isalpha, position_info[1]))
+                position = ''.join(filter(str.isalpha, position_info[2]))
+            if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1]) or line.startswith(possible_entry_label[2]):
+                fake_entries = line[9:]
                 entries = fake_entries.split('-')
-            if line.startswith(goals_label):
+            if line.startswith(possible_take_profits_label[0]) or line.startswith(possible_take_profits_label[1]):
                 fake_profits = line[9:]
                 possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
             if line.startswith(stop_label):
-                stop_loss = line[11:]
+                stop_loss = line[3:]
+                stop_loss = stop_loss.replace("..", ".")
+            if line.startswith(leverage):
+                possible_leverage = line.split(' ')
+                possible_leverage = list(filter(None, possible_leverage))
+                leverage = ''.join(filter(str.isdigit, possible_leverage[2]))
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
@@ -165,7 +168,10 @@ class Telegram(BaseTelegram):
             if line.startswith(stop_label):
                 stop_loss = line[4:]
                 stop_loss = self.handle_ca_recommend_to_array(stop_loss)
-                stop_loss = min(float(s) for s in stop_loss)
+                try:
+                    stop_loss = min(float(s) for s in stop_loss)
+                except:
+                    stop_loss = '0'
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
@@ -199,7 +205,7 @@ class Telegram(BaseTelegram):
         signals = []
         splitted_info = message_text.splitlines()
         buy_label = 'Entry at: '
-        goals_label = 'Sell at: '
+        possible_take_profits = ['Sell at: ', 'Targets: ']
         stop_label = 'Stop Loss: '
         pair = 'Coin: '
         current_price = ''
@@ -211,7 +217,6 @@ class Telegram(BaseTelegram):
         stop_loss = ''
         signal_identification = ['Exchange: Binance', 'Exchange: Binance Futures', 'Exchange: ByBit']
         is_signal = any(x in signal_identification for x in splitted_info)
-        possible_take_profits = ['Sell at: ', 'Targets: ']
         if not is_signal:
             return
         for line in splitted_info:
@@ -248,10 +253,10 @@ class Telegram(BaseTelegram):
             signal[0].pair = signal[0].pair.replace('USD', 'USDT')
 
         logger.debug(f"Attempt to write into DB the following signal: "
-                     f"Pair: '{signal[0].pair} '"
-                     f"Entry Points: '{signal[0].entry_points} '"
-                     f"Take Profits: '{signal[0].take_profits} '"
-                     f"Stop Loss: '{signal[0].stop_loss} '")
+                     f"Pair: '{signal[0].pair}'"
+                     f"Entry Points: '{signal[0].entry_points}'"
+                     f"Take Profits: '{signal[0].take_profits}'"
+                     f"Stop Loss: '{signal[0].stop_loss}'")
         try:
             Signal.create_signal(techannel_abbr=channel_abbr,
                                  symbol=signal[0].pair,
@@ -295,13 +300,14 @@ class ChinaImageToSignal:
 
     def find_pair(self, array):
         pair = ''
-        matches = ["USDT", "BTC", "U20"]
+        matches = ["USDT", "BTC", "U20", "Z20"]
 
         for item in array:
             if any(x in item for x in matches):
                 usdt_position = item.rfind('USDT')
                 btc_position = item.rfind('BTC')
                 utwenty_position = item.rfind('U20')
+                ztwenty_position = item.rfind('Z20')
                 if usdt_position > 0:
                     pair = item[0:usdt_position + 4]
                 if btc_position > 0:
@@ -309,6 +315,9 @@ class ChinaImageToSignal:
                 if utwenty_position > 0:
                     pair_utwenty = item[0:utwenty_position + 3]
                     pair = pair_utwenty.replace("U20", "BTC")
+                if ztwenty_position > 0:
+                    pair_ztwenty = item[0:ztwenty_position + 3]
+                    pair = pair_ztwenty.replace("Z20", "BTC")
         return ''.join(filter(str.isalpha, pair))
 
     def get_action(self, array):
