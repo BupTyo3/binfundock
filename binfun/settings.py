@@ -274,6 +274,8 @@ class Config:
         self.crypto_angel_id = telegram.get('crypto_angel_id', None)
         self.tca_altcoin = telegram.get('TCA_Altcoin', None)
         self.tca_leverage = telegram.get('TCA_Leverage', None)
+        self.tca_origin = telegram.get('TCA_Origin', None)
+        self.margin_whales = telegram.get('Margin_Whales', None)
 
 
 conf_obj = Config()
