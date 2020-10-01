@@ -10,5 +10,6 @@ python-dotenv==0.14.0
 python-binance==0.7.5
 pytesseract
 telethon
+asyncio
 
 
