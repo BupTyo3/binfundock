@@ -37,12 +37,17 @@ class Command(SystemCommand):
         with self.client:
             self.client.loop.run_until_complete(self.telegram.parse_tca_channel('leverage'))
 
+    def collect_info_from_tca_origin_channel(self):
+        with self.client:
+            self.client.loop.run_until_complete(self.telegram.parse_tca_origin_channel())
+
     def handle(self, *args, **options):
         channel = options['channel']
         china_matches = ["China", "china"]
         angel_matches = ["angel", "Angel", 'cryptoangel', 'crypto_angel', 'CryptoAngel']
         tca_altcoin_matches = ["tca_altcoin", "altcoin", "altcoins"]
         tca_leverage_matches = ["tca_leverage", "leverage"]
+        tca_origin_matches = ["tca_origin", "origin"]
         if not get_or_create_crontask().china_channel_enabled:
             pass
         elif any(x in channel for x in china_matches):
@@ -59,4 +64,8 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in tca_leverage_matches):
             self.collect_info_from_tca_leverage_channel()
+        if not get_or_create_crontask().tca_origin_enabled:
+            pass
+        elif any(x in channel for x in tca_origin_matches):
+            self.collect_info_from_tca_origin_channel()
 

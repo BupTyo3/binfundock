@@ -18,6 +18,7 @@ class CronTask(CronTaskBase):
     crypto_channel_enabled = models.BooleanField(default=False)
     tca_leverage_enabled = models.BooleanField(default=False)
     tca_altcoin_enabled = models.BooleanField(default=False)
+    tca_origin_enabled = models.BooleanField(default=False)
 
     objects = models.Manager()
 
