@@ -13,3 +13,12 @@ class SignalStatus(Enum):
     def choices(cls):
         return [(key.value, key.name) for key in cls]
 
+
+class SignalPosition(Enum):
+    LONG = 'long'  # BUY
+    SHORT = 'short'  # SELL
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+
