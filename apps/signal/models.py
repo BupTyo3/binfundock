@@ -295,10 +295,10 @@ class Signal(BaseSignal):
         if self.position != SignalPosition.LONG.value:
             logger.warning(f"Position is not LONG: '{self}'")
             return
-        # if not self._check_if_balance_enough_for_signal(market):
-        #     # TODO: Add sent message to yourself telegram
-        #     logger.debug(f"Not enough money for Signal '{self}'")
-        #     return
+        if not self._check_if_balance_enough_for_signal(market):
+            # TODO: Add sent message to yourself telegram
+            logger.debug(f"Not enough money for Signal '{self}'")
+            return
         self.status = SignalStatus.FORMED.value
         self.save()
         for index, entry_point in enumerate(self.entry_points.all()):
