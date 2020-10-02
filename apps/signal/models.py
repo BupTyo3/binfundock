@@ -417,7 +417,7 @@ class Signal(BaseSignal):
                 local_canceled=True).exclude(_status__in=statuses_not_for_cancel):
             local_cancelled_order.cancel_into_market()
         # push not_sent SELL orders
-        for sell_order in self.sell_orders.filter(_status=OrderStatus.NOT_SENT.value):
+        for sell_order in self.sell_orders.filter(_status=OrderStatus.NOT_SENT.value, no_need_push=False):
             sell_order.push_to_market()
         # push not_sent BUY orders
         for buy_order in self.buy_orders.filter(_status=OrderStatus.NOT_SENT.value):
