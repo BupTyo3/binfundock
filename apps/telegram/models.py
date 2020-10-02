@@ -72,28 +72,36 @@ class Telegram(BaseTelegram):
         return False
 
     async def parse_tca_origin_channel(self):
-        await asyncio.sleep(random.random())
+        pause = random.randint(5000, 10000) / 1000.0
+        channel_abbr = 'assist_origin'
         chat_name = conf_obj.tca_origin
         chat_entity = await self.client.get_entity(chat_name)
-        channel_abbr = 'tca_origin'
-        async for message in self.client.iter_messages(entity=chat_entity, limit=15):
-            exists = await self.is_signal_handled(message.id, channel_abbr)
-            should_handle_msg = not exists
-            if message.text and should_handle_msg:
-                signal = self.parse_tca_origin_message(message.text, message.id)
-                if not signal[0].pair:
-                    self.is_urgent_close_position(message.text, channel_abbr)
-                    return
-                await self.write_signal_to_db(channel_abbr, signal, message.id)
+        await asyncio.sleep(pause)
+        from telethon import errors
+        try:
+            async for message in self.client.iter_messages(entity=chat_entity, limit=15):
+                exists = await self.is_signal_handled(message.id, channel_abbr)
+                should_handle_msg = not exists
+                if message.text and should_handle_msg:
+                    signal = self.parse_tca_origin_message(message.text, message.id)
+                    if not signal[0].pair:
+                        self.is_urgent_close_position(message.text, channel_abbr)
+                        return
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
+                    if not inserted_to_db:
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB,"
+                                                            f"please check logs for '{signal[0].pair}'"
+                                                            f"related to the '{channel_abbr}' algorithm")
+        except errors.FloodWaitError as e:
+            print('Have to sleep', e.seconds, 'seconds')
+            time.sleep(e.seconds)
 
     def parse_tca_origin_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
-        possible_entry_label = ['Entry at: ', 'Get in : ', 'Get  in : ']
+        possible_entry_label = ['Entry at: ', 'Entry : ', 'Get in : ', 'Get  in : ']
         possible_take_profits_label = ['Sell at: ', 'Targets: ']
-        'Targets: 0..980 - 0.990 - 1..020 - 1..050'
-        'Get  in : 0.960 - 0.970'
-        stop_label = 'SL: '
+        possible_stop_label = ['SL: ', 'SL : ']
         pair_label = ['Pair: ', 'Рair: ']
         pair = ''
         current_price = ''
@@ -106,18 +114,19 @@ class Telegram(BaseTelegram):
         signal_identification = 'CF Leverage  Trading Signal'
         for line in splitted_info:
             if line.startswith(pair_label[0]) or line.startswith(pair_label[1]):
-                position_info = line.split(' ')
+                possible_position_info = line.split(' ')
+                position_info = list(filter(None, possible_position_info))
                 pair = ''.join(filter(str.isalpha, position_info[1]))
                 position = ''.join(filter(str.isalpha, position_info[2]))
             if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1]) or line.startswith(possible_entry_label[2]):
-                fake_entries = line[9:]
+                fake_entries = line[8:]
                 entries = fake_entries.split('-')
             if line.startswith(possible_take_profits_label[0]) or line.startswith(possible_take_profits_label[1]):
                 fake_profits = line[9:]
                 possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
-            if line.startswith(stop_label):
-                stop_loss = line[3:]
+            if line.startswith(possible_stop_label[0]) or line.startswith(possible_stop_label[1]):
+                stop_loss = line[4:]
                 stop_loss = stop_loss.replace("..", ".")
             if line.startswith(leverage):
                 possible_leverage = line.split(' ')
@@ -128,11 +137,12 @@ class Telegram(BaseTelegram):
         return signals
 
     async def parse_china_channel(self):
-        await asyncio.sleep(random.random())
+        pause = random.randint(300, 1600) / 1000.0
+        await asyncio.sleep(pause)
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
         chat_id = int(conf_obj.chat_china_id)
-        channel_abbr = 'china'
+        channel_abbr = 'AI'
         async for message in self.client.iter_messages(chat_id, limit=10):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
@@ -142,19 +152,28 @@ class Telegram(BaseTelegram):
                 signal = verify_signal.get_active_pairs_info(pairs)
                 if not signal:
                     return
-                await self.write_signal_to_db(channel_abbr, signal, message.id)
+                inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
+                if not inserted_to_db:
+                    await self.send_message_to_yourself(f"Error during processing the signal to DB,"
+                                                        f"please check logs for '{signal[0].pair}'"
+                                                        f"related to the '{channel_abbr}' algorithm")
 
     async def parse_crypto_angel_channel(self):
-        await asyncio.sleep(random.random())
+        pause = random.randint(300, 1600) / 1000.0
+        await asyncio.sleep(pause)
         chat_id = int(conf_obj.crypto_angel_id)
-        channel_abbr = 'crypto_angel'
+        channel_abbr = 'crypto_passive'
         async for message in self.client.iter_messages(chat_id, limit=10):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_angel_message(message.text, message.id)
                 if signal[0].pair:
-                    await self.write_signal_to_db(channel_abbr, signal, message.id)
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
+                    if not inserted_to_db:
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB,"
+                                                            f"please check logs for '{signal[0].pair}'"
+                                                            f"related to the '{channel_abbr}' algorithm")
 
     def parse_angel_message(self, message_text, message_id):
         signals = []
@@ -201,14 +220,15 @@ class Telegram(BaseTelegram):
         return array
 
     async def parse_tca_channel(self, sub_type: str):
-        await asyncio.sleep(random.random())
+        pause = random.randint(300, 1600) / 1000.0
+        await asyncio.sleep(pause)
         chat_id = int
         channel_abbr = ''
         if sub_type == 'altcoin':
-            channel_abbr = 'tca_altcoin'
+            channel_abbr = 'assist_altcoin'
             chat_id = int(conf_obj.tca_altcoin)
         if sub_type == 'leverage':
-            channel_abbr = 'tca_leverage'
+            channel_abbr = 'assist_leverage'
             chat_id = int(conf_obj.tca_leverage)
         async for message in self.client.iter_messages(chat_id, limit=10):
             exists = await self.is_signal_handled(message.id, channel_abbr)
@@ -216,7 +236,11 @@ class Telegram(BaseTelegram):
             if message.text and should_handle_msg:
                 signal = self.parse_tca_message(message.text, message.id)
                 if signal:
-                    await self.write_signal_to_db(channel_abbr, signal, message.id)
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
+                    if not inserted_to_db:
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB,"
+                                                            f"please check logs for '{signal[0].pair}'"
+                                                            f"related to the '{channel_abbr}' algorithm")
 
     def parse_tca_message(self, message_text, message_id):
         signals = []
@@ -270,10 +294,12 @@ class Telegram(BaseTelegram):
             signal[0].pair = signal[0].pair.replace('USD', 'USDT')
 
         logger.debug(f"Attempt to write into DB the following signal: "
-                     f"Pair: '{signal[0].pair}'"
-                     f"Entry Points: '{signal[0].entry_points}'"
-                     f"Take Profits: '{signal[0].take_profits}'"
-                     f"Stop Loss: '{signal[0].stop_loss}'")
+                     f" Pair: '{signal[0].pair}'"
+                     f" Entry Points: '{signal[0].entry_points}'"
+                     f" Take Profits: '{signal[0].take_profits}'"
+                     f" Stop Loss: '{signal[0].stop_loss}'"
+                     f" Algorithm: '{channel_abbr}'"
+                     f" Message ID: '{message_id}'")
         try:
             Signal.create_signal(techannel_abbr=channel_abbr,
                                  symbol=signal[0].pair,
@@ -284,14 +310,11 @@ class Telegram(BaseTelegram):
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
         except Exception as e:
             logger.error(f"Write into DB failed: {e}")
-            # await self.send_message_to_yourself(f"Error during processing the signal to DB,"
-            #                                     f"please check logs for '{signal[0].pair}'"
-            #                                     f"related to the '{channel_abbr}' algorithm")
+            return False
 
     # send messages to yourself...
     async def send_message_to_yourself(self, message):
         await self.client.send_message('me', message)
-
 
 #
 #     # @client.on(events.NewMessage)

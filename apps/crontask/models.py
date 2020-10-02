@@ -17,11 +17,13 @@ class CronTask(CronTaskBase):
     pull_job_enabled = models.BooleanField(default=False)
     bought_worker_enabled = models.BooleanField(default=False)
     sold_worker_enabled = models.BooleanField(default=False)
-    china_channel_enabled = models.BooleanField(default=False)
-    crypto_channel_enabled = models.BooleanField(default=False)
-    tca_leverage_enabled = models.BooleanField(default=False)
-    tca_altcoin_enabled = models.BooleanField(default=False)
-    tca_origin_enabled = models.BooleanField(default=False)
+
+    ai_algorithm = models.BooleanField(default=False)
+    crypto_passive = models.BooleanField(default=False)
+    assist_leverage = models.BooleanField(default=False)
+    assist_altcoin = models.BooleanField(default=False)
+    assist_origin = models.BooleanField(default=False)
+
     balance_to_signal_perc = models.FloatField(
         default=_default_balance_percentage_by_signal,
         help_text='how percent for one signal from the balance'
