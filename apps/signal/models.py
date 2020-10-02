@@ -11,7 +11,7 @@ from utils.framework.models import (
     generate_increment_name_after_suffix,
 )
 from .base_model import BaseSignal
-from .utils import SignalStatus
+from .utils import SignalStatus, SignalPosition
 from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket
 from apps.techannel.models import Techannel
@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 
 
 class Signal(BaseSignal):
+    _default_leverage = 1
     conf = conf_obj
+
     techannel = models.ForeignKey(to=Techannel,
                                   related_name='signals',
                                   on_delete=models.DO_NOTHING)
@@ -45,6 +47,10 @@ class Signal(BaseSignal):
                                choices=SignalStatus.choices(),
                                default=SignalStatus.NEW.value,
                                db_column='status')
+    position = models.CharField(max_length=32,
+                                choices=SignalPosition.choices(),
+                                default=SignalPosition.LONG.value, )
+    leverage = models.PositiveIntegerField(default=_default_leverage)
 
     objects = models.Manager()
 
@@ -66,10 +72,29 @@ class Signal(BaseSignal):
         logger.debug(self)
 
     @classmethod
+    def _calculate_position(cls,
+                            stop_loss: float,
+                            entry_points: List[float],
+                            take_profits: List[float]):
+        """
+        Calculate position: LONG or SHORT
+        """
+        if max(entry_points) < min(take_profits) and stop_loss < min(entry_points):
+            position = SignalPosition.LONG.value
+            logger.debug(f"{position}")
+        elif min(entry_points) > max(take_profits) and stop_loss > max(entry_points):
+            position = SignalPosition.SHORT.value
+            logger.debug(f"{position}")
+        else:
+            raise Exception
+        return position
+
+    @classmethod
     @transaction.atomic
     def create_signal(cls, symbol: str, techannel_abbr: str,
                       stop_loss: float, outer_signal_id: int,
-                      entry_points: List[float], take_profits: List[float]):
+                      entry_points: List[float], take_profits: List[float],
+                      leverage: Optional[int] = None):
         """
         Create signal
         """
@@ -80,9 +105,14 @@ class Signal(BaseSignal):
         if sm_obj:
             logger.warning(f"Signal '{outer_signal_id}':'{techannel_abbr}' already exists")
             return
+        position = cls._calculate_position(stop_loss, entry_points, take_profits)
         sm_obj = Signal.objects.create(
-            techannel=techannel, symbol=symbol,
-            stop_loss=stop_loss, outer_signal_id=outer_signal_id)
+            techannel=techannel,
+            symbol=symbol,
+            stop_loss=stop_loss,
+            outer_signal_id=outer_signal_id,
+            position=position,
+            leverage=leverage if leverage else cls._default_leverage)
         for entry_point in entry_points:
             EntryPoint.objects.create(signal=sm_obj, value=entry_point)
         for take_profit in take_profits:
@@ -259,8 +289,11 @@ class Signal(BaseSignal):
         Function for forming Buy orders for NEW signal
         """
         if self._status != SignalStatus.NEW.value:
-            logger.warning(f'Not valid Signal status for formation BUY order: '
-                           f'{self._status} : {SignalStatus.NEW.value}')
+            logger.warning(f"Not valid Signal status for formation BUY order: "
+                           f"{self._status} : {SignalStatus.NEW.value}")
+            return
+        if self.position != SignalPosition.LONG.value:
+            logger.warning(f"Position is not LONG: '{self}'")
             return
         if not self._check_if_balance_enough_for_signal(market):
             # TODO: Add sent message to yourself telegram
@@ -384,7 +417,7 @@ class Signal(BaseSignal):
                 local_canceled=True).exclude(_status__in=statuses_not_for_cancel):
             local_cancelled_order.cancel_into_market()
         # push not_sent SELL orders
-        for sell_order in self.sell_orders.filter(_status=OrderStatus.NOT_SENT.value):
+        for sell_order in self.sell_orders.filter(_status=OrderStatus.NOT_SENT.value, no_need_push=False):
             sell_order.push_to_market()
         # push not_sent BUY orders
         for buy_order in self.buy_orders.filter(_status=OrderStatus.NOT_SENT.value):

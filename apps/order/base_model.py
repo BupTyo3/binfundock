@@ -5,6 +5,7 @@ from typing import Optional
 
 from django.db import models
 from django.db.models import F
+from django.utils import timezone
 
 from utils.framework.models import SystemBaseModel, SystemBaseModelWithoutModified
 from apps.order.utils import OrderStatus
@@ -75,6 +76,10 @@ class BaseOrder(SystemBaseModel):
     def push_count_increase(self):
         self.push_count = F('push_count') + 1
         self.save()
+
+    def _set_updated_by_api_without_saving(self):
+        """Update last_updated_by_api field by current time"""
+        self.last_updated_by_api = timezone.now()
 
 
 class HistoryApiBaseOrder(SystemBaseModelWithoutModified):
