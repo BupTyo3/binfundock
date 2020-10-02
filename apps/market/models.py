@@ -131,9 +131,12 @@ class Market(BaseMarket):
                                          custom_sl_order_id: str,
                                          stop_limit_price: float):
         response = self.my_client.order_oco_sell(
-            symbol=symbol, quantity=quantity, price=price_to_str(price),
+            symbol=symbol,
+            quantity=quantity,
+            price=price_to_str(price),
             limitClientOrderId=custom_order_id,
-            stopClientOrderId=custom_sl_order_id, stopPrice=stop_loss,
+            stopClientOrderId=custom_sl_order_id,
+            stopPrice=price_to_str(stop_loss),
             stopLimitPrice=price_to_str(stop_limit_price),
             stopLimitTimeInForce=self.my_client.TIME_IN_FORCE_GTC)
         return response
