@@ -37,6 +37,8 @@ class TechannelFilter(InputFilter):
 class SignalAdmin(admin.ModelAdmin):
     list_display = ['id',
                     'symbol',
+                    'position',
+                    'leverage',
                     'entry_points',
                     'take_profits',
                     'stop_loss',
