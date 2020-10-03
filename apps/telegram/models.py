@@ -269,7 +269,8 @@ class Telegram(BaseTelegram):
                 pair = ''.join(filter(str.isalpha, line[6:]))
             if line.startswith(buy_label):
                 fake_entries = line[10:]
-                entries = fake_entries.split('-')
+                possible_entries = fake_entries.split('-')
+                entries = left_numbers(possible_entries)
             if line.startswith(possible_take_profits[0]) or line.startswith(possible_take_profits[1]):
                 fake_profits = line[9:]
                 possible_profits = fake_profits.split('-')
@@ -513,6 +514,8 @@ class SignalVerification:
             logger.debug(f"Current price: {current_pair['price']}")
             logger.debug(f"Position: {pair_object.position}")
             if pair_object.leverage:
+                pair_object.leverage = pair_object.leverage.split('.')
+                pair_object.leverage = ''.join(filter(str.isdigit, pair_object.leverage[0]))
                 logger.debug(f"Leverage: {pair_object.leverage}")
             logger.debug(f"Entries: {entries}")
             logger.debug(f"Take profits: {profits}")
