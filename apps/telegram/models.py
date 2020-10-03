@@ -295,6 +295,7 @@ class Telegram(BaseTelegram):
 
         logger.debug(f"Attempt to write into DB the following signal: "
                      f" Pair: '{signal[0].pair}'"
+                     f" Leverage: '{signal[0].leverage}'"
                      f" Entry Points: '{signal[0].entry_points}'"
                      f" Take Profits: '{signal[0].take_profits}'"
                      f" Stop Loss: '{signal[0].stop_loss}'"
@@ -302,12 +303,14 @@ class Telegram(BaseTelegram):
                      f" Message ID: '{message_id}'")
         try:
             Signal.create_signal(techannel_abbr=channel_abbr,
+                                 leverage=signal[0].leverage,
                                  symbol=signal[0].pair,
                                  stop_loss=signal[0].stop_loss,
                                  entry_points=signal[0].entry_points,
                                  take_profits=signal[0].take_profits,
                                  outer_signal_id=message_id)
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
+            return True
         except Exception as e:
             logger.error(f"Write into DB failed: {e}")
             return False
