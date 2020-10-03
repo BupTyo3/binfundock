@@ -513,7 +513,8 @@ class SignalVerification:
             logger.debug(f"Current price: {current_pair['price']}")
             logger.debug(f"Position: {pair_object.position}")
             if pair_object.leverage:
-                pair_object.leverage = ''.join(filter(str.isdigit, pair_object.leverage))
+                pair_object.leverage = pair_object.leverage.split('.')
+                pair_object.leverage = ''.join(filter(str.isdigit, pair_object.leverage[0]))
                 logger.debug(f"Leverage: {pair_object.leverage}")
             logger.debug(f"Entries: {entries}")
             logger.debug(f"Take profits: {profits}")
