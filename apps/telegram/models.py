@@ -269,7 +269,8 @@ class Telegram(BaseTelegram):
                 pair = ''.join(filter(str.isalpha, line[6:]))
             if line.startswith(buy_label):
                 fake_entries = line[10:]
-                entries = fake_entries.split('-')
+                possible_entries = fake_entries.split('-')
+                entries = left_numbers(possible_entries)
             if line.startswith(possible_take_profits[0]) or line.startswith(possible_take_profits[1]):
                 fake_profits = line[9:]
                 possible_profits = fake_profits.split('-')
