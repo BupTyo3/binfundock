@@ -79,10 +79,14 @@ class Signal(BaseSignal):
         """
         Calculate position: LONG or SHORT
         """
-        if max(entry_points) < min(take_profits) and stop_loss < min(entry_points):
+        max_entry = max(entry_points)
+        min_entry = min(entry_points)
+        min_take = min(take_profits)
+        max_take = max(take_profits)
+        if max_entry < min_take and stop_loss < min_entry:
             position = SignalPosition.LONG.value
             logger.debug(f"{position}")
-        elif min(entry_points) > max(take_profits) and stop_loss > max(entry_points):
+        elif min_entry > max_take and stop_loss > max_entry:
             position = SignalPosition.SHORT.value
             logger.debug(f"{position}")
         else:
