@@ -537,6 +537,8 @@ class SignalVerification:
                 # frac, whole = math.modf(int(price))
                 # if price.startswith('0') and price.find('.') != dot_position:
                 if price.find('.') != dot_position:
+                    if current_pair_info['price'].startswith('0') and not price.startswith('0'):
+                        price = '0' + price
                     price = price[:dot_position] + "." + price[dot_position:]
                     verified_entries.append(price)
                 else:
