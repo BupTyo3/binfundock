@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 if platform == "win32":
     pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
+leverage_matches = ["LATHFFA", "EFA", "FFA", "EEA", "LETHEFA", "LATHEFA", "LETHFFA", "#LAT", "#LET", "HFFA"]
 regexp_numbers = '\d+\.?\d+'
 regexp_stop = '\d+\.?\d+$'
 
@@ -385,10 +386,8 @@ class ChinaImageToSignal:
 
     def get_leverage(self, array):
         leverage = None
-        matches = ["LATHFFA", "EFA", "FFA", "EEA", "LETHEFA", "LATHEFA", "LETHFFA", "#LAT", "#LET", "HFFA"]
-
         for item in array:
-            if any(x in item for x in matches):
+            if any(x in item for x in leverage_matches):
                 if item.rfind(': ') > 0:
                     leverage = item.split(': ', 1)[-1]
                 if item.rfind('= ') > 0:
@@ -399,7 +398,8 @@ class ChinaImageToSignal:
     def find_entry_points(self, array, action, leverage):
         for item in array:
             result = regex.findall(regexp_numbers, item)
-            if len(result) > 1:
+            is_leverage = any(x in item for x in leverage_matches)
+            if len(result) >= 1 and not is_leverage:
                 if not action:
                     action = 'Buy'
                 if not leverage:
