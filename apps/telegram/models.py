@@ -91,6 +91,7 @@ class Telegram(BaseTelegram):
         return False
 
     async def parse_tca_origin_channel(self):
+        logger.debug('PARSING ASSIST ORIGIN:')
         channel_abbr = 'assist_origin'
         chat_name = conf_obj.tca_origin
         chat_entity = await self.client.get_entity(chat_name)
@@ -117,18 +118,24 @@ class Telegram(BaseTelegram):
         self.close_loop()
 
     def close_loop(self):
-        should_be_closed = False
-        while not should_be_closed:
+        should_be_closed = True
+        while should_be_closed:
             try:
                 self.client.loop.close()
+                should_be_closed = False
             except RuntimeError:
                 time.sleep(2)
                 try:
                     self.client.loop.close()
-                    should_be_closed = True
+                    should_be_closed = False
                 except RuntimeError:
                     time.sleep(2)
-                    should_be_closed = True
+                    try:
+                        self.client.loop.close()
+                        should_be_closed = False
+                    except RuntimeError:
+                        time.sleep(2)
+                        should_be_closed = False
 
 
     def parse_tca_origin_message(self, message_text, message_id):
@@ -142,7 +149,8 @@ class Telegram(BaseTelegram):
         current_price = ''
         is_margin = False
         position = None
-        leverage = 'Leverage:'
+        leverage_label = ['Leverage:', 'Levеrage:']
+        leverage = ''
         entries = ''
         profits = ''
         stop_loss = ['']
@@ -164,7 +172,7 @@ class Telegram(BaseTelegram):
             if line.startswith(possible_stop_label[0]) or line.startswith(possible_stop_label[1]):
                 stop_loss = line[4:]
                 stop_loss = left_numbers([stop_loss])
-            if line.startswith(leverage):
+            if line.startswith(leverage_label[0]) or line.startswith(leverage_label[1]):
                 possible_leverage = line.split(' ')
                 possible_leverage = list(filter(None, possible_leverage))
                 leverage = ''.join(filter(str.isdigit, possible_leverage[2]))
@@ -173,6 +181,7 @@ class Telegram(BaseTelegram):
         return signals
 
     async def parse_china_channel(self):
+        logger.debug('PARSING AI:')
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
         chat_id = int(conf_obj.chat_china_id)
@@ -194,6 +203,7 @@ class Telegram(BaseTelegram):
         self.close_loop()
 
     async def parse_crypto_angel_channel(self):
+        logger.debug('PARSING CRYPTO PASSIVE:')
         chat_id = int(conf_obj.crypto_angel_id)
         channel_abbr = 'crypto_passive'
         async for message in self.client.iter_messages(chat_id, limit=10):
@@ -254,6 +264,7 @@ class Telegram(BaseTelegram):
         return array
 
     async def parse_tca_channel(self, sub_type: str):
+        logger.debug('PARSING TCA:')
         chat_id = int
         channel_abbr = ''
         if sub_type == 'altcoin':
@@ -320,13 +331,18 @@ class Telegram(BaseTelegram):
 
     @sync_to_async
     def write_signal_to_db(self, channel_abbr: str, signal, message_id):
+        if not signal[0].pair:
+            return
+        if 'Е' in signal[0].pair:
+            signal[0].pair = signal[0].pair.replace('Е', 'E')
+        if 'ОМ' in signal[0].pair:
+            signal[0].pair = signal[0].pair.replace('ОМ', 'OM')
         sm_obj = Signal.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).first()
         if sm_obj:
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists")
             quit()
         if signal[0].pair[-3:] == 'USD':
             signal[0].pair = signal[0].pair.replace('USD', 'USDT')
-
         logger.debug(f"Attempt to write into DB the following signal: "
                      f" Pair: '{signal[0].pair}'"
                      f" Leverage: '{signal[0].leverage}'"
