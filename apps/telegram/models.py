@@ -76,7 +76,7 @@ class Telegram(BaseTelegram):
         channel_abbr = 'assist_origin'
         chat_name = conf_obj.tca_origin
         chat_entity = await self.client.get_entity(chat_name)
-        await asyncio.sleep(10000)
+        time.sleep(7)
         from telethon import errors
         try:
             async for message in self.client.iter_messages(entity=chat_entity, limit=15):
@@ -137,12 +137,12 @@ class Telegram(BaseTelegram):
         return signals
 
     async def parse_china_channel(self):
-        await asyncio.sleep(3000)
+        time.sleep(3)
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
         chat_id = int(conf_obj.chat_china_id)
         channel_abbr = 'ai'
-        async for message in self.client.iter_messages(chat_id, limit=10):
+        async for message in self.client.iter_messages(chat_id, limit=5):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg and message.photo:
@@ -158,7 +158,7 @@ class Telegram(BaseTelegram):
                                                         f"related to the '{channel_abbr}' algorithm")
 
     async def parse_crypto_angel_channel(self):
-        await asyncio.sleep(1000)
+        time.sleep(4)
         chat_id = int(conf_obj.crypto_angel_id)
         channel_abbr = 'crypto_passive'
         async for message in self.client.iter_messages(chat_id, limit=10):
@@ -218,7 +218,7 @@ class Telegram(BaseTelegram):
         return array
 
     async def parse_tca_channel(self, sub_type: str):
-        await asyncio.sleep(2000)
+        time.sleep(5)
         chat_id = int
         channel_abbr = ''
         if sub_type == 'altcoin':
@@ -548,6 +548,8 @@ class SignalVerification:
             for price in pair_object.take_profits:
                 # if price.find('.') > 0 and price.find('.') != dot_position:
                 if price.find('.') != dot_position:
+                    if current_pair_info['price'].startswith('0') and not price.startswith('0'):
+                        price = '0' + price
                     price = price[:dot_position] + "." + price[dot_position:]
                     verified_profits.append(price)
                 else:

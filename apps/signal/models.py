@@ -90,7 +90,8 @@ class Signal(BaseSignal):
             position = SignalPosition.SHORT.value
             logger.debug(f"{position}")
         else:
-            raise Exception("Wrong info in the signal")
+            logger.error("Wrong info in the signal!")
+            return 'error'
         return position
 
     @classmethod
