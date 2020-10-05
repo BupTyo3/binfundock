@@ -86,11 +86,12 @@ class BuyOrderAdmin(admin.ModelAdmin):
                     # 'stop_loss',
                     'custom_order_id',
                     'index',
-                    'push_count',
                     'status',
                     'handled_worked',
+                    'push_count',
                     'local_canceled',
                     'local_canceled_time',
+                    'created',
                     'last_updated_by_api',
                     ]
     select_related_fields = ['signal', ]
@@ -119,11 +120,13 @@ class SellOrderAdmin(admin.ModelAdmin):
                     'stop_loss',
                     'custom_order_id',
                     'index',
-                    'push_count',
                     'status',
                     'handled_worked',
+                    'push_count',
+                    'no_need_push',
                     'local_canceled',
                     'local_canceled_time',
+                    'created',
                     'last_updated_by_api',
                     ]
     select_related_fields = ['signal', ]

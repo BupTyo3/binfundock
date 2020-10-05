@@ -501,6 +501,7 @@ class Signal(BaseSignal):
         params = {
             'signal': self,
             'local_canceled': False,
+            'no_need_push': False,
             '_status__in': [OrderStatus.SENT.value, ]
         }
         return SellOrder.objects.filter(**params)
