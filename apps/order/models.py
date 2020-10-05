@@ -1,6 +1,6 @@
 import logging
 
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from django.db import models, transaction
 from django.contrib.auth import get_user_model
@@ -172,7 +172,7 @@ class SellOrder(BaseOrder):
     @classmethod
     def _form_tp_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
                        take_profit: float, stop_loss: float,
-                       custom_order_id: str, index: int):
+                       custom_order_id: Optional[str], index: int):
         """Form Take Profit order"""
         order = SellOrder.objects.create(
             market=market,
@@ -181,7 +181,7 @@ class SellOrder(BaseOrder):
             price=take_profit,
             stop_loss=stop_loss if stop_loss is not None else signal.stop_loss,
             signal=signal,
-            custom_order_id=None if not custom_order_id else custom_order_id,
+            custom_order_id=custom_order_id,
             index=index)
         return order
 

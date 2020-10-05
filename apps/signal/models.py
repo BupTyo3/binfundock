@@ -253,7 +253,7 @@ class Signal(BaseSignal):
             quantity=distributed_quantity,
             take_profit=take_profit,
             stop_loss=stop_loss,
-            custom_order_id=None if not custom_order_id else custom_order_id,
+            custom_order_id=custom_order_id,
             index=index
         )
         return order
@@ -414,8 +414,8 @@ class Signal(BaseSignal):
                                    OrderStatus.NOT_EXISTS.value,
                                    OrderStatus.NOT_SENT.value, ]
         cancelled_params = {
-            'local_canceled': False,
-            'no_need_push': False
+            'local_canceled': True,
+            'no_need_push': False,
         }
         cancelled_excluded_params = {
             '_status__in': statuses_not_for_cancel
@@ -430,7 +430,7 @@ class Signal(BaseSignal):
             local_cancelled_order.cancel_into_market()
         orders_params = {
             '_status': OrderStatus.NOT_SENT.value,
-            'no_need_push': False
+            'no_need_push': False,
         }
         # push not_sent SELL orders
         for sell_order in self.sell_orders.filter(**orders_params):
