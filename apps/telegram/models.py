@@ -72,6 +72,24 @@ class Telegram(BaseTelegram):
             return True
         return False
 
+    def is_urgent_correct_position(self, message, channel_abbr):
+        # TODO: add logic here as it is not relevant
+        should_move_label = ['move']
+        should_move = any(x in should_move_label for x in message)
+        if should_move:
+            if 'BTC' in message.text:
+                obj = Signal.objects.filter(
+                    symbol='BTCUSDT', techannel__abbr=channel_abbr).order_by('id').last()
+                if obj:
+                    logger.debug(f'please close the position: {obj}')
+            if 'ETH' in message.text:
+                obj = Signal.objects.filter(
+                    symbol='ETHUSDT', techannel__abbr=channel_abbr).order_by('id').last()
+                if obj:
+                    logger.debug(f'please close the position: {obj}')
+            return True
+        return False
+
     async def parse_tca_origin_channel(self):
         channel_abbr = 'assist_origin'
         chat_name = conf_obj.tca_origin
@@ -84,8 +102,10 @@ class Telegram(BaseTelegram):
                 if message.text and should_handle_msg:
                     signal = self.parse_tca_origin_message(message.text, message.id)
                     if not signal[0].pair:
-                        self.is_urgent_close_position(message.text, channel_abbr)
-                        return
+                        attention_to_close = self.is_urgent_close_position(message.text, channel_abbr)
+                        correct_position = self.is_urgent_correct_position(message.text, channel_abbr)
+                        if attention_to_close or correct_position:
+                            logger.error('A SIGNAL REQUIRES ATTENTION!')
                     inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
                     if not inserted_to_db:
                         await self.send_message_to_yourself(f"Error during processing the signal to DB,"
@@ -94,7 +114,22 @@ class Telegram(BaseTelegram):
         except errors.FloodWaitError as e:
             print('Have to sleep', e.seconds, 'seconds')
             time.sleep(e.seconds)
-        self.client.loop.close()
+        self.close_loop()
+
+    def close_loop(self):
+        should_be_closed = False
+        while not should_be_closed:
+            try:
+                self.client.loop.close()
+            except RuntimeError:
+                time.sleep(2)
+                try:
+                    self.client.loop.close()
+                    should_be_closed = True
+                except RuntimeError:
+                    time.sleep(2)
+                    should_be_closed = True
+
 
     def parse_tca_origin_message(self, message_text, message_id):
         signals = []
@@ -110,7 +145,7 @@ class Telegram(BaseTelegram):
         leverage = 'Leverage:'
         entries = ''
         profits = ''
-        stop_loss = ''
+        stop_loss = ['']
         signal_identification = 'CF Leverage  Trading Signal'
         for line in splitted_info:
             if line.startswith(pair_label[0]) or line.startswith(pair_label[1]):
@@ -120,20 +155,21 @@ class Telegram(BaseTelegram):
                 position = ''.join(filter(str.isalpha, position_info[2]))
             if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1]) or line.startswith(possible_entry_label[2]):
                 fake_entries = line[8:]
-                entries = fake_entries.split('-')
+                possible_entries = fake_entries.split('-')
+                entries = left_numbers(possible_entries)
             if line.startswith(possible_take_profits_label[0]) or line.startswith(possible_take_profits_label[1]):
                 fake_profits = line[9:]
                 possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
             if line.startswith(possible_stop_label[0]) or line.startswith(possible_stop_label[1]):
                 stop_loss = line[4:]
-                stop_loss = stop_loss.replace("..", ".")
+                stop_loss = left_numbers([stop_loss])
             if line.startswith(leverage):
                 possible_leverage = line.split(' ')
                 possible_leverage = list(filter(None, possible_leverage))
                 leverage = ''.join(filter(str.isdigit, possible_leverage[2]))
         signals.append(SignalModel(pair, current_price, is_margin, position,
-                                   leverage, entries, profits, stop_loss, message_id))
+                                   leverage, entries, profits, stop_loss[0], message_id))
         return signals
 
     async def parse_china_channel(self):
@@ -155,7 +191,7 @@ class Telegram(BaseTelegram):
                     await self.send_message_to_yourself(f"Error during processing the signal to DB,"
                                                         f"please check logs for '{signal[0].pair}'"
                                                         f"related to the '{channel_abbr}' algorithm")
-        self.client.loop.close()
+        self.close_loop()
 
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
@@ -171,7 +207,7 @@ class Telegram(BaseTelegram):
                         await self.send_message_to_yourself(f"Error during processing the signal to DB,"
                                                             f"please check logs for '{signal[0].pair}'"
                                                             f"related to the '{channel_abbr}' algorithm")
-        self.client.loop.close()
+        self.close_loop()
 
     def parse_angel_message(self, message_text, message_id):
         signals = []
@@ -237,7 +273,7 @@ class Telegram(BaseTelegram):
                         await self.send_message_to_yourself(f"Error during processing the signal to DB,"
                                                             f"please check logs for '{signal[0].pair}'"
                                                             f"related to the '{channel_abbr}' algorithm")
-        self.client.loop.close()
+        self.close_loop()
 
     def parse_tca_message(self, message_text, message_id):
         signals = []
