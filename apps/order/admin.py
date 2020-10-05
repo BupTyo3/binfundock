@@ -10,6 +10,45 @@ from .models import (
 )
 
 
+class SignalIDFilter(InputFilter):
+    parameter_name = 'signal_id'
+    title = _('Signal_id')
+
+    def queryset(self, request, queryset):
+        if self.value() is not None:
+            try:
+                signal_id = self.value()
+            except ValueError:
+                return queryset
+            return queryset.filter(signal__id=signal_id)
+
+
+class OuterIDFilter(InputFilter):
+    parameter_name = 'outer_id'
+    title = _('Outer_ID')
+
+    def queryset(self, request, queryset):
+        if self.value() is not None:
+            try:
+                outer_id = self.value()
+            except ValueError:
+                return queryset
+            return queryset.filter(signal__outer_signal_id=outer_id)
+
+
+class TechannelFilter(InputFilter):
+    parameter_name = 'techannel_abbr'
+    title = _('Techannel_Abbr')
+
+    def queryset(self, request, queryset):
+        if self.value() is not None:
+            try:
+                techannel_abbr = self.value()
+            except ValueError:
+                return queryset
+            return queryset.filter(signal__techannel__abbr=techannel_abbr)
+
+
 class OrderIDFilter(InputFilter):
     parameter_name = 'order_id'
     title = _('Order_ID')
@@ -59,6 +98,9 @@ class BuyOrderAdmin(admin.ModelAdmin):
     list_filter = [
         '_status',
         'signal___status',
+        SignalIDFilter,
+        OuterIDFilter,
+        TechannelFilter,
     ]
 
     @staticmethod
@@ -89,6 +131,9 @@ class SellOrderAdmin(admin.ModelAdmin):
     list_filter = [
         '_status',
         'signal___status',
+        SignalIDFilter,
+        OuterIDFilter,
+        TechannelFilter,
     ]
 
     @staticmethod

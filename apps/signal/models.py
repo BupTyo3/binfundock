@@ -413,19 +413,30 @@ class Signal(BaseSignal):
         statuses_not_for_cancel = [OrderStatus.CANCELED.value,
                                    OrderStatus.NOT_EXISTS.value,
                                    OrderStatus.NOT_SENT.value, ]
+        cancelled_params = {
+            'local_canceled': False,
+            'no_need_push': False
+        }
+        cancelled_excluded_params = {
+            '_status__in': statuses_not_for_cancel
+        }
         # cancel local_cancelled buy orders
         for local_cancelled_order in self.buy_orders.filter(
-                local_canceled=True).exclude(_status__in=statuses_not_for_cancel):
+                **cancelled_params).exclude(**cancelled_excluded_params):
             local_cancelled_order.cancel_into_market()
         # cancel local_cancelled sell orders
         for local_cancelled_order in self.sell_orders.filter(
-                local_canceled=True).exclude(_status__in=statuses_not_for_cancel):
+                **cancelled_params).exclude(**cancelled_excluded_params):
             local_cancelled_order.cancel_into_market()
+        orders_params = {
+            '_status': OrderStatus.NOT_SENT.value,
+            'no_need_push': False
+        }
         # push not_sent SELL orders
-        for sell_order in self.sell_orders.filter(_status=OrderStatus.NOT_SENT.value, no_need_push=False):
+        for sell_order in self.sell_orders.filter(**orders_params):
             sell_order.push_to_market()
         # push not_sent BUY orders
-        for buy_order in self.buy_orders.filter(_status=OrderStatus.NOT_SENT.value):
+        for buy_order in self.buy_orders.filter(**orders_params):
             buy_order.push_to_market()
             # set status if at least one order has created
             if self.status not in [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]:
@@ -690,7 +701,9 @@ class Signal(BaseSignal):
             return
 
         _order_statuses = [OrderStatus.SENT.value, ]
-        params = {'_status__in': _order_statuses}
+        params = {
+            '_status__in': _order_statuses,
+        }
         for buy_order in self.buy_orders.filter(**params):
             buy_order.update_buy_order_info_by_api()
         for sell_order in self.sell_orders.filter(**params):
