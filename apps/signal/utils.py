@@ -17,6 +17,7 @@ class SignalStatus(Enum):
 class SignalPosition(Enum):
     LONG = 'long'  # BUY
     SHORT = 'short'  # SELL
+    ERROR = 'error'  # something wrong with the signal
 
     @classmethod
     def choices(cls):
