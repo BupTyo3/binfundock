@@ -76,7 +76,6 @@ class Telegram(BaseTelegram):
         channel_abbr = 'assist_origin'
         chat_name = conf_obj.tca_origin
         chat_entity = await self.client.get_entity(chat_name)
-        time.sleep(7)
         from telethon import errors
         try:
             async for message in self.client.iter_messages(entity=chat_entity, limit=15):
@@ -137,7 +136,6 @@ class Telegram(BaseTelegram):
         return signals
 
     async def parse_china_channel(self):
-        time.sleep(3)
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
         chat_id = int(conf_obj.chat_china_id)
@@ -158,7 +156,6 @@ class Telegram(BaseTelegram):
                                                         f"related to the '{channel_abbr}' algorithm")
 
     async def parse_crypto_angel_channel(self):
-        time.sleep(4)
         chat_id = int(conf_obj.crypto_angel_id)
         channel_abbr = 'crypto_passive'
         async for message in self.client.iter_messages(chat_id, limit=10):
@@ -218,7 +215,6 @@ class Telegram(BaseTelegram):
         return array
 
     async def parse_tca_channel(self, sub_type: str):
-        time.sleep(5)
         chat_id = int
         channel_abbr = ''
         if sub_type == 'altcoin':

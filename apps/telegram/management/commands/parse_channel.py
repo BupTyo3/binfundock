@@ -1,5 +1,6 @@
 import logging
 
+import asyncio
 from telethon import TelegramClient
 
 from apps.signal.models import Signal
@@ -24,22 +25,27 @@ class Command(SystemCommand):
     def collect_info_from_china_channel(self):
         with self.client:
             self.client.loop.run_until_complete(self.telegram.parse_china_channel())
+        self.client.loop.close()
 
     def collect_info_from_angel_channel(self):
         with self.client:
             self.client.loop.run_until_complete(self.telegram.parse_crypto_angel_channel())
+        self.client.loop.close()
 
     def collect_info_from_tca_altcoin_channel(self):
         with self.client:
             self.client.loop.run_until_complete(self.telegram.parse_tca_channel('altcoin'))
+            self.client.loop.close()
 
     def collect_info_from_tca_leverage_channel(self):
         with self.client:
             self.client.loop.run_until_complete(self.telegram.parse_tca_channel('leverage'))
+        self.client.loop.close()
 
     def collect_info_from_tca_origin_channel(self):
         with self.client:
             self.client.loop.run_until_complete(self.telegram.parse_tca_origin_channel())
+        self.client.loop.close()
 
     def handle(self, *args, **options):
         channel = options['channel']
