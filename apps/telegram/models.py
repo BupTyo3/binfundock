@@ -94,6 +94,7 @@ class Telegram(BaseTelegram):
         except errors.FloodWaitError as e:
             print('Have to sleep', e.seconds, 'seconds')
             time.sleep(e.seconds)
+        self.client.loop.close()
 
     def parse_tca_origin_message(self, message_text, message_id):
         signals = []
@@ -154,6 +155,7 @@ class Telegram(BaseTelegram):
                     await self.send_message_to_yourself(f"Error during processing the signal to DB,"
                                                         f"please check logs for '{signal[0].pair}'"
                                                         f"related to the '{channel_abbr}' algorithm")
+        self.client.loop.close()
 
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
@@ -169,6 +171,7 @@ class Telegram(BaseTelegram):
                         await self.send_message_to_yourself(f"Error during processing the signal to DB,"
                                                             f"please check logs for '{signal[0].pair}'"
                                                             f"related to the '{channel_abbr}' algorithm")
+        self.client.loop.close()
 
     def parse_angel_message(self, message_text, message_id):
         signals = []
@@ -234,6 +237,7 @@ class Telegram(BaseTelegram):
                         await self.send_message_to_yourself(f"Error during processing the signal to DB,"
                                                             f"please check logs for '{signal[0].pair}'"
                                                             f"related to the '{channel_abbr}' algorithm")
+        self.client.loop.close()
 
     def parse_tca_message(self, message_text, message_id):
         signals = []
