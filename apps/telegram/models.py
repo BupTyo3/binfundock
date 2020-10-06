@@ -13,7 +13,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 
 from apps.signal.models import Signal, EntryPoint, TakeProfit
-from utils.parse_channels.str_parser import left_numbers
+from utils.parse_channels.str_parser import left_numbers, check_pair
 from .base_model import BaseTelegram
 from .init_client import ShtClient
 from pytesseract import image_to_string
@@ -120,7 +120,7 @@ class Telegram(BaseTelegram):
         signals = []
         splitted_info = message_text.splitlines()
         possible_entry_label = ['Entry at: ', 'Entry : ', 'Get in : ', 'Get  in : ']
-        possible_take_profits_label = ['Sell at: ', 'Targets: ']
+        possible_take_profits_label = ['Sell at: ', 'Targets: ', 'Тargets: ']
         possible_stop_label = ['SL: ', 'SL : ']
         pair_label = ['Pair: ', 'Рair: ']
         pair = ''
@@ -305,10 +305,7 @@ class Telegram(BaseTelegram):
     def write_signal_to_db(self, channel_abbr: str, signal, message_id):
         if not signal[0].pair:
             return
-        if 'Е' in signal[0].pair:
-            signal[0].pair = signal[0].pair.replace('Е', 'E')
-        if 'ОМ' in signal[0].pair:
-            signal[0].pair = signal[0].pair.replace('ОМ', 'OM')
+        signal[0].pair = check_pair(signal[0].pair)
         sm_obj = Signal.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).first()
         if sm_obj:
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists")
