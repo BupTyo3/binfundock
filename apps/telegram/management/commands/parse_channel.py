@@ -1,5 +1,5 @@
 import logging
-
+from random import random
 import asyncio
 from telethon import TelegramClient
 
@@ -19,7 +19,7 @@ class Command(SystemCommand):
         super().__init__()
 
     def init_telegram(self):
-        self._client = TelegramClient('lucrativetrend', conf_obj.api_id, conf_obj.api_hash)
+        self._client = TelegramClient(f'lucrativetrend-{random()}', conf_obj.api_id, conf_obj.api_hash)
         self._client.start()
         self._telegram = Telegram(self._client)
 
