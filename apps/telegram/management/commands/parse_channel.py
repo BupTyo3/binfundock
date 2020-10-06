@@ -18,8 +18,8 @@ class Command(SystemCommand):
         self._telegram = None
         super().__init__()
 
-    def init_telegram(self):
-        self._client = TelegramClient(f'lucrativetrend-{random()}', conf_obj.api_id, conf_obj.api_hash)
+    def init_telegram(self, session_name):
+        self._client = TelegramClient(session_name, conf_obj.api_id, conf_obj.api_hash)
         self._client.start()
         self._telegram = Telegram(self._client)
 
@@ -28,27 +28,27 @@ class Command(SystemCommand):
         parser.add_argument('--channel', type=str, help='Type a channel name')
 
     def collect_info_from_china_channel(self):
-        self.init_telegram()
+        self.init_telegram('Lucrative-AI')
         with self._client:
             self._client.loop.run_until_complete(self._telegram.parse_china_channel())
 
     def collect_info_from_angel_channel(self):
-        self.init_telegram()
+        self.init_telegram('Lucrative-Passive')
         with self._client:
             self._client.loop.run_until_complete(self._telegram.parse_crypto_angel_channel())
 
     def collect_info_from_tca_altcoin_channel(self):
-        self.init_telegram()
+        self.init_telegram('Lucrative-altcoin')
         with self._client:
             self._client.loop.run_until_complete(self._telegram.parse_tca_channel('altcoin'))
 
     def collect_info_from_tca_leverage_channel(self):
-        self.init_telegram()
+        self.init_telegram('Lucrative-leverage')
         with self._client:
             self._client.loop.run_until_complete(self._telegram.parse_tca_channel('leverage'))
 
     def collect_info_from_tca_origin_channel(self):
-        self.init_telegram()
+        self.init_telegram('Lucrative-origin')
         with self._client:
             self._client.loop.run_until_complete(self._telegram.parse_tca_origin_channel())
 
