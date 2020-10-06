@@ -91,12 +91,13 @@ class Telegram(BaseTelegram):
         return False
 
     async def parse_tca_origin_channel(self):
+        time.sleep(7)
         logger.debug('PARSING ASSIST ORIGIN:')
         channel_abbr = 'assist_origin'
-        chat_name = conf_obj.tca_origin
-        chat_entity = await self.client.get_entity(chat_name)
         from telethon import errors
         try:
+            chat_name = conf_obj.tca_origin
+            chat_entity = await self.client.get_entity(chat_name)
             async for message in self.client.iter_messages(entity=chat_entity, limit=15):
                 exists = await self.is_signal_handled(message.id, channel_abbr)
                 should_handle_msg = not exists
@@ -115,28 +116,6 @@ class Telegram(BaseTelegram):
         except errors.FloodWaitError as e:
             print('Have to sleep', e.seconds, 'seconds')
             time.sleep(e.seconds)
-        self.close_loop()
-
-    def close_loop(self):
-        should_be_closed = True
-        while should_be_closed:
-            try:
-                self.client.loop.close()
-                should_be_closed = False
-            except RuntimeError:
-                time.sleep(2)
-                try:
-                    self.client.loop.close()
-                    should_be_closed = False
-                except RuntimeError:
-                    time.sleep(2)
-                    try:
-                        self.client.loop.close()
-                        should_be_closed = False
-                    except RuntimeError:
-                        time.sleep(2)
-                        should_be_closed = False
-
 
     def parse_tca_origin_message(self, message_text, message_id):
         signals = []
@@ -200,7 +179,6 @@ class Telegram(BaseTelegram):
                     await self.send_message_to_yourself(f"Error during processing the signal to DB,"
                                                         f"please check logs for '{signal[0].pair}'"
                                                         f"related to the '{channel_abbr}' algorithm")
-        self.close_loop()
 
     async def parse_crypto_angel_channel(self):
         logger.debug('PARSING CRYPTO PASSIVE:')
@@ -217,7 +195,6 @@ class Telegram(BaseTelegram):
                         await self.send_message_to_yourself(f"Error during processing the signal to DB,"
                                                             f"please check logs for '{signal[0].pair}'"
                                                             f"related to the '{channel_abbr}' algorithm")
-        self.close_loop()
 
     def parse_angel_message(self, message_text, message_id):
         signals = []
@@ -284,7 +261,6 @@ class Telegram(BaseTelegram):
                         await self.send_message_to_yourself(f"Error during processing the signal to DB,"
                                                             f"please check logs for '{signal[0].pair}'"
                                                             f"related to the '{channel_abbr}' algorithm")
-        self.close_loop()
 
     def parse_tca_message(self, message_text, message_id):
         signals = []
