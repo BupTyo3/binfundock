@@ -102,16 +102,17 @@ class Telegram(BaseTelegram):
                 should_handle_msg = not exists
                 if message.text and should_handle_msg:
                     signal = self.parse_tca_origin_message(message.text, message.id)
-                    if not signal[0].pair:
+                    if signal[0].pair:
+                        inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
+                        if not inserted_to_db:
+                            await self.send_message_to_yourself(f"Error during processing the signal to DB,"
+                                                                f"please check logs for '{signal[0].pair}'"
+                                                                f"related to the '{channel_abbr}' algorithm")
+                    else:
                         attention_to_close = self.is_urgent_close_position(message.text, channel_abbr)
                         correct_position = self.is_urgent_correct_position(message.text, channel_abbr)
                         if attention_to_close or correct_position:
                             logger.error('A SIGNAL REQUIRES ATTENTION!')
-                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
-                    if not inserted_to_db:
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB,"
-                                                            f"please check logs for '{signal[0].pair}'"
-                                                            f"related to the '{channel_abbr}' algorithm")
         except errors.FloodWaitError as e:
             print('Have to sleep', e.seconds, 'seconds')
             time.sleep(e.seconds)
@@ -127,7 +128,7 @@ class Telegram(BaseTelegram):
         current_price = ''
         is_margin = False
         position = None
-        leverage_label = ['Leverage:', 'Levеrage:']
+        leverage_label = ['Leverage:', 'Levеrage:', 'Leveragе']
         leverage = ''
         entries = ''
         profits = ''
@@ -143,14 +144,16 @@ class Telegram(BaseTelegram):
                 fake_entries = line[8:]
                 possible_entries = fake_entries.split('-')
                 entries = left_numbers(possible_entries)
-            if line.startswith(possible_take_profits_label[0]) or line.startswith(possible_take_profits_label[1]):
+            if line.startswith(possible_take_profits_label[0]) or line.startswith(possible_take_profits_label[1])\
+                    or line.startswith(possible_take_profits_label[2]):
                 fake_profits = line[9:]
                 possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
             if line.startswith(possible_stop_label[0]) or line.startswith(possible_stop_label[1]):
                 stop_loss = line[4:]
                 stop_loss = left_numbers([stop_loss])
-            if line.startswith(leverage_label[0]) or line.startswith(leverage_label[1]):
+            if line.startswith(leverage_label[0]) or line.startswith(leverage_label[1])\
+                    or line.startswith(leverage_label[2]):
                 possible_leverage = line.split(' ')
                 possible_leverage = list(filter(None, possible_leverage))
                 leverage = ''.join(filter(str.isdigit, possible_leverage[2]))
