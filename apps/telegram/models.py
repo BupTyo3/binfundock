@@ -104,10 +104,11 @@ class Telegram(BaseTelegram):
                     signal = self.parse_tca_origin_message(message.text, message.id)
                     if signal[0].pair:
                         inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
-                        if not inserted_to_db:
-                            await self.send_message_to_yourself(f"Error during processing the signal to DB,"
-                                                                f"please check logs for '{signal[0].pair}'"
-                                                                f"related to the '{channel_abbr}' algorithm")
+                        if inserted_to_db != 'success':
+                            await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                                f"please check logs for '{signal[0].pair}' "
+                                                                f"related to the '{channel_abbr}' algorithm: "
+                                                                f"{inserted_to_db}")
                     else:
                         attention_to_close = self.is_urgent_close_position(message.text, channel_abbr)
                         correct_position = self.is_urgent_correct_position(message.text, channel_abbr)
@@ -161,6 +162,59 @@ class Telegram(BaseTelegram):
                                    leverage, entries, profits, stop_loss[0], message_id))
         return signals
 
+    async def parse_margin_whale_channel(self):
+        chat_id = int(conf_obj.margin_whales)
+        channel_abbr = 'margin_whale'
+        async for message in self.client.iter_messages(chat_id, limit=5):
+            exists = await self.is_signal_handled(message.id, channel_abbr)
+            should_handle_msg = not exists
+            if should_handle_msg and message.photo:
+                signal = self.parse_margin_whale_message(message.text, message.id)
+                if not signal:
+                    return
+                inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
+                if inserted_to_db != 'success':
+                    await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                        f"please check logs for '{signal[0].pair}' "
+                                                        f"related to the '{channel_abbr}' algorithm: "
+                                                        f"{inserted_to_db}")
+
+    def parse_margin_whale_message(self, message_text, message_id):
+        signals = []
+        splitted_info = message_text.splitlines()
+        buy_label = 'ENTRY  : '
+        margin_label = '#MARGIN'
+        goals_label = 'Target'
+        stop_label = 'STOP LOSS: '
+        pair = ''
+        current_price = ''
+        is_margin = False
+        position = None
+        leverage = 'Leverage : '
+        entries = ''
+        profits = []
+        stop_loss = ''
+        for line in splitted_info:
+            if line.startswith(margin_label):
+                fake_pair = line.split(' ')
+                possible_pair = fake_pair[2]
+                if 'XBT' in possible_pair:
+                    pair = 'BTCUSDT'
+            if line.startswith(buy_label):
+                fake_entries = line[9:]
+                entries = fake_entries.split('-')
+            if line.startswith(leverage):
+                possible_leverage = line.split(':')
+                leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
+            if line.startswith(goals_label):
+                possible_profits = line.split('-')
+                profits.append(possible_profits[1].replace(' ', ''))
+            if line.startswith(stop_label):
+                stop_loss = line[11:]
+        signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        return signals
+
     async def parse_china_channel(self):
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
@@ -176,10 +230,11 @@ class Telegram(BaseTelegram):
                 if not signal:
                     return
                 inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
-                if not inserted_to_db:
-                    await self.send_message_to_yourself(f"Error during processing the signal to DB,"
-                                                        f"please check logs for '{signal[0].pair}'"
-                                                        f"related to the '{channel_abbr}' algorithm")
+                if inserted_to_db != 'success':
+                    await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                        f"please check logs for '{signal[0].pair}' "
+                                                        f"related to the '{channel_abbr}' algorithm: "
+                                                        f"{inserted_to_db}")
 
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
@@ -191,10 +246,11 @@ class Telegram(BaseTelegram):
                 signal = self.parse_angel_message(message.text, message.id)
                 if signal[0].pair:
                     inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
-                    if not inserted_to_db:
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB,"
-                                                            f"please check logs for '{signal[0].pair}'"
-                                                            f"related to the '{channel_abbr}' algorithm")
+                    if inserted_to_db != 'success':
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                            f"please check logs for '{signal[0].pair}' "
+                                                            f"related to the '{channel_abbr}' algorithm: "
+                                                            f"{inserted_to_db}")
 
     def parse_angel_message(self, message_text, message_id):
         signals = []
@@ -225,7 +281,7 @@ class Telegram(BaseTelegram):
                 stop_loss = line[4:]
                 stop_loss = self.handle_ca_recommend_to_array(stop_loss)
                 try:
-                    stop_loss = min(float(s) for s in stop_loss)
+                    stop_loss = f'{min(float(s) for s in stop_loss)}'
                 except:
                     stop_loss = '0'
         signals.append(SignalModel(pair, current_price, is_margin, position,
@@ -256,10 +312,11 @@ class Telegram(BaseTelegram):
                 signal = self.parse_tca_message(message.text, message.id)
                 if signal:
                     inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
-                    if not inserted_to_db:
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB,"
-                                                            f"please check logs for '{signal[0].pair}'"
-                                                            f"related to the '{channel_abbr}' algorithm")
+                    if inserted_to_db != 'success':
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                            f"please check logs for '{signal[0].pair}' "
+                                                            f"related to the '{channel_abbr}' algorithm: "
+                                                            f"{inserted_to_db}")
 
     def parse_tca_message(self, message_text, message_id):
         signals = []
@@ -332,10 +389,10 @@ class Telegram(BaseTelegram):
                                  take_profits=signal[0].take_profits,
                                  outer_signal_id=message_id)
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
-            return True
+            return 'success'
         except Exception as e:
             logger.error(f"Write into DB failed: {e}")
-            return False
+            return e
 
     # send messages to yourself...
     async def send_message_to_yourself(self, message):
