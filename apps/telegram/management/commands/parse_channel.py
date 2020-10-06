@@ -52,6 +52,11 @@ class Command(SystemCommand):
         with self._client:
             self._client.loop.run_until_complete(self._telegram.parse_tca_origin_channel())
 
+    def collect_info_from_margin_whales_channel(self):
+        self.init_telegram('Lucrative-Whales')
+        with self._client:
+            self._client.loop.run_until_complete(self._telegram.parse_margin_whale_channel())
+
     def handle(self, *args, **options):
         channel = options['channel']
         china_matches = ["China", "china"]
@@ -59,6 +64,7 @@ class Command(SystemCommand):
         tca_altcoin_matches = ["tca_altcoin", "altcoin", "altcoins"]
         tca_leverage_matches = ["tca_leverage", "leverage"]
         tca_origin_matches = ["tca_origin", "origin"]
+        margin_whale_matches = ["margin", "whale", "marginwhale", "margin_whale"]
         if not get_or_create_crontask().ai_algorithm:
             pass
         elif any(x in channel for x in china_matches):
@@ -79,4 +85,8 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in tca_origin_matches):
             self.collect_info_from_tca_origin_channel()
+        if not get_or_create_crontask().margin_whale:
+            pass
+        elif any(x in channel for x in margin_whale_matches):
+            self.collect_info_from_margin_whales_channel()
 
