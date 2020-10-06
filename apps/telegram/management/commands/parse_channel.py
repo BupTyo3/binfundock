@@ -13,35 +13,44 @@ logger = logging.getLogger(__name__)
 
 
 class Command(SystemCommand):
-    help = 'Closes the specified poll for voting'
-    client = TelegramClient('lucrativetrend', conf_obj.api_id, conf_obj.api_hash)
-    client.start()
-    telegram = Telegram(client)
+    def __init__(self):
+        self._client = None
+        self._telegram = None
+        super().__init__()
+
+    def init_telegram(self):
+        self._client = TelegramClient('lucrativetrend', conf_obj.api_id, conf_obj.api_hash)
+        self._client.start()
+        self._telegram = Telegram(self._client)
 
     def add_arguments(self, parser):
         pass
         parser.add_argument('--channel', type=str, help='Type a channel name')
 
     def collect_info_from_china_channel(self):
-        with self.client:
-            self.client.loop.run_until_complete(self.telegram.parse_china_channel())
+        self.init_telegram()
+        with self._client:
+            self._client.loop.run_until_complete(self._telegram.parse_china_channel())
 
     def collect_info_from_angel_channel(self):
-        with self.client:
-            self.client.loop.run_until_complete(self.telegram.parse_crypto_angel_channel())
+        self.init_telegram()
+        with self._client:
+            self._client.loop.run_until_complete(self._telegram.parse_crypto_angel_channel())
 
     def collect_info_from_tca_altcoin_channel(self):
-        with self.client:
-            self.client.loop.run_until_complete(self.telegram.parse_tca_channel('altcoin'))
+        self.init_telegram()
+        with self._client:
+            self._client.loop.run_until_complete(self._telegram.parse_tca_channel('altcoin'))
 
     def collect_info_from_tca_leverage_channel(self):
-        with self.client:
-            self.client.loop.run_until_complete(self.telegram.parse_tca_channel('leverage'))
+        self.init_telegram()
+        with self._client:
+            self._client.loop.run_until_complete(self._telegram.parse_tca_channel('leverage'))
 
     def collect_info_from_tca_origin_channel(self):
-        with self.client:
-            self.client.loop.run_until_complete(self.telegram.parse_tca_origin_channel())
-
+        self.init_telegram()
+        with self._client:
+            self._client.loop.run_until_complete(self._telegram.parse_tca_origin_channel())
 
     def handle(self, *args, **options):
         channel = options['channel']
