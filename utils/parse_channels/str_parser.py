@@ -10,3 +10,22 @@ def left_numbers(array: List[str]) -> List[str]:
                                or n in ['.', ',']]) for el in array]
     return list(filter(None, possible_array))
 
+
+def check_pair(string):
+    if 'Е' in string:
+        string = string.replace('Е', 'E')
+    if 'О' in string:
+        string = string.replace('О', 'O')
+    if 'М' in string:
+        string = string.replace('М', 'M')
+    if 'С' in string:
+        string = string.replace('С', 'C')
+    if 'Т' in string:
+        string = string.replace('Т', 'T')
+    if 'В' in string:
+        string = string.replace('В', 'B')
+    if 'А' in string:
+        string = string.replace('А', 'A')
+    if 'Н' in string:
+        string = string.replace('Н', 'H')
+    return string
