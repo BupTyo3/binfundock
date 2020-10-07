@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from utils.framework.models import (
     SystemBaseModel,
-    generate_increment_name_after_suffix,
+    get_increased_leading_number,
 )
 from .base_model import BaseSignal
 from .utils import SignalStatus, SignalPosition
@@ -101,19 +101,19 @@ class Signal(BaseSignal):
 
     @classmethod
     @transaction.atomic
-    def create_signal(cls, symbol: str, techannel_abbr: str,
+    def create_signal(cls, symbol: str, techannel_name: str,
                       stop_loss: float, outer_signal_id: int,
                       entry_points: List[float], take_profits: List[float],
                       leverage: Optional[int] = None):
         """
         Create signal
         """
-        techannel, created = Techannel.objects.get_or_create(abbr=techannel_abbr)
+        techannel, created = Techannel.objects.get_or_create(name=techannel_name)
         if created:
             logger.debug(f"Telegram channel '{techannel}' was created")
         sm_obj = Signal.objects.filter(outer_signal_id=outer_signal_id, techannel=techannel).first()
         if sm_obj:
-            logger.warning(f"Signal '{outer_signal_id}':'{techannel_abbr}' already exists")
+            logger.warning(f"Signal '{outer_signal_id}':'{techannel_name}' already exists")
             return
         position = cls._calculate_position(stop_loss, entry_points, take_profits)
         sm_obj = Signal.objects.create(
@@ -171,6 +171,7 @@ class Signal(BaseSignal):
         # return res / n_distribution  # эквивалент 33 долларов
 
     @staticmethod
+    @rounded_result
     def __find_not_fractional_by_step(value: float, step: float) -> float:
         """
         Round by Market rules
@@ -315,7 +316,7 @@ class Signal(BaseSignal):
             coin_quantity = self._get_distributed_toc_quantity(market, entry_point.value)
             self.__form_buy_order(market, coin_quantity, entry_point, index)
 
-    def _formation_sell_orders(self, market: BaseMarket, sell_quantity: float) -> None:
+    def _formation_first_sell_orders(self, market: BaseMarket, sell_quantity: float) -> None:
         """
         Function for creating Sell orders
         """
@@ -325,6 +326,7 @@ class Signal(BaseSignal):
                 market=market, distributed_quantity=distributed_quantity,
                 take_profit=take_profit.value, index=index)
 
+    @rounded_result
     def _get_new_stop_loss(self, worked_sell_orders: QuerySet) -> float:
         """
         Business logic
@@ -349,22 +351,10 @@ class Signal(BaseSignal):
         """
         Form one copied Sell order by original Sell order (with updated quantity or stop_loss)
         """
-        max_number_of_copies = 300  # Max number of copies of Sell orders
-        copy_delimiter = '_copy_'
-        max_length_of_signal_id = 50  # length of custom_order_id field of BaseOrder model
         from apps.order.models import SellOrder
 
-        def check_if_that_name_already_exists_function(custom_order_id):
-            if SellOrder.objects.filter(custom_order_id=custom_order_id).exists():
-                return True
         order = SellOrder.objects.filter(id=original_order_id).first()
-        new_custom_order_id = generate_increment_name_after_suffix(
-            order.custom_order_id,
-            check_if_that_name_already_exists_function,
-            copy_delimiter,
-            max_number_of_copies,
-            max_length_of_signal_id
-        )
+        new_custom_order_id = get_increased_leading_number(order.custom_order_id)
         logger.debug(f"New copied SELL order custom_order_id = '{new_custom_order_id}'")
         new_sell_order = self.__form_sell_order(
             market=order.market,
@@ -534,6 +524,7 @@ class Signal(BaseSignal):
         sent_orders.update(local_canceled=True, local_canceled_time=now_)
 
     @debug_input_and_returned
+    @rounded_result
     def __get_bought_quantity(self, worked_orders: QuerySet) -> float:
         """
         Get Sum of bought_quantity of worked Buy orders
@@ -555,6 +546,7 @@ class Signal(BaseSignal):
         return res['quantity__sum']
 
     @debug_input_and_returned
+    @rounded_result
     def __calculate_new_bought_quantity(self,
                                         sent_sell_orders: QuerySet,
                                         addition_quantity: float) -> float:
@@ -601,7 +593,7 @@ class Signal(BaseSignal):
                                                sell_quantity=new_bought_quantity)
         # Form sell orders if the signal doesn't have any
         elif not self.sell_orders.exists():
-            self._formation_sell_orders(worked_orders.last().market, bought_quantity)
+            self._formation_first_sell_orders(worked_orders.last().market, bought_quantity)
         self.__update_flag_handled_worked_orders(worked_orders)
         # Change status
         if self.status not in [SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]:
