@@ -352,7 +352,7 @@ class Telegram(BaseTelegram):
                      f" Algorithm: '{channel_abbr}'"
                      f" Message ID: '{message_id}'")
         try:
-            Signal.create_signal(techannel_abbr=channel_abbr,
+            Signal.create_signal(techannel_name=channel_abbr,
                                  leverage=signal[0].leverage,
                                  symbol=signal[0].pair,
                                  stop_loss=signal[0].stop_loss,

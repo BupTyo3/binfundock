@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class BuyOrder(BaseOrder):
     type_: str = 'buy'
-    order_type_separator: str = 'b'
+    order_type_separator: str = 'bb'
     market = models.ForeignKey(to=Market,
                                related_name='buy_orders',
                                on_delete=models.DO_NOTHING)
@@ -45,18 +45,6 @@ class BuyOrder(BaseOrder):
 
     def __str__(self):
         return f"{self.pk}:{self.symbol}:{self.custom_order_id}"
-
-    def save(self, *args, **kwargs):
-        """
-        Addition: Form custom_order_id on creation
-        """
-        if not self.pk and not self.custom_order_id:
-            self.custom_order_id = self.form_order_id(
-                market_separator=self.market.order_id_separator,
-                message_id=self.signal.outer_signal_id,
-                techannel_abbr=self.signal.techannel.abbr,
-                index=self.index)
-        super().save(*args, **kwargs)
 
     def push_to_market(self):
         """
@@ -106,7 +94,7 @@ class BuyOrder(BaseOrder):
 class SellOrder(BaseOrder):
     _SL_APPEND_INDEX = 500
     type_: str = 'sell'
-    order_type_separator: str = 's'
+    order_type_separator: str = 'ss'
 
     market = models.ForeignKey(to=Market,
                                related_name='sell_orders',
@@ -138,18 +126,6 @@ class SellOrder(BaseOrder):
 
     def __str__(self):
         return f"{self.pk}:{self.symbol}:{self.custom_order_id}"
-
-    def save(self, *args, **kwargs):
-        """
-        Form custom_order_id on creation
-        """
-        if not self.pk and not self.custom_order_id:
-            self.custom_order_id = self.form_order_id(
-                market_separator=self.market.order_id_separator,
-                message_id=self.signal.outer_signal_id,
-                techannel_abbr=self.signal.techannel.abbr,
-                index=self.index)
-        super().save(*args, **kwargs)
 
     @classmethod
     def _form_sell_stop_loss_order(cls, tp_order: 'SellOrder'):
@@ -188,7 +164,7 @@ class SellOrder(BaseOrder):
     @classmethod
     def form_sell_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
                         take_profit: float, stop_loss: float,
-                        custom_order_id: str, index: int):
+                        custom_order_id: Optional[str], index: int):
         """Form OCO SELL order:
         One - tp_order (Take Profit order),
         Second - sl_order (Stop Loss order)"""
