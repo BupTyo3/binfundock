@@ -1,13 +1,20 @@
 import logging
 
+from typing import Optional, TYPE_CHECKING
+
 from utils.framework.models import SystemBaseModel
 from .utils import SignalStatus
+
+if TYPE_CHECKING:
+    from apps.techannel.base_model import TechannelBase
 
 logger = logging.getLogger(__name__)
 
 
 class BaseSignal(SystemBaseModel):
     status: SignalStatus
+    techannel: "TechannelBase"
+    outer_signal_id: int
 
     class Meta:
         abstract = True

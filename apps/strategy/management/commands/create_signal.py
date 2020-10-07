@@ -62,7 +62,7 @@ class Command(SystemCommand):
             else:
                 logger.debug("You typed No - The End")
                 quit()
-        sm_obj = Signal.create_signal(techannel_abbr=techannel,
+        sm_obj = Signal.create_signal(techannel_name=techannel,
                                       symbol=symbol,
                                       stop_loss=stop_loss,
                                       entry_points=entry_points,

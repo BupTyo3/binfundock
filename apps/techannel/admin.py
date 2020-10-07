@@ -5,5 +5,8 @@ from .models import Techannel
 
 @admin.register(Techannel)
 class TechannelAdmin(admin.ModelAdmin):
-    pass
+    list_display = ['id',
+                    'abbr',
+                    'name',
+                    ]
 

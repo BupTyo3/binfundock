@@ -1,4 +1,6 @@
+import re
 from abc import ABC
+from typing import Optional
 
 from django.core.cache import cache
 from django.core.management.base import BaseCommand
@@ -98,3 +100,65 @@ def generate_increment_name_after_suffix(
     else:
         return False
     return new_name[-max_length_of_result:]
+
+
+def get_trailing_number(s: str) -> Optional[int]:
+    """
+    Get trailing number from the string
+    "hello45" -> 45
+    "hello" -> None
+    """
+    m = re.search(r'\d+$', s)
+    return int(m.group()) if m else None
+
+
+def get_leading_number(s: str) -> Optional[int]:
+    """
+    Get leading number from the string
+    "45hello" -> 45
+    "hello" -> None
+    """
+    m = re.search(r'^\d+', s)
+    return int(m.group()) if m else None
+
+
+def left_only_numbers_letters_underscores(s: str) -> str:
+    """
+    Convert:
+    "Hello world_18!!!" -> "Hello_world_18"
+    """
+    return re.sub(r'[\W]+', '', s)
+
+
+def get_increased_leading_number(string: str) -> str:
+    """
+    Convert:
+    "45hello" -> "46hello"
+    "hello" -> "0hello"
+    "0hello" -> "1hello"
+    """
+    leading_number = get_leading_number(string)
+    new_main_part = string
+    if leading_number is not None:
+        new_leading_number = leading_number + 1
+        new_main_part = string.lstrip(str(leading_number))
+    else:
+        new_leading_number = 0
+    return f"{new_leading_number}{new_main_part}"
+
+
+def get_increased_trailing_number(string: str) -> str:
+    """
+    Convert:
+    "hello45" -> "hello46"
+    "hello" -> "hello0"
+    "hello0" -> "hello1"
+    """
+    leading_number = get_leading_number(string)
+    new_main_part = string
+    if leading_number is not None:
+        new_leading_number = leading_number + 1
+        new_main_part = string.lstrip(str(leading_number))
+    else:
+        new_leading_number = 0
+    return f"{new_leading_number}{new_main_part}"
