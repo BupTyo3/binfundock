@@ -121,7 +121,7 @@ class Telegram(BaseTelegram):
     def parse_tca_origin_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
-        possible_entry_label = ['Entry at: ', 'Entry : ', 'Get in : ', 'Get  in : ']
+        possible_entry_label = ['Entry at: ', 'Entry : ', 'Entrу :', 'Get in : ', 'Gеt in :', 'Get  in : ']
         possible_take_profits_label = ['Sell at: ', 'Targets: ', 'Тargets: ']
         possible_stop_label = ['SL: ', 'SL : ']
         pair_label = ['Pair: ', 'Рair: ']
@@ -141,7 +141,9 @@ class Telegram(BaseTelegram):
                 position_info = list(filter(None, possible_position_info))
                 pair = ''.join(filter(str.isalpha, position_info[1]))
                 position = ''.join(filter(str.isalpha, position_info[2]))
-            if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1]) or line.startswith(possible_entry_label[2]):
+            if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1])\
+                    or line.startswith(possible_entry_label[2]) or line.startswith(possible_entry_label[3])\
+                    or line.startswith(possible_entry_label[4]) or line.startswith(possible_entry_label[5]):
                 fake_entries = line[8:]
                 possible_entries = fake_entries.split('-')
                 entries = left_numbers(possible_entries)
@@ -151,8 +153,8 @@ class Telegram(BaseTelegram):
                 possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
             if line.startswith(possible_stop_label[0]) or line.startswith(possible_stop_label[1]):
-                stop_loss = line[4:]
-                stop_loss = left_numbers([stop_loss])
+                stop_loss = line.split(' ')
+                stop_loss = left_numbers([stop_loss[1]])
             if line.startswith(leverage_label[0]) or line.startswith(leverage_label[1])\
                     or line.startswith(leverage_label[2]):
                 possible_leverage = line.split(' ')
@@ -202,7 +204,8 @@ class Telegram(BaseTelegram):
                     pair = 'BTCUSDT'
             if line.startswith(buy_label):
                 fake_entries = line[9:]
-                entries = fake_entries.split('-')
+                possible_entries = fake_entries.split('-')
+                entries = left_numbers(possible_entries)
             if line.startswith(leverage):
                 possible_leverage = line.split(':')
                 leverage = ''.join(filter(str.isdigit, possible_leverage[1]))

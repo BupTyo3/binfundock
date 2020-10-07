@@ -1,6 +1,6 @@
 import logging
 
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING, Union
 
 from django.db import models, transaction
 from django.db.models import QuerySet, Sum
@@ -73,16 +73,21 @@ class Signal(BaseSignal):
 
     @classmethod
     def _calculate_position(cls,
-                            stop_loss: float,
-                            entry_points: List[float],
-                            take_profits: List[float]):
+                            stop_loss: Union[float, str],
+                            entry_points: List[Union[float, str]],
+                            take_profits: List[Union[float, str]]):
         """
         Calculate position: LONG or SHORT
         """
+        entry_points = [float(i) for i in entry_points]
+        take_profits = [float(i) for i in take_profits]
+        stop_loss = float(stop_loss)
+
         max_entry = max(entry_points)
         min_entry = min(entry_points)
         min_take = min(take_profits)
         max_take = max(take_profits)
+
         if max_entry < min_take and stop_loss < min_entry:
             position = SignalPosition.LONG.value
             logger.debug(f"{position}")
