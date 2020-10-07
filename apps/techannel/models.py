@@ -19,7 +19,6 @@ class Techannel(TechannelBase):
                             unique=True,
                             help_text='unique name. Lowercase alphanumeric and underscores')
     abbr = models.CharField(max_length=6,
-                            default=gen_short_uuid(4),
                             unique=True,
                             help_text='unique short abbreviation for custom_order_id')
 
