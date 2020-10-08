@@ -81,6 +81,8 @@ class Market(BaseMarket):
             BaseMarket.order_statuses.PARTIAL.value,
         client_class.ORDER_STATUS_NEW:
             BaseMarket.order_statuses.SENT.value,
+        client_class.ORDER_STATUS_EXPIRED:
+            BaseMarket.order_statuses.EXPIRED.value,
         BaseMarket.order_statuses.NOT_EXISTS:
             BaseMarket.order_statuses.NOT_EXISTS.value,
     }
