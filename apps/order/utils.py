@@ -8,6 +8,7 @@ class OrderStatus(Enum):
     NOT_SENT = 'not_sent'
     NOT_EXISTS = 'not_exists'
     SENT = 'sent'
+    EXPIRED = 'expired'
     UNKNOWN = 'unknown'
 
     @classmethod
