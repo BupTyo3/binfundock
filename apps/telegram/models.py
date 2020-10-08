@@ -20,6 +20,7 @@ from pytesseract import image_to_string
 from PIL import Image
 from binfun.settings import conf_obj
 from sys import platform
+from apps.techannel.models import Techannel
 
 logger = logging.getLogger(__name__)
 
@@ -93,12 +94,13 @@ class Telegram(BaseTelegram):
     async def parse_tca_origin_channel(self):
         time.sleep(7)
         channel_abbr = 'assist_origin'
+        short_channel_abbr = 'asor'
         from telethon import errors
         try:
             chat_name = conf_obj.tca_origin
             chat_entity = await self.client.get_entity(chat_name)
-            async for message in self.client.iter_messages(entity=chat_entity, limit=15):
-                exists = await self.is_signal_handled(message.id, channel_abbr)
+            async for message in self.client.iter_messages(entity=chat_entity, limit=25):
+                exists = await self.is_signal_handled(message.id, short_channel_abbr)
                 should_handle_msg = not exists
                 if message.text and should_handle_msg:
                     signal = self.parse_tca_origin_message(message.text, message.id)
@@ -121,7 +123,7 @@ class Telegram(BaseTelegram):
     def parse_tca_origin_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
-        possible_entry_label = ['Entry at: ', 'Entry : ', 'Entrу :', 'Get in : ', 'Gеt in :', 'Get  in : ']
+        possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in : ', 'Gеt in :', 'Get  in : ']
         possible_take_profits_label = ['Sell at: ', 'Targets: ', 'Тargets: ']
         possible_stop_label = ['SL: ', 'SL : ']
         pair_label = ['Pair: ', 'Рair: ']
@@ -143,18 +145,28 @@ class Telegram(BaseTelegram):
                 position = ''.join(filter(str.isalpha, position_info[2]))
             if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1])\
                     or line.startswith(possible_entry_label[2]) or line.startswith(possible_entry_label[3])\
-                    or line.startswith(possible_entry_label[4]) or line.startswith(possible_entry_label[5]):
+                    or line.startswith(possible_entry_label[4]) or line.startswith(possible_entry_label[5])\
+                    or line.startswith(possible_entry_label[6]):
                 fake_entries = line[8:]
                 possible_entries = fake_entries.split('-')
-                entries = left_numbers(possible_entries)
+                if '(' in line:
+                    last_entry = possible_entries[- 1].split('(')
+                    entries = left_numbers(possible_entries[:-1] + last_entry[:-1])
+                else:
+                    entries = left_numbers(possible_entries)
             if line.startswith(possible_take_profits_label[0]) or line.startswith(possible_take_profits_label[1])\
                     or line.startswith(possible_take_profits_label[2]):
                 fake_profits = line[9:]
                 possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
             if line.startswith(possible_stop_label[0]) or line.startswith(possible_stop_label[1]):
-                stop_loss = line.split(' ')
-                stop_loss = left_numbers([stop_loss[1]])
+                if '(' in line:
+                    possible_stop_loss = line.split('(')
+                    stop_loss = possible_stop_loss[0].split(' ')
+                    stop_loss = left_numbers([stop_loss[1]])
+                else:
+                    stop_loss = line[4:]
+                    stop_loss = left_numbers([stop_loss])
             if line.startswith(leverage_label[0]) or line.startswith(leverage_label[1])\
                     or line.startswith(leverage_label[2]) or line.startswith(leverage_label[3]):
                 possible_leverage = line.split(' ')
@@ -167,8 +179,9 @@ class Telegram(BaseTelegram):
     async def parse_margin_whale_channel(self):
         chat_id = int(conf_obj.margin_whales)
         channel_abbr = 'margin_whale'
+        short_channel_abbr = 'mawh'
         async for message in self.client.iter_messages(chat_id, limit=5):
-            exists = await self.is_signal_handled(message.id, channel_abbr)
+            exists = await self.is_signal_handled(message.id, short_channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg and message.photo:
                 signal = self.parse_margin_whale_message(message.text, message.id)
@@ -242,6 +255,7 @@ class Telegram(BaseTelegram):
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
         channel_abbr = 'crypto_passive'
+        channel_abbr = 'crpa'
         async for message in self.client.iter_messages(chat_id, limit=10):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
@@ -302,14 +316,17 @@ class Telegram(BaseTelegram):
     async def parse_tca_channel(self, sub_type: str):
         chat_id = int
         channel_abbr = ''
+        short_channel_abbr = ''
         if sub_type == 'altcoin':
             channel_abbr = 'assist_altcoin'
+            short_channel_abbr = 'asal'
             chat_id = int(conf_obj.tca_altcoin)
         if sub_type == 'leverage':
             channel_abbr = 'assist_leverage'
+            short_channel_abbr = 'asle'
             chat_id = int(conf_obj.tca_leverage)
         async for message in self.client.iter_messages(chat_id, limit=10):
-            exists = await self.is_signal_handled(message.id, channel_abbr)
+            exists = await self.is_signal_handled(message.id, short_channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_tca_message(message.text, message.id)
