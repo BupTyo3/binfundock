@@ -198,7 +198,7 @@ class Telegram(BaseTelegram):
     def parse_margin_whale_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
-        buy_label = 'ENTRY  : '
+        buy_label = ['ENTRY  : ', 'ENTRY : ']
         margin_label = '#MARGIN'
         goals_label = 'Target'
         stop_label = 'STOP LOSS: '
@@ -216,8 +216,8 @@ class Telegram(BaseTelegram):
                 possible_pair = fake_pair[2]
                 if 'XBT' in possible_pair:
                     pair = 'BTCUSDT'
-            if line.startswith(buy_label):
-                fake_entries = line[9:]
+            if line.startswith(buy_label[0]) or line.startswith(buy_label[1]):
+                fake_entries = line[8:]
                 possible_entries = fake_entries.split('-')
                 entries = left_numbers(possible_entries)
             if line.startswith(leverage):
