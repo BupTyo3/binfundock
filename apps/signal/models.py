@@ -499,7 +499,7 @@ class Signal(BaseSignal):
             'no_need_push': False,
             '_status__in': [OrderStatus.SENT.value, ]
         }
-        return SellOrder.objects.filter(**params)
+        return SellOrder.objects.filter(**params).select_for_update()
 
     @staticmethod
     def __update_flag_handled_worked_orders(worked_orders: QuerySet):
@@ -558,6 +558,20 @@ class Signal(BaseSignal):
         res = all_quantity / sent_sell_orders.count()
         pair = self._get_pair(sent_sell_orders.last().market)
         return self.__find_not_fractional_by_step(res, pair.step_quantity)
+
+    @staticmethod
+    def __exclude_sl_or_tp_orders(main_orders: QuerySet, worked_orders: QuerySet) -> QuerySet:
+        """Exclude paired orders
+        e.g.:
+        main_orders = [order_1_tp, order_1_sl, order_2_tp]
+        worked_orders = [order_2_sl]
+        return: [order_1_tp, order_1_sl]
+        """
+        worked_sl_orders = worked_orders.exclude(sl_order=None).values('sl_order')
+        worked_tp_orders = worked_orders.exclude(tp_order=None).values('tp_order')
+        main_orders = main_orders.exclude(id__in=worked_sl_orders)
+        main_orders = main_orders.exclude(id__in=worked_tp_orders)
+        return main_orders
 
     @transaction.atomic
     @debug_input_and_returned
@@ -626,6 +640,7 @@ class Signal(BaseSignal):
             self.__cancel_sent_orders(opened_buy_orders)
         # Recreating opened sent sell orders with new stop_loss
         sent_sell_orders = self.__get_sent_sell_orders()
+        sent_sell_orders = self.__exclude_sl_or_tp_orders(sent_sell_orders, worked_orders)
         if sent_sell_orders:
             copied_sent_sell_orders_ids = list(sent_sell_orders.all().values_list('id', flat=True))
             self.__cancel_sent_orders(sent_sell_orders)
