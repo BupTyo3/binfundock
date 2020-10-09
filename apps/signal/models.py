@@ -377,6 +377,7 @@ class Signal(BaseSignal):
         if new_stop_loss is None and not sell_quantity:
             new_stop_loss = self._get_new_stop_loss(worked_sell_orders)
         res = list()
+        original_orders_ids.sort()
         for order_id in original_orders_ids:
             res.append(self._formation_copied_sell_order(
                 original_order_id=order_id, new_stop_loss=new_stop_loss, sell_quantity=sell_quantity))
@@ -453,7 +454,9 @@ class Signal(BaseSignal):
         }
         return BuyOrder.objects.filter(**params)
 
-    def __get_not_handled_worked_sell_orders(self) -> QuerySet:
+    def __get_not_handled_worked_sell_orders(self,
+                                             sl_orders: bool = False,
+                                             tp_orders: bool = False) -> QuerySet:
         """
         Function to get not handled worked Sell orders
         """
@@ -466,7 +469,10 @@ class Signal(BaseSignal):
             'local_canceled': False,
             '_status': OrderStatus.COMPLETED.value
         }
-        return SellOrder.objects.filter(**params)
+        qs = SellOrder.objects.filter(**params)
+        qs = qs.exclude(sl_order=None) if not sl_orders else qs
+        qs = qs.exclude(tp_order=None) if not tp_orders else qs
+        return qs.select_for_update()
 
     @debug_input_and_returned
     def __get_sent_buy_orders(self) -> QuerySet:
@@ -631,8 +637,8 @@ class Signal(BaseSignal):
                      SignalStatus.SOLD.value, ]
         if self._status not in _statuses:
             return
-        worked_orders = self.__get_not_handled_worked_sell_orders()
-        if not worked_orders:
+        worked_tp_orders = self.__get_not_handled_worked_sell_orders(tp_orders=True)
+        if not worked_tp_orders:
             return
         opened_buy_orders = self.__get_sent_buy_orders()
         # Cancel all buy_orders
@@ -640,17 +646,17 @@ class Signal(BaseSignal):
             self.__cancel_sent_orders(opened_buy_orders)
         # Recreating opened sent sell orders with new stop_loss
         sent_sell_orders = self.__get_sent_sell_orders()
-        sent_sell_orders = self.__exclude_sl_or_tp_orders(sent_sell_orders, worked_orders)
+        sent_sell_orders = self.__exclude_sl_or_tp_orders(sent_sell_orders, worked_tp_orders)
         if sent_sell_orders:
             copied_sent_sell_orders_ids = list(sent_sell_orders.all().values_list('id', flat=True))
             self.__cancel_sent_orders(sent_sell_orders)
             self._formation_copied_sell_orders(original_orders_ids=copied_sent_sell_orders_ids,
-                                               worked_sell_orders=worked_orders)
+                                               worked_sell_orders=worked_tp_orders)
         # Change status
         if self.status not in [SignalStatus.SOLD.value, ]:
             self.status = SignalStatus.SOLD.value
             self.save()
-        self.__update_flag_handled_worked_orders(worked_orders)
+        self.__update_flag_handled_worked_orders(worked_tp_orders)
         # TODO: Add logic of calculate profit or loss
         pass
 
