@@ -256,9 +256,9 @@ class Telegram(BaseTelegram):
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
         channel_abbr = 'crypto_passive'
-        channel_abbr = 'crpa'
+        short_channel_abbr = 'crpa'
         async for message in self.client.iter_messages(chat_id, limit=10):
-            exists = await self.is_signal_handled(message.id, channel_abbr)
+            exists = await self.is_signal_handled(message.id, short_channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_angel_message(message.text, message.id)
@@ -308,7 +308,11 @@ class Telegram(BaseTelegram):
 
     def handle_ca_recommend_to_array(self, message_line):
         splitted_info = message_line.split('-')
-        key_numbers = len(splitted_info[-1])
+        last_element = ''.join(filter(str.isdigit, splitted_info[-1]))
+        splitted_info[-1] = splitted_info[-1].replace('+', '')
+        if len(splitted_info[0]) == len(splitted_info[-1]):
+            return splitted_info
+        key_numbers = len(last_element)
         prefix = splitted_info[0][:-key_numbers]
         array = [f'{prefix}{n}' for n in splitted_info][1:]
         array.insert(0, splitted_info[0])
