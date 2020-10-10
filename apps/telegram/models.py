@@ -99,6 +99,7 @@ class Telegram(BaseTelegram):
         from telethon import errors
         try:
             chat_name = conf_obj.tca_origin
+            # TODO: https://github.com/LonamiWebs/Telethon/issues/494 find code example there for get entity
             chat_entity = await self.client.get_entity(chat_name)
             async for message in self.client.iter_messages(entity=chat_entity, limit=25):
                 exists = await self.is_signal_handled(message.id, short_channel_abbr)
