@@ -28,34 +28,70 @@ class Command(SystemCommand):
         parser.add_argument('--channel', type=str, help='Type a channel name')
 
     def collect_info_from_china_channel(self):
-        self.init_telegram('Lucrative-AI')
-        with self._client:
-            self._client.loop.run_until_complete(self._telegram.parse_china_channel())
+        session_name = 'Lucrative-AI'
+        self.init_telegram(session_name)
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_china_channel())
+        except Exception as e:
+            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+        finally:
+            self._client.disconnect()
 
     def collect_info_from_angel_channel(self):
-        self.init_telegram('Lucrative-Passive')
-        with self._client:
-            self._client.loop.run_until_complete(self._telegram.parse_crypto_angel_channel())
+        session_name = 'Lucrative-Passive'
+        self.init_telegram(session_name)
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_crypto_angel_channel())
+        except Exception as e:
+            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+        finally:
+            self._client.disconnect()
 
     def collect_info_from_tca_altcoin_channel(self):
-        self.init_telegram('Lucrative-altcoin')
-        with self._client:
-            self._client.loop.run_until_complete(self._telegram.parse_tca_channel('altcoin'))
+        session_name = 'Lucrative-altcoin'
+        self.init_telegram(session_name)
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_tca_channel('altcoin'))
+        except Exception as e:
+            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+        finally:
+            self._client.disconnect()
 
     def collect_info_from_tca_leverage_channel(self):
-        self.init_telegram('Lucrative-leverage')
-        with self._client:
-            self._client.loop.run_until_complete(self._telegram.parse_tca_channel('leverage'))
+        session_name = 'Lucrative-leverage'
+        self.init_telegram(session_name)
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_tca_channel('leverage'))
+        except Exception as e:
+            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+        finally:
+            self._client.disconnect()
 
     def collect_info_from_tca_origin_channel(self):
-        self.init_telegram('Lucrative-origin')
-        with self._client:
-            self._client.loop.run_until_complete(self._telegram.parse_tca_origin_channel())
+        session_name = 'Lucrative-origin'
+        self.init_telegram(session_name)
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_tca_origin_channel())
+        except Exception as e:
+            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+        finally:
+            self._client.disconnect()
 
     def collect_info_from_margin_whales_channel(self):
-        self.init_telegram('Lucrative-Whales')
-        with self._client:
-            self._client.loop.run_until_complete(self._telegram.parse_margin_whale_channel())
+        session_name = 'Lucrative-Whales'
+        self.init_telegram(session_name)
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_margin_whale_channel())
+        except Exception as e:
+            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+        finally:
+            self._client.disconnect()
 
     def handle(self, *args, **options):
         channel = options['channel']
@@ -89,4 +125,3 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in margin_whale_matches):
             self.collect_info_from_margin_whales_channel()
-
