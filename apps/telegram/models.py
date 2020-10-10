@@ -13,6 +13,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 
 from apps.signal.models import Signal, EntryPoint, TakeProfit
+from tools.tools import countdown
 from utils.parse_channels.str_parser import left_numbers, check_pair
 from .base_model import BaseTelegram
 from .init_client import ShtClient
@@ -117,8 +118,8 @@ class Telegram(BaseTelegram):
                         if attention_to_close or correct_position:
                             logger.error('A SIGNAL REQUIRES ATTENTION!')
         except errors.FloodWaitError as e:
-            print('Have to sleep', e.seconds, 'seconds')
-            time.sleep(e.seconds)
+            logger.debug(f'Have to sleep {e.seconds} seconds')
+            countdown(e.seconds)
 
     def parse_tca_origin_message(self, message_text, message_id):
         signals = []

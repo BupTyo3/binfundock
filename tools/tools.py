@@ -23,6 +23,18 @@ def gen_short_uuid(length: int = 8) -> str:
     return str(uuid.uuid4())[:length]
 
 
+def countdown(t):
+    import time
+    while t:
+        mins, secs = divmod(t, 60)
+        timeformat = '{:02d}:{:02d}'.format(mins, secs)
+        # print(timeformat, )
+        logger.debug(f'Wait for a message: {timeformat} \r')
+        time.sleep(1)
+        t -= 1
+    print('Countdown finished\n\n\n')
+
+
 def rounded_result(func: Optional[Callable] = None, *, digits: int = 8):
     """
     Decorator to round the result
