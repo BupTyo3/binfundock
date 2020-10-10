@@ -15,3 +15,17 @@ class OrderStatus(Enum):
     def choices(cls):
         return [(key.value, key.name) for key in cls]
 
+
+class OrderType(Enum):
+    LIMIT = 'limit'
+    MARKET = 'market'
+    TAKE_PROFIT = 'take_profit'
+    STOP_LOSS = 'stop_loss'
+    STOP_LOSS_LIMIT = 'stop_loss_limit'
+    TAKE_PROFIT_LIMIT = 'take_profit_limit'
+    LIMIT_MAKER = 'limit_maker'
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+
