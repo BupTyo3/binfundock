@@ -123,6 +123,11 @@ def convert_to_coin_quantity(quantity, value):
 
 
 @rounded_result
+def convert_to_amount(quantity, value):
+    return quantity * value
+
+
+@rounded_result
 def get_percent(value: float, percentage) -> float:
     return (value * percentage) / 100
 

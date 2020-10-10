@@ -8,7 +8,7 @@ from django.db.models import F
 from django.utils import timezone
 
 from utils.framework.models import SystemBaseModel, SystemBaseModelWithoutModified
-from apps.order.utils import OrderStatus
+from apps.order.utils import OrderStatus, OrderType
 from tools.tools import gen_short_uuid
 
 if TYPE_CHECKING:
@@ -27,12 +27,19 @@ class BaseOrder(SystemBaseModel):
     outer_signal_id: Optional[models.PositiveIntegerField]
     index: Optional[models.PositiveIntegerField]
     stop_loss: Optional[float]
-    status: OrderStatus
+    status: str
     signal: "BaseSignal"
 
     symbol = models.CharField(max_length=16)
     quantity = models.FloatField()
     price = models.FloatField()
+    _status = models.CharField(max_length=32,
+                               choices=OrderStatus.choices(),
+                               default=OrderStatus.NOT_SENT.value,
+                               db_column='status')
+    type = models.CharField(max_length=32,
+                            choices=OrderType.choices(),
+                            default=OrderType.LIMIT.value)
     push_count = models.PositiveIntegerField(default=0)
     custom_order_id = models.CharField(max_length=36)
     handled_worked = models.BooleanField(

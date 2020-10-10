@@ -3,7 +3,7 @@ import logging
 from django.db import models
 from django.contrib.auth import get_user_model
 
-from typing import Tuple, TYPE_CHECKING
+from typing import Tuple, TypedDict, TYPE_CHECKING
 
 from binance import client
 from apps.order.utils import OrderStatus
@@ -24,6 +24,14 @@ if TYPE_CHECKING:
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+class PartialResponse(TypedDict):
+    status: str
+    status_updated: bool
+    price: float
+    executed_quantity: float
+    avg_sold_market_price: float
 
 
 class BiClient(client.Client, BaseClient):
@@ -59,6 +67,7 @@ class Market(BaseMarket):
     status_ = 'status'
     type_ = 'type'
     side_ = 'side'
+    fills_ = 'fills'
     price_ = 'price'
     origQty_ = 'origQty'
     orderId_ = 'orderId'
@@ -83,7 +92,7 @@ class Market(BaseMarket):
             BaseMarket.order_statuses.SENT.value,
         client_class.ORDER_STATUS_EXPIRED:
             BaseMarket.order_statuses.EXPIRED.value,
-        BaseMarket.order_statuses.NOT_EXISTS:
+        BaseMarket.order_statuses.NOT_EXISTS.value:
             BaseMarket.order_statuses.NOT_EXISTS.value,
     }
 
@@ -107,17 +116,41 @@ class Market(BaseMarket):
         """Get partially data by key executed_quantity"""
         return response[self.executed_quantity_]
 
+    @floated_result
+    def _get_price(self, response) -> float:
+        """Get partially data by key price"""
+        return response.get(self.price_)
+
+    @floated_result
+    def _get_avg_sold_price(self, response) -> float:
+        """Get partially data by key price"""
+        fills = response.get(self.fills_)
+        res = 0
+        n = 0
+        for order in fills:
+            n += 1
+            res += self._get_price(order)
+        return res / n
+
     @catch_exception(
-        code=-2013, alternative={'status': OrderStatus.NOT_EXISTS, executed_quantity_: 0.0})
+        code=-2013, alternative={'status': OrderStatus.NOT_EXISTS.value, executed_quantity_: 0.0, price_: 0.0})
     @api_logging(text="Getting info by CustomOrderId")
     def _get_order_info_api(self, symbol, custom_order_id):
         """Send request to get order info"""
         return self.my_client.get_order(symbol=symbol, origClientOrderId=custom_order_id)
 
-    def _get_partially_order_data_from_response(self, response) -> Tuple[OrderStatus, float]:
+    def _get_partially_order_data_from_response(self, response) -> PartialResponse:
         """Get partially order data"""
         order_status, updated = self._convert_to_our_order_status(response[self.status_])
-        return order_status, self._get_executed_quantity(response)
+        res = dict()
+        res.update({
+            'status': order_status,
+            'status_updated': updated,
+            'price': self._get_price(response) if response.get(self.price_) else None,
+            'avg_sold_market_price': self._get_avg_sold_price(response) if response.get(self.fills_) else None,
+            'executed_quantity': self._get_executed_quantity(response)
+        })
+        return res
 
     def _convert_to_our_order_status(self, market_order_status: str) -> Tuple[OrderStatus, bool]:
         """Function to transform response orders statuses to our"""
@@ -134,11 +167,11 @@ class Market(BaseMarket):
         return response
 
     @api_logging
-    def _push_sell_stop_loss_limit_order(self, symbol: str,
-                                         quantity: float, price: float,
-                                         stop_loss: float, custom_order_id: str,
-                                         custom_sl_order_id: str,
-                                         stop_limit_price: float):
+    def _push_sell_oco_order(self, symbol: str,
+                             quantity: float, price: float,
+                             stop_loss: float, custom_order_id: str,
+                             custom_sl_order_id: str,
+                             stop_limit_price: float):
         """Send request to create OCO order.
         We push one request to the Market, but two orders will be created:
         tp_order, sl_order
@@ -155,6 +188,21 @@ class Market(BaseMarket):
         return response
 
     @api_logging
+    def _push_sell_market_order(self,
+                                symbol: str,
+                                quantity: float,
+                                custom_order_id: str):
+        """Send request to create Market order.
+        """
+        response = self.my_client.order_market_sell(
+            symbol=symbol,
+            quantity=quantity,
+            newClientOrderId=custom_order_id)
+        return response
+
+    @catch_exception(
+        code=-2011, alternative={'status': OrderStatus.NOT_EXISTS.value, executed_quantity_: 0.0, price_: 0.0})
+    @api_logging(text="Cancel order into Market")
     def _cancel_order(self, symbol: str, custom_order_id: str):
         """Send request to cancel order"""
         return self.my_client.cancel_order(symbol=symbol, origClientOrderId=custom_order_id)
@@ -181,7 +229,7 @@ class Market(BaseMarket):
         return response[self.price_]
 
     @debug_input_and_returned
-    def get_order_info(self, symbol, custom_order_id) -> Tuple[OrderStatus, float]:
+    def get_order_info(self, symbol, custom_order_id) -> PartialResponse:
         """Get transformed order info from the Market by api"""
         response = self._get_order_info_api(symbol, custom_order_id)
         return self._get_partially_order_data_from_response(response)
@@ -193,11 +241,12 @@ class Market(BaseMarket):
         logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_buy_limit_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
-        status, executed_quantity = self._get_partially_order_data_from_response(response)
+        data = self._get_partially_order_data_from_response(response)
+        status, executed_quantity = data.get('status'), data.get('executed_quantity')
         order.update_order_api_history(status, executed_quantity)
         return response
 
-    def push_sell_stop_loss_limit_order(self, order: 'SellOrder'):
+    def push_sell_oco_order(self, order: 'SellOrder'):
         """
         Push OCO order.
         We push one request to the Market, but two orders will be created:
@@ -207,7 +256,7 @@ class Market(BaseMarket):
         pair = Pair.objects.filter(symbol=order.symbol, market=self).first()
         logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         # TODO: change to sell order
-        response = self._push_sell_stop_loss_limit_order(
+        response = self._push_sell_oco_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price,
             custom_order_id=order.custom_order_id, custom_sl_order_id=order.sl_order.custom_order_id,
             stop_loss=order.stop_loss, stop_limit_price=order.sl_order.price)
@@ -217,9 +266,26 @@ class Market(BaseMarket):
         order.sl_order.update_order_api_history(default_status, default_executed_quantity)
         return response
 
+    def push_sell_market_order(self, order: 'SellOrder'):
+        """
+        Push Market order.
+        """
+        from apps.pair.models import Pair
+        pair = Pair.objects.filter(symbol=order.symbol, market=self).first()
+        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
+        response = self._push_sell_market_order(
+            symbol=order.symbol, quantity=order.quantity,
+            custom_order_id=order.custom_order_id)
+        data = self._get_partially_order_data_from_response(response)
+        status, executed_quantity = data.get('status'), data.get('executed_quantity')
+        avg_sold_market_price = data.get('avg_sold_market_price')
+        order.update_order_api_history(status, executed_quantity, avg_sold_market_price)
+        return response
+
     def cancel_order(self, order: 'BaseOrder'):
         """Cancel order"""
-        return self._cancel_order(order.symbol, order.custom_order_id)
+        response = self._cancel_order(order.symbol, order.custom_order_id)
+        # return self._get_partially_order_data_from_response(response)
 
     def update_pairs_info_api(self):
         """
