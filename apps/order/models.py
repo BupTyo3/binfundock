@@ -5,7 +5,7 @@ from typing import Optional, TYPE_CHECKING
 from django.db import models, transaction
 from django.contrib.auth import get_user_model
 
-from apps.order.utils import OrderStatus
+from apps.order.utils import OrderStatus, OrderType
 from apps.market.models import Market
 from apps.signal.models import Signal
 from .base_model import BaseOrder, HistoryApiBaseOrder
@@ -25,10 +25,6 @@ class BuyOrder(BaseOrder):
                                on_delete=models.DO_NOTHING)
     # TODO: remove this field and _bought_quantity and setters, getters and others using
     bought_quantity = models.FloatField(default=0)
-    _status = models.CharField(max_length=32,
-                               choices=OrderStatus.choices(),
-                               default=OrderStatus.NOT_SENT.value,
-                               db_column='status')
     index = models.PositiveIntegerField()
     signal = models.ForeignKey(to=Signal,
                                related_name='buy_orders',
@@ -59,7 +55,9 @@ class BuyOrder(BaseOrder):
         Cancel order into the Market
         """
         logger.debug(f"Cancel BUY order! {self}")
-        self.market.cancel_order(self)
+        data = self.market.cancel_order(self)
+        # status, bought_quantity = data.get('status'), data.get('executed_quantity', 0)
+        # self.update_order_api_history(status, bought_quantity)
 
     def update_buy_order_info_by_api(self):
         """
@@ -70,7 +68,8 @@ class BuyOrder(BaseOrder):
         if self.status not in statuses_:
             return
         logger.debug(f"Get info about BUY order by API: {self}")
-        status, bought_quantity = self.market.get_order_info(self.symbol, self.custom_order_id)
+        data = self.market.get_order_info(self.symbol, self.custom_order_id)
+        status, bought_quantity = data.get('status'), data.get('executed_quantity')
         self.update_order_api_history(status, bought_quantity)
 
     @transaction.atomic
@@ -93,6 +92,7 @@ class BuyOrder(BaseOrder):
 
 class SellOrder(BaseOrder):
     _SL_APPEND_INDEX = 500
+    _MARKET_INDEX = 300
     type_: str = 'sell'
     order_type_separator: str = 'ss'
 
@@ -101,10 +101,6 @@ class SellOrder(BaseOrder):
                                on_delete=models.DO_NOTHING)
     stop_loss = models.FloatField(default=0)
     sold_quantity = models.FloatField(default=0)
-    _status = models.CharField(max_length=32,
-                               choices=OrderStatus.choices(),
-                               default=OrderStatus.NOT_SENT.value,
-                               db_column='status')
     index = models.PositiveIntegerField()
     signal = models.ForeignKey(to=Signal,
                                related_name='sell_orders',
@@ -142,6 +138,7 @@ class SellOrder(BaseOrder):
             no_need_push=True,
             signal=tp_order.signal,
             custom_order_id=custom_sl_order_id,
+            type=OrderType.STOP_LOSS_LIMIT.value,
             index=tp_order.index + cls._SL_APPEND_INDEX)
         return order
 
@@ -158,13 +155,32 @@ class SellOrder(BaseOrder):
             stop_loss=stop_loss if stop_loss is not None else signal.stop_loss,
             signal=signal,
             custom_order_id=custom_order_id,
+            type=OrderType.LIMIT_MAKER.value,
             index=index)
         return order
 
     @classmethod
-    def form_sell_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
-                        take_profit: float, stop_loss: float,
-                        custom_order_id: Optional[str], index: int):
+    def _form_sell_market_order(cls, market: 'BaseMarket',
+                                signal: Signal,
+                                quantity: float,
+                                price: float,
+                                custom_order_id: Optional[str]):
+        """Form Take Profit order"""
+        order = SellOrder.objects.create(
+            market=market,
+            symbol=signal.symbol,
+            quantity=quantity,
+            price=price,
+            signal=signal,
+            custom_order_id=custom_order_id,
+            type=OrderType.MARKET.value,
+            index=cls._MARKET_INDEX)
+        return order
+
+    @classmethod
+    def form_sell_oco_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
+                            take_profit: float, stop_loss: float,
+                            custom_order_id: Optional[str], index: int):
         """Form OCO SELL order:
         One - tp_order (Take Profit order),
         Second - sl_order (Stop Loss order)"""
@@ -174,6 +190,19 @@ class SellOrder(BaseOrder):
         cls._form_sell_stop_loss_order(tp_order=tp_order)
         return tp_order
 
+    @classmethod
+    def form_sell_market_order(cls, market: 'BaseMarket',
+                               signal: Signal,
+                               quantity: float,
+                               price: float,
+                               custom_order_id: Optional[str] = None):
+        """Form Market SELL order:
+        """
+        order = cls._form_sell_market_order(
+            market=market, signal=signal, quantity=quantity, price=price,
+            custom_order_id=custom_order_id)
+        return order
+
     def push_to_market(self):
         """
         Push order to the Market by api
@@ -182,14 +211,19 @@ class SellOrder(BaseOrder):
             return
         logger.debug(f"Push sell order! {self}")
         self.push_count_increase()
-        self.market.push_sell_stop_loss_limit_order(self)
+        if self.type == OrderType.LIMIT_MAKER.value:
+            self.market.push_sell_oco_order(self)
+        elif self.type == OrderType.MARKET.value:
+            self.market.push_sell_market_order(self)
 
     def cancel_into_market(self):
         """
         Cancel order into the Market
         """
         logger.debug(f"Cancel SELL order! {self}")
-        self.market.cancel_order(self)
+        data = self.market.cancel_order(self)
+        # status, sold_quantity = data.get('status'), data.get('executed_quantity', 0)
+        # self.update_order_api_history(status, sold_quantity)
 
     def update_sell_order_info_by_api(self):
         """
@@ -200,11 +234,12 @@ class SellOrder(BaseOrder):
         if self.status not in statuses_:
             return
         logger.debug(f"Get info about SELL order by API: {self}")
-        status, sold_quantity = self.market.get_order_info(self.symbol, self.custom_order_id)
-        self.update_order_api_history(status, sold_quantity)
+        data = self.market.get_order_info(self.symbol, self.custom_order_id)
+        status, sold_quantity, price = data.get('status'), data.get('executed_quantity'), data.get('price')
+        self.update_order_api_history(status, sold_quantity, price)
 
     @transaction.atomic
-    def update_order_api_history(self, status, executed_quantity):
+    def update_order_api_history(self, status: str, executed_quantity: float, price: Optional[float] = None):
         """
         Create HistoryApiSellOrder entity if not exists or we got new data (status or executed_quantity).
         Set Order status (for the first time - SENT)
@@ -213,8 +248,13 @@ class SellOrder(BaseOrder):
         last_api_history = HistoryApiSellOrder.objects.filter(main_order=self).last()
         if not last_api_history or (last_api_history.status != status or
                                     last_api_history.sold_quantity != executed_quantity):
+            # Update order
             self.status = status
             self.sold_quantity = executed_quantity
+            if self.type == OrderType.MARKET.value and price:
+                logger.debug(f"Update price for Market order '{self}' = {self.price} -> {price}")
+                self.price = price
+            # Create history record
             HistoryApiSellOrder.objects.create(main_order=self,
                                                status=status,
                                                sold_quantity=executed_quantity)

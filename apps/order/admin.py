@@ -79,7 +79,7 @@ class CustomOrderIDFilter(InputFilter):
 class BuyOrderAdmin(admin.ModelAdmin):
     list_display = ['id',
                     'symbol',
-                    'signal_status',
+                    's_status',
                     'price',
                     'quantity',
                     'bought_quantity',
@@ -90,6 +90,7 @@ class BuyOrderAdmin(admin.ModelAdmin):
                     'handled_worked',
                     'push_count',
                     'local_canceled',
+                    'type',
                     'local_canceled_time',
                     'created',
                     'last_updated_by_api',
@@ -102,10 +103,11 @@ class BuyOrderAdmin(admin.ModelAdmin):
         SignalIDFilter,
         OuterIDFilter,
         TechannelFilter,
+        'type',
     ]
 
     @staticmethod
-    def signal_status(order):
+    def s_status(order):
         return order.signal.status
 
 
@@ -113,7 +115,7 @@ class BuyOrderAdmin(admin.ModelAdmin):
 class SellOrderAdmin(admin.ModelAdmin):
     list_display = ['id',
                     'symbol',
-                    'signal_status',
+                    's_status',
                     'price',
                     'quantity',
                     'sold_quantity',
@@ -125,6 +127,7 @@ class SellOrderAdmin(admin.ModelAdmin):
                     'push_count',
                     'no_need_push',
                     'local_canceled',
+                    'type',
                     'local_canceled_time',
                     'created',
                     'last_updated_by_api',
@@ -137,10 +140,11 @@ class SellOrderAdmin(admin.ModelAdmin):
         SignalIDFilter,
         OuterIDFilter,
         TechannelFilter,
+        'type',
     ]
 
     @staticmethod
-    def signal_status(order):
+    def s_status(order):
         return order.signal.status
 
 

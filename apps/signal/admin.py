@@ -59,6 +59,7 @@ class SignalAdmin(admin.ModelAdmin):
         'push_orders',
         'run_bought_worker',
         'run_sold_worker',
+        'sell_by_market',
         'update_info_by_api',
     ]
 
@@ -102,7 +103,10 @@ class SignalAdmin(admin.ModelAdmin):
     def run_sold_worker(self, request, queryset):
         for signal in queryset:
             self._run_sold_worker_one(request, signal)
-            pass
+
+    def sell_by_market(self, request, queryset):
+        for signal in queryset:
+            self._sell_by_market_one(request, signal)
 
     @notifications_handling('')
     def _form_one(self, request, signal):
@@ -123,6 +127,10 @@ class SignalAdmin(admin.ModelAdmin):
     @notifications_handling('')
     def _run_sold_worker_one(self, request, signal):
         signal.worker_for_sold_orders()
+
+    @notifications_handling('')
+    def _sell_by_market_one(self, request, signal):
+        signal.try_to_spoil(force=True)
 
 
 class PointOuterIDFilter(InputFilter):
