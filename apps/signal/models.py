@@ -51,7 +51,7 @@ class Signal(BaseSignal):
                                 choices=SignalPosition.choices(),
                                 default=SignalPosition.LONG.value, )
     leverage = models.PositiveIntegerField(default=_default_leverage)
-    message_date = models.DateTimeField(max_length=32, default=timezone.datetime)
+    message_date = models.DateTimeField(auto_now_add=True, blank=True)
 
     objects = models.Manager()
 
@@ -78,7 +78,7 @@ class Signal(BaseSignal):
                       stop_loss: float, outer_signal_id: int,
                       entry_points: List[float], take_profits: List[float],
                       leverage: Optional[int] = None,
-                      message_date=timezone.datetime):
+                      message_date=timezone.now()):
         """
         Create signal
         """
