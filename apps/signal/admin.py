@@ -45,6 +45,7 @@ class SignalAdmin(admin.ModelAdmin):
                     'techannel',
                     'outer_signal_id',
                     'status',
+                    'message_date',
                     'created',
                     ]
     select_related_fields = ['techannel', 'entry_points', 'take_profits', ]
@@ -78,11 +79,11 @@ class SignalAdmin(admin.ModelAdmin):
 
     @staticmethod
     def take_profits(signal):
-        return '::'.join([str(i.value) for i in signal.take_profits.all()])
+        return ' - '.join([str(i.value) for i in signal.take_profits.all()])
 
     @staticmethod
     def entry_points(signal):
-        return '::'.join([str(i.value) for i in signal.entry_points.all()])
+        return ' - '.join([str(i.value) for i in signal.entry_points.all()])
 
     def form_buy_orders(self, request, queryset):
         for signal in queryset:

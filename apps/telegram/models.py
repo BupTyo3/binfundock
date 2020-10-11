@@ -11,6 +11,7 @@ import asyncio
 import random
 from asgiref.sync import sync_to_async
 from django.conf import settings
+from telethon.tl.types import InputPeerChannel, Channel, InputChannel, User
 
 from apps.signal.models import Signal, EntryPoint, TakeProfit
 from tools.tools import countdown
@@ -93,21 +94,21 @@ class Telegram(BaseTelegram):
         return False
 
     async def parse_tca_origin_channel(self):
-        time.sleep(7)
         channel_abbr = 'assist_origin'
         short_channel_abbr = 'asor'
         from telethon import errors
         try:
-            chat_name = conf_obj.tca_origin
-            # TODO: https://github.com/LonamiWebs/Telethon/issues/494 find code example there for get entity
-            chat_entity = await self.client.get_entity(chat_name)
-            async for message in self.client.iter_messages(entity=chat_entity, limit=25):
+            channel_id = 1200686541
+            access_hash = -3660432826774178781
+            channel_entity = User(id=channel_id, access_hash=access_hash)
+
+            async for message in self.client.iter_messages(entity=channel_entity, limit=25):
                 exists = await self.is_signal_handled(message.id, short_channel_abbr)
                 should_handle_msg = not exists
                 if message.text and should_handle_msg:
                     signal = self.parse_tca_origin_message(message.text, message.id)
                     if signal[0].pair:
-                        inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
+                        inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                         if inserted_to_db != 'success':
                             await self.send_message_to_yourself(f"Error during processing the signal to DB, "
                                                                 f"please check logs for '{signal[0].pair}' "
@@ -190,7 +191,7 @@ class Telegram(BaseTelegram):
                 signal = self.parse_margin_whale_message(message.text, message.id)
                 if not signal:
                     return
-                inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
+                inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                 if inserted_to_db != 'success':
                     await self.send_message_to_yourself(f"Error during processing the signal to DB, "
                                                         f"please check logs for '{signal[0].pair}' "
@@ -248,7 +249,7 @@ class Telegram(BaseTelegram):
                 signal = verify_signal.get_active_pairs_info(pairs)
                 if not signal:
                     return
-                inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
+                inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                 if inserted_to_db != 'success':
                     await self.send_message_to_yourself(f"Error during processing the signal to DB, "
                                                         f"please check logs for '{signal[0].pair}' "
@@ -265,7 +266,7 @@ class Telegram(BaseTelegram):
             if message.text and should_handle_msg:
                 signal = self.parse_angel_message(message.text, message.id)
                 if signal[0].pair:
-                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                     if inserted_to_db != 'success':
                         await self.send_message_to_yourself(f"Error during processing the signal to DB, "
                                                             f"please check logs for '{signal[0].pair}' "
@@ -338,7 +339,7 @@ class Telegram(BaseTelegram):
             if message.text and should_handle_msg:
                 signal = self.parse_tca_message(message.text, message.id)
                 if signal:
-                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id)
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                     if inserted_to_db != 'success':
                         await self.send_message_to_yourself(f"Error during processing the signal to DB, "
                                                             f"please check logs for '{signal[0].pair}' "
@@ -389,7 +390,7 @@ class Telegram(BaseTelegram):
         return Signal.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).exists()
 
     @sync_to_async
-    def write_signal_to_db(self, channel_abbr: str, signal, message_id):
+    def write_signal_to_db(self, channel_abbr: str, signal, message_id, message_date):
         if not signal[0].pair:
             return
         signal[0].pair = check_pair(signal[0].pair)
@@ -414,7 +415,8 @@ class Telegram(BaseTelegram):
                                  stop_loss=signal[0].stop_loss,
                                  entry_points=signal[0].entry_points,
                                  take_profits=signal[0].take_profits,
-                                 outer_signal_id=message_id)
+                                 outer_signal_id=message_id,
+                                 message_date=message_date)
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
             return 'success'
         except Exception as e:

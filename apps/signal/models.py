@@ -51,6 +51,7 @@ class Signal(BaseSignal):
                                 choices=SignalPosition.choices(),
                                 default=SignalPosition.LONG.value, )
     leverage = models.PositiveIntegerField(default=_default_leverage)
+    message_date = models.DateTimeField(max_length=32, default=timezone.now)
 
     objects = models.Manager()
 
@@ -76,7 +77,8 @@ class Signal(BaseSignal):
     def create_signal(cls, symbol: str, techannel_name: str,
                       stop_loss: float, outer_signal_id: int,
                       entry_points: List[float], take_profits: List[float],
-                      leverage: Optional[int] = None):
+                      leverage: Optional[int] = None,
+                      message_date=timezone.now):
         """
         Create signal
         """
@@ -94,7 +96,8 @@ class Signal(BaseSignal):
             stop_loss=stop_loss,
             outer_signal_id=outer_signal_id,
             position=position,
-            leverage=leverage if leverage else cls._default_leverage)
+            leverage=leverage if leverage else cls._default_leverage,
+            message_date=message_date)
         for entry_point in entry_points:
             EntryPoint.objects.create(signal=sm_obj, value=entry_point)
         for take_profit in take_profits:
@@ -955,4 +958,3 @@ class TakeProfit(SystemBaseModel):
 
     def __str__(self):
         return f"{self.signal.symbol}:{self.value}"
-
