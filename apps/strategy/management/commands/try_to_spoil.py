@@ -43,6 +43,6 @@ class Command(SystemCommand):
         # if not get_or_create_crontask().push_job_enabled:
         #     return
 
-        Signal.try_to_spoil(
+        Signal.try_to_spoil_worker(
             outer_signal_id=outer_signal_id,
             techannel_abbr=techannel)
