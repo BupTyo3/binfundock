@@ -7,6 +7,7 @@ class SignalStatus(Enum):
     PUSHED = 'pushed'
     BOUGHT = 'bought'
     SOLD = 'sold'
+    CANCELING = 'canceling'
     CLOSED = 'closed'
 
     @classmethod
