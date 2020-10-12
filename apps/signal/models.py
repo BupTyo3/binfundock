@@ -499,8 +499,6 @@ class Signal(BaseSignal):
         params = {
             'signal': self,
             # TODO: check these cases
-            # 'local_canceled': False,
-            'no_need_push': False,
             '_status__in': [OrderStatus.COMPLETED.value, ]
         }
         return SellOrder.objects.filter(**params).select_for_update()
