@@ -51,7 +51,7 @@ class Signal(BaseSignal):
                                 choices=SignalPosition.choices(),
                                 default=SignalPosition.LONG.value, )
     leverage = models.PositiveIntegerField(default=_default_leverage)
-    message_date = models.DateTimeField(auto_now_add=True, blank=True)
+    message_date = models.DateTimeField(default=timezone.now, blank=True)
 
     objects = models.Manager()
 
