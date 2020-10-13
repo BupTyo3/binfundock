@@ -10,7 +10,7 @@ from utils.framework.models import (
     SystemBaseModel,
     get_increased_leading_number,
 )
-from .base_model import BaseSignal
+from .base_model import BaseSignal, BaseHistorySignal
 from .utils import SignalStatus, SignalPosition
 from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket
@@ -52,6 +52,9 @@ class Signal(BaseSignal):
                                 default=SignalPosition.LONG.value, )
     leverage = models.PositiveIntegerField(default=_default_leverage)
     message_date = models.DateTimeField(default=timezone.now, blank=True)
+    all_targets = models.BooleanField(
+        help_text="Flag is unset if the Signal was spoiled by admin",
+        default=True)
 
     objects = models.Manager()
 
@@ -71,6 +74,7 @@ class Signal(BaseSignal):
         self.main_coin = self._get_main_coin(self.symbol)
         super().save(*args, **kwargs)
         logger.debug(self)
+        HistorySignal.write_in_history(self, self.status)
 
     @classmethod
     @transaction.atomic
@@ -603,7 +607,7 @@ class Signal(BaseSignal):
         return main_orders
 
     @debug_input_and_returned
-    def _spoil(self):
+    def _spoil(self, force: bool = False):
         from apps.order.utils import OrderStatus
         market = self.buy_orders.last().market
         not_completed_buy_orders = self.__get_sent_buy_orders(
@@ -622,6 +626,9 @@ class Signal(BaseSignal):
             self.__form_sell_market_order(quantity=residual_quantity, market=market, price=price)
         else:
             logger.debug(f"No RESIDUAL QUANTITY for Signal '{self}'")
+        if force:
+            # Set flag because admin decided to spoil the signal
+            self.all_targets = False
         self.status = SignalStatus.CANCELING.value
         self.save()
 
@@ -701,7 +708,7 @@ class Signal(BaseSignal):
         and there are no worked Buy orders
         """
         if force:
-            self._spoil()
+            self._spoil(force=True)
             return
         _statuses = [
             SignalStatus.FORMED.value,
@@ -1030,3 +1037,32 @@ class TakeProfit(SystemBaseModel):
 
     def __str__(self):
         return f"{self.signal.symbol}:{self.value}"
+
+
+class HistorySignal(BaseHistorySignal):
+    status = models.CharField(max_length=32,
+                              choices=SignalStatus.choices(),
+                              default=SignalStatus.NEW.value)
+    main_signal = models.ForeignKey(to=Signal,
+                                    related_name='signal_history',
+                                    on_delete=models.CASCADE)
+    current_price = models.FloatField(null=True)
+
+    objects = models.Manager()
+
+    def __str__(self):
+        return f"HS_{self.pk}:Main_signal:{self.main_signal}"
+
+    @classmethod
+    def write_in_history(cls,
+                         signal: Signal,
+                         status: str,
+                         current_price: Optional[float] = None):
+        last_buy_order = signal.buy_orders.last() if not current_price else None
+        if last_buy_order:
+            try:
+                current_price = last_buy_order.market.get_current_price(signal.symbol)
+            except Exception:
+                logger.warning(f"Current price for HistorySignal failed to get. Signal '{signal}'")
+        cls.objects.create(main_signal=signal, status=status, current_price=current_price)
+        logger.debug(f"Add HistorySignal Record for Signal '{signal}' status = '{status}'")
