@@ -4,7 +4,7 @@ from django.utils.translation import ugettext_lazy as _
 from apps.market.utils import get_or_create_market
 from utils.admin import InputFilter
 
-from .models import Signal, EntryPoint, TakeProfit
+from .models import Signal, EntryPoint, TakeProfit, HistorySignal
 
 
 class OuterIDFilter(InputFilter):
@@ -47,6 +47,7 @@ class SignalAdmin(admin.ModelAdmin):
                     'status',
                     'message_date',
                     'created',
+                    'all_targets',
                     ]
     select_related_fields = ['techannel', 'entry_points', 'take_profits', ]
     search_fields = ['id', 'outer_signal_id', 'symbol', 'techannel__abbr', ]
@@ -182,6 +183,19 @@ class SignalIDFilter(InputFilter):
             return queryset.filter(signal__id=signal_id)
 
 
+class MainSignalIDFilter(InputFilter):
+    parameter_name = 'signal_id'
+    title = _('Signal_id')
+
+    def queryset(self, request, queryset):
+        if self.value() is not None:
+            try:
+                signal_id = self.value()
+            except ValueError:
+                return queryset
+            return queryset.filter(main_signal_id=signal_id)
+
+
 @admin.register(EntryPoint)
 class EntryPointAdmin(admin.ModelAdmin):
     list_display = ['id',
@@ -222,3 +236,14 @@ class TakeProfitAdmin(admin.ModelAdmin):
     @staticmethod
     def signal_status(order):
         return order.signal.status
+
+
+@admin.register(HistorySignal)
+class HistorySignalAdmin(admin.ModelAdmin):
+    list_display = ['id', 'main_signal', 'status', 'current_price', 'created', ]
+    select_related_fields = ['main_signal', ]
+    search_fields = ['id', 'main_signal__outer_signal_id', 'main_signal__symbol', 'main_signal__techannel__abbr', ]
+    list_filter = [
+        'status',
+        MainSignalIDFilter,
+    ]
