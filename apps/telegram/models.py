@@ -189,7 +189,7 @@ class Telegram(BaseTelegram):
             should_handle_msg = not exists
             if should_handle_msg and message.photo:
                 signal = self.parse_margin_whale_message(message.text, message.id)
-                if not signal:
+                if signal[0].pair:
                     return
                 inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                 if inserted_to_db != 'success':
