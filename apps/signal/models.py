@@ -51,7 +51,7 @@ class Signal(BaseSignal):
                                 choices=SignalPosition.choices(),
                                 default=SignalPosition.LONG.value, )
     leverage = models.PositiveIntegerField(default=_default_leverage)
-    message_date = models.DateTimeField(auto_now_add=True, blank=True)
+    message_date = models.DateTimeField(default=timezone.now, blank=True)
 
     objects = models.Manager()
 
@@ -499,8 +499,6 @@ class Signal(BaseSignal):
         params = {
             'signal': self,
             # TODO: check these cases
-            # 'local_canceled': False,
-            'no_need_push': False,
             '_status__in': [OrderStatus.COMPLETED.value, ]
         }
         return SellOrder.objects.filter(**params).select_for_update()
@@ -624,6 +622,39 @@ class Signal(BaseSignal):
             self.__form_sell_market_order(quantity=residual_quantity, market=market, price=price)
         else:
             logger.debug(f"No RESIDUAL QUANTITY for Signal '{self}'")
+        self.status = SignalStatus.CANCELING.value
+        self.save()
+
+    @debug_input_and_returned
+    def _check_is_ready_to_be_closed(self) -> bool:
+        """
+        Check Signal if it has no opened Buy orders and no opened Sell orders
+        """
+        from apps.order.utils import OrderStatus
+        not_finished_orders_statuses = [
+            OrderStatus.NOT_SENT.value,
+            OrderStatus.SENT.value,
+            OrderStatus.PARTIAL.value,
+        ]
+        not_finished_orders_params = {
+            '_status__in': not_finished_orders_statuses,
+        }
+        if self.buy_orders.filter(**not_finished_orders_params).exists():
+            return False
+        logger.debug(f"1/2:Signal '{self}' has no Opened BUY orders")
+        if self.sell_orders.filter(**not_finished_orders_params).exists():
+            return False
+        logger.debug(f"2/2:Signal '{self}' has no Opened SELL orders")
+        return True
+
+    @debug_input_and_returned
+    def _close(self):
+        """
+        Function to close the Signal
+        """
+        logger.debug(f"Signal '{self}' will be closed")
+        self.status = SignalStatus.CLOSED.value
+        self.save()
 
     @rounded_result
     def get_real_stop_price(self, price: float, market: BaseMarket) -> float:
@@ -657,10 +688,10 @@ class Signal(BaseSignal):
             logger.debug(f"Not enough money for Signal '{self}'")
             return
         self.status = SignalStatus.FORMED.value
-        self.save()
         for index, entry_point in enumerate(self.entry_points.all()):
             coin_quantity = self._get_distributed_toc_quantity(market, entry_point.value)
             self.__form_buy_order(market, coin_quantity, entry_point, index)
+        self.save()
 
     @transaction.atomic
     @debug_input_and_returned
@@ -672,7 +703,10 @@ class Signal(BaseSignal):
         if force:
             self._spoil()
             return
-        _statuses = [SignalStatus.PUSHED.value, ]
+        _statuses = [
+            SignalStatus.FORMED.value,
+            SignalStatus.PUSHED.value,
+        ]
         if self._status not in _statuses:
             return
         current_price = self.buy_orders.last().market.get_current_price(self.symbol)
@@ -681,6 +715,24 @@ class Signal(BaseSignal):
         cheapest_sent_sell_order = sent_sell_orders.order_by('-price').last()
         if cheapest_sent_sell_order and current_price >= cheapest_sent_sell_order.price:
             self._spoil()
+
+    @transaction.atomic
+    @debug_input_and_returned
+    def try_to_close(self) -> bool:
+        """
+        Worker closes the Signal if it has no opened Buy orders and no opened Sell orders
+        """
+        _statuses = [
+            SignalStatus.FORMED.value,
+            SignalStatus.PUSHED.value,
+            SignalStatus.BOUGHT.value,
+            SignalStatus.SOLD.value,
+            SignalStatus.CANCELING.value,
+        ]
+        if self._status not in _statuses:
+            return False
+        if self._check_is_ready_to_be_closed():
+            self._close()
 
     @debug_input_and_returned
     def push_orders(self):
@@ -913,10 +965,10 @@ class Signal(BaseSignal):
                             outer_signal_id: Optional[int] = None,
                             techannel_abbr: Optional[str] = None):
         """Handle all signals. Try_to_spoil worker"""
-        _statuses = [SignalStatus.FORMED.value,
-                     SignalStatus.PUSHED.value,
-                     SignalStatus.BOUGHT.value,
-                     SignalStatus.SOLD.value, ]
+        _statuses = [
+            SignalStatus.FORMED.value,
+            SignalStatus.PUSHED.value,
+        ]
         params = {'_status__in': _statuses}
         if outer_signal_id:
             params.update({'outer_signal_id': outer_signal_id,
@@ -924,6 +976,26 @@ class Signal(BaseSignal):
         formed_signals = Signal.objects.filter(**params)
         for signal in formed_signals:
             signal.try_to_spoil()
+
+    @classmethod
+    def closer_worker(cls,
+                      outer_signal_id: Optional[int] = None,
+                      techannel_abbr: Optional[str] = None):
+        """Handle all signals. Try_to_close worker"""
+        _statuses = [
+            SignalStatus.FORMED.value,
+            SignalStatus.PUSHED.value,
+            SignalStatus.BOUGHT.value,
+            SignalStatus.SOLD.value,
+            SignalStatus.CANCELING.value,
+        ]
+        params = {'_status__in': _statuses}
+        if outer_signal_id:
+            params.update({'outer_signal_id': outer_signal_id,
+                           'techannel__abbr': techannel_abbr})
+        formed_signals = Signal.objects.filter(**params)
+        for signal in formed_signals:
+            signal.try_to_close()
 
 
 class EntryPoint(SystemBaseModel):

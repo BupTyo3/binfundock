@@ -61,6 +61,7 @@ class SignalAdmin(admin.ModelAdmin):
         'run_bought_worker',
         'run_sold_worker',
         'sell_by_market',
+        'try_to_close',
         'update_info_by_api',
     ]
 
@@ -109,6 +110,10 @@ class SignalAdmin(admin.ModelAdmin):
         for signal in queryset:
             self._sell_by_market_one(request, signal)
 
+    def try_to_close(self, request, queryset):
+        for signal in queryset:
+            self._try_to_close(request, signal)
+
     @notifications_handling('')
     def _form_one(self, request, signal):
         signal.formation_buy_orders(get_or_create_market())
@@ -132,6 +137,10 @@ class SignalAdmin(admin.ModelAdmin):
     @notifications_handling('')
     def _sell_by_market_one(self, request, signal):
         signal.try_to_spoil(force=True)
+
+    @notifications_handling('')
+    def _try_to_close(self, request, signal):
+        signal.try_to_close()
 
 
 class PointOuterIDFilter(InputFilter):
