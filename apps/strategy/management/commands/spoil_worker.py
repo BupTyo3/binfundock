@@ -28,8 +28,6 @@ class Command(SystemCommand):
             signal_statuses = [
                 SignalStatus.FORMED.value,
                 SignalStatus.PUSHED.value,
-                SignalStatus.BOUGHT.value,
-                SignalStatus.SOLD.value,
             ]
             logger.debug(f"Try to spoil all {signal_statuses} signals")
         if not options['without_checking']:
@@ -40,9 +38,9 @@ class Command(SystemCommand):
                 logger.debug("You typed No - The End")
                 quit()
 
-        # if not get_or_create_crontask().push_job_enabled:
-        #     return
+        if not get_or_create_crontask().spoil_worker_enabled:
+            return
 
-        Signal.try_to_spoil_worker(
+        Signal.spoil_worker(
             outer_signal_id=outer_signal_id,
             techannel_abbr=techannel)

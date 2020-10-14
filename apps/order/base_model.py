@@ -1,7 +1,7 @@
 import logging
 
 from abc import abstractmethod
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING
 
 from django.db import models
 from django.db.models import F
@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from utils.framework.models import SystemBaseModel, SystemBaseModelWithoutModified
 from apps.order.utils import OrderStatus, OrderType
-from tools.tools import gen_short_uuid
+from tools.tools import gen_short_uuid, debug_input_and_returned
 
 if TYPE_CHECKING:
     from apps.signal.base_model import BaseSignal
@@ -53,6 +53,8 @@ class BaseOrder(SystemBaseModel):
         default=False)
     last_updated_by_api = models.DateTimeField(blank=True,
                                                null=True)
+
+    objects = models.Manager()
 
     class Meta:
         abstract = True
@@ -102,6 +104,78 @@ class BaseOrder(SystemBaseModel):
     def _set_updated_by_api_without_saving(self):
         """Update last_updated_by_api field by current time"""
         self.last_updated_by_api = timezone.now()
+
+
+class BaseBuyOrder(BaseOrder):
+    type_: str = 'buy'
+    order_type_separator: str = 'bb'
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    @debug_input_and_returned
+    def get_min_price_order(cls,
+                            signal: 'BaseSignal',
+                            statuses: Optional[List[OrderStatus]] = None) -> Optional['BaseOrder']:
+        params = {'signal': signal}
+        if statuses:
+            params.update({'_status__in': statuses})
+        return cls.objects.filter(**params).order_by('-price').last()
+
+    @classmethod
+    @debug_input_and_returned
+    def get_max_price_order(cls,
+                            signal: 'BaseSignal',
+                            statuses: Optional[List[OrderStatus]] = None) -> Optional['BaseOrder']:
+        params = {'signal': signal}
+        if statuses:
+            params.update({'_status__in': statuses})
+        return cls.objects.filter(**params).order_by('price').last()
+
+
+class BaseSellOrder(BaseOrder):
+    type_: str = 'sell'
+    order_type_separator: str = 'ss'
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    @debug_input_and_returned
+    def get_min_price_order(cls,
+                            signal: 'BaseSignal',
+                            statuses: Optional[List[OrderStatus]] = None,
+                            stop_loss_orders: bool = False) -> Optional['BaseOrder']:
+        """
+        Function to get a SellOrder with min price
+         (choose from stop_loss orders or take_profit orders)
+        """
+        params = {'signal': signal}
+        if statuses:
+            params.update({'_status__in': statuses})
+        if stop_loss_orders:
+            return cls.objects.filter(**params).exclude(tp_order=None).order_by('-price').last()
+        else:
+            return cls.objects.filter(**params).exclude(sl_order=None).order_by('-price').last()
+
+    @classmethod
+    @debug_input_and_returned
+    def get_max_price_order(cls,
+                            signal: 'BaseSignal',
+                            statuses: Optional[List[OrderStatus]] = None,
+                            stop_loss_orders: bool = False) -> Optional['BaseOrder']:
+        """
+        Function to get a SellOrder with min price
+         (choose from stop_loss orders or take_profit orders)
+        """
+        params = {'signal': signal}
+        if statuses:
+            params.update({'_status__in': statuses})
+        if stop_loss_orders:
+            return cls.objects.filter(**params).exclude(tp_order=None).order_by('price').last()
+        else:
+            return cls.objects.filter(**params).exclude(sl_order=None).order_by('price').last()
 
 
 class HistoryApiBaseOrder(SystemBaseModelWithoutModified):
