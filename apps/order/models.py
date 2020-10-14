@@ -8,7 +8,11 @@ from django.contrib.auth import get_user_model
 from apps.order.utils import OrderStatus, OrderType
 from apps.market.models import Market
 from apps.signal.models import Signal
-from .base_model import BaseOrder, HistoryApiBaseOrder
+from .base_model import (
+    BaseBuyOrder,
+    BaseSellOrder,
+    HistoryApiBaseOrder,
+)
 
 if TYPE_CHECKING:
     from apps.market.base_model import BaseMarket
@@ -17,9 +21,7 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-class BuyOrder(BaseOrder):
-    type_: str = 'buy'
-    order_type_separator: str = 'bb'
+class BuyOrder(BaseBuyOrder):
     market = models.ForeignKey(to=Market,
                                related_name='buy_orders',
                                on_delete=models.DO_NOTHING)
@@ -90,11 +92,9 @@ class BuyOrder(BaseOrder):
         self.save()
 
 
-class SellOrder(BaseOrder):
+class SellOrder(BaseSellOrder):
     _SL_APPEND_INDEX = 500
     _MARKET_INDEX = 300
-    type_: str = 'sell'
-    order_type_separator: str = 'ss'
 
     market = models.ForeignKey(to=Market,
                                related_name='sell_orders',

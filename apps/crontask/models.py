@@ -17,6 +17,8 @@ class CronTask(CronTaskBase):
     pull_job_enabled = models.BooleanField(default=False)
     bought_worker_enabled = models.BooleanField(default=False)
     sold_worker_enabled = models.BooleanField(default=False)
+    spoil_worker_enabled = models.BooleanField(default=False)
+    close_worker_enabled = models.BooleanField(default=False)
 
     ai_algorithm = models.BooleanField(default=False)
     crypto_passive = models.BooleanField(default=False)

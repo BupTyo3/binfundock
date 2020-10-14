@@ -9,6 +9,8 @@ class CronTaskAdmin(admin.ModelAdmin):
                     'pull_job_enabled',
                     'bought_worker_enabled',
                     'sold_worker_enabled',
+                    'spoil_worker_enabled',
+                    'close_worker_enabled',
 
                     'ai_algorithm',
                     'crypto_passive',

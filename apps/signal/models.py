@@ -3,20 +3,23 @@ import logging
 from typing import Optional, List, TYPE_CHECKING, Union
 
 from django.db import models, transaction
-from django.db.models import QuerySet, Sum
+from django.db.models import QuerySet, Sum, F
 from django.utils import timezone
 
 from utils.framework.models import (
-    SystemBaseModel,
     get_increased_leading_number,
 )
-from .base_model import BaseSignal, BaseHistorySignal
+from .base_model import (
+    BaseSignal, BaseHistorySignal,
+    BaseEntryPoint, BaseTakeProfit,
+)
 from .utils import SignalStatus, SignalPosition
 from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
 from tools.tools import (
+    rou,
     rounded_result,
     debug_input_and_returned,
     subtract_fee,
@@ -39,10 +42,8 @@ class Signal(BaseSignal):
     outer_signal_id = models.PositiveIntegerField()
     main_coin = models.CharField(max_length=16)
     stop_loss = models.FloatField()
-    _bought_quantity = models.FloatField(db_column='bought_quantity',
-                                         help_text='Fullness of buy_orders',
-                                         default=0)
     income = models.FloatField(help_text='Profit or Loss', default=0)
+    amount = models.FloatField(help_text='Amount of Main Asset', default=0)
     _status = models.CharField(max_length=32,
                                choices=SignalStatus.choices(),
                                default=SignalStatus.NEW.value,
@@ -109,6 +110,38 @@ class Signal(BaseSignal):
         logger.debug(f"Signal '{sm_obj}' has been created successfully")
         return sm_obj
 
+    def get_market(self):
+        return self.buy_orders.last().market
+
+    @rounded_result
+    def __get_calculated_amount(self):
+        completed_buy_orders = self.__get_completed_buy_orders()
+        bought_amount = self.__get_bought_amount(completed_buy_orders)
+        return bought_amount
+
+    @rounded_result
+    def __get_calculated_income(self):
+        completed_buy_orders = self.__get_completed_buy_orders()
+        bought_amount = self.__get_bought_amount(completed_buy_orders)
+        completed_sell_orders = self.__get_completed_sell_orders()
+        sold_amount = self.__get_sold_amount(completed_sell_orders)
+        sold_amount_subtracted_fee = subtract_fee(sold_amount, self.get_market().market_fee)
+        res = sold_amount_subtracted_fee - bought_amount
+        logger.debug(f"Income calculating for Signal '{self}': COMPLETED_BUY_ORDERS: {completed_buy_orders}; "
+                     f"COMPLETED_SELL_ORDERS: {completed_sell_orders}; "
+                     f"BOUGHT_amount={bought_amount}; SOLD_AMOUNT={sold_amount}; "
+                     f"SOLD_AMOUNT_SUBTRACTED_FEE={sold_amount_subtracted_fee}; "
+                     f"INCOME={rou(res)}")
+        return res
+
+    def _update_income(self):
+        self.income = self.__get_calculated_income()
+        self.save()
+
+    def _update_amount(self):
+        self.amount = self.__get_calculated_amount()
+        self.save()
+
     @classmethod
     def _calculate_position(cls,
                             stop_loss: Union[float, str],
@@ -148,15 +181,6 @@ class Signal(BaseSignal):
             if symbol[-len(main_coin):] == main_coin:
                 return main_coin
         raise Exception("Provided main coin is not serviced")
-
-    @property
-    def bought_quantity(self):
-        # self._update_bought_quantity()
-        return self._bought_quantity
-
-    @bought_quantity.setter
-    def bought_quantity(self, value: float):
-        self._bought_quantity = value
 
     def __get_buy_distribution(self):
         return self.entry_points.count()
@@ -366,7 +390,7 @@ class Signal(BaseSignal):
             # get price of previous order as a new stop_loss
             previous_order = self.sell_orders.filter(index=(last_worked_sell_order.index - 1)).last()
             res = previous_order.price
-        pair = self._get_pair(worked_sell_orders.last().market)
+        pair = self._get_pair(self.get_market())
         return self.__find_not_fractional_by_step(res, pair.step_price)
 
     @debug_input_and_returned
@@ -408,18 +432,6 @@ class Signal(BaseSignal):
             res.append(self._formation_copied_sell_order(
                 original_order_id=order_id, new_stop_loss=new_stop_loss, sell_quantity=sell_quantity))
         return res
-
-    @debug_input_and_returned
-    def _update_bought_quantity(self):
-        """
-        Outdated
-        """
-        bought_quantity: float = 0
-        for buy_order in self.buy_orders.all():
-            # TODO change the logic
-            # buy_order.update_info_by_api()
-            bought_quantity += buy_order.bought_quantity
-        self._bought_quantity = bought_quantity
 
     def __get_not_handled_worked_buy_orders(self) -> QuerySet:
         """
@@ -520,7 +532,6 @@ class Signal(BaseSignal):
             'signal': self,
             # TODO: check these cases
             # 'local_canceled': False,
-            'no_need_push': False,
             '_status__in': [OrderStatus.COMPLETED.value, ]
         }
         return BuyOrder.objects.filter(**params).select_for_update()
@@ -555,10 +566,27 @@ class Signal(BaseSignal):
         """
         # TODO: move it
         res = worked_orders.aggregate(Sum('bought_quantity'))
-        bought_quantity = res['bought_quantity__sum']
-        res = subtract_fee(bought_quantity, worked_orders.last().market.market_fee)
-        pair = self._get_pair(worked_orders.last().market)
+        bought_quantity = res['bought_quantity__sum'] or 0
+        res = subtract_fee(bought_quantity, self.get_market().market_fee)
+        pair = self._get_pair(self.get_market())
         return self.__find_not_fractional_by_step(res, pair.step_quantity)
+
+    @debug_input_and_returned
+    @rounded_result
+    def __get_bought_amount(self, worked_orders: QuerySet) -> float:
+        """
+        """
+        # TODO: move it
+        qs = worked_orders.annotate(amount=F('price') * F('quantity'))
+        return qs.aggregate(Sum('amount'))['amount__sum'] or 0
+
+    @staticmethod
+    def __get_sold_amount(worked_orders: QuerySet) -> float:
+        """
+        """
+        # TODO: move it
+        qs = worked_orders.annotate(sold_amount=F('price') * F('sold_quantity'))
+        return qs.aggregate(Sum('sold_amount'))['sold_amount__sum'] or 0
 
     @staticmethod
     def __get_sold_quantity(worked_orders: QuerySet) -> float:
@@ -567,7 +595,7 @@ class Signal(BaseSignal):
         """
         # TODO: move it
         res = worked_orders.aggregate(Sum('sold_quantity'))
-        return res['sold_quantity__sum']
+        return res['sold_quantity__sum'] or 0
 
     @staticmethod
     def __get_planned_sold_quantity(worked_orders: QuerySet) -> float:
@@ -589,7 +617,7 @@ class Signal(BaseSignal):
          """
         all_quantity = self.__get_planned_sold_quantity(sent_sell_orders) + addition_quantity
         res = all_quantity / sent_sell_orders.count()
-        pair = self._get_pair(sent_sell_orders.last().market)
+        pair = self._get_pair(self.get_market())
         return self.__find_not_fractional_by_step(res, pair.step_quantity)
 
     @staticmethod
@@ -609,7 +637,7 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def _spoil(self, force: bool = False):
         from apps.order.utils import OrderStatus
-        market = self.buy_orders.last().market
+        market = self.get_market()
         not_completed_buy_orders = self.__get_sent_buy_orders(
             statuses=[OrderStatus.NOT_SENT.value, OrderStatus.SENT.value])
         # Cancel all buy_orders
@@ -716,12 +744,15 @@ class Signal(BaseSignal):
         ]
         if self._status not in _statuses:
             return
-        current_price = self.buy_orders.last().market.get_current_price(self.symbol)
-        # TODO: change logic to min(take_profit) instead of cheapest_sent_sell_order
-        sent_sell_orders = self.__get_sent_sell_orders()
-        cheapest_sent_sell_order = sent_sell_orders.order_by('-price').last()
-        if cheapest_sent_sell_order and current_price >= cheapest_sent_sell_order.price:
+        current_price = self.get_market().get_current_price(self.symbol)
+        min_profit_price = TakeProfit.get_min_value(self)
+        msg = f"Check try_to_spoil '{self}':" \
+              f" if: current_price >= min_profit_price: {current_price} >= {min_profit_price}?"
+        if current_price >= min_profit_price:
+            logger.debug(msg + ': Yes')
             self._spoil()
+        else:
+            logger.debug(msg + ': No')
 
     @transaction.atomic
     @debug_input_and_returned
@@ -740,6 +771,8 @@ class Signal(BaseSignal):
             return False
         if self._check_is_ready_to_be_closed():
             self._close()
+            self._update_income()
+            self._update_amount()
 
     @debug_input_and_returned
     def push_orders(self):
@@ -821,7 +854,7 @@ class Signal(BaseSignal):
                                                sell_quantity=new_bought_quantity)
         # Form sell orders if the signal doesn't have any
         elif not self.sell_orders.exists():
-            self._formation_first_sell_orders(worked_orders.last().market, bought_quantity)
+            self._formation_first_sell_orders(self.get_market(), bought_quantity)
         self.__update_flag_handled_worked_orders(worked_orders)
         # Change status
         if self.status not in [SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]:
@@ -968,9 +1001,9 @@ class Signal(BaseSignal):
             signal.worker_for_sold_orders()
 
     @classmethod
-    def try_to_spoil_worker(cls,
-                            outer_signal_id: Optional[int] = None,
-                            techannel_abbr: Optional[str] = None):
+    def spoil_worker(cls,
+                     outer_signal_id: Optional[int] = None,
+                     techannel_abbr: Optional[str] = None):
         """Handle all signals. Try_to_spoil worker"""
         _statuses = [
             SignalStatus.FORMED.value,
@@ -985,9 +1018,9 @@ class Signal(BaseSignal):
             signal.try_to_spoil()
 
     @classmethod
-    def closer_worker(cls,
-                      outer_signal_id: Optional[int] = None,
-                      techannel_abbr: Optional[str] = None):
+    def close_worker(cls,
+                     outer_signal_id: Optional[int] = None,
+                     techannel_abbr: Optional[str] = None):
         """Handle all signals. Try_to_close worker"""
         _statuses = [
             SignalStatus.FORMED.value,
@@ -1000,12 +1033,12 @@ class Signal(BaseSignal):
         if outer_signal_id:
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
-        formed_signals = Signal.objects.filter(**params)
-        for signal in formed_signals:
+        signals = Signal.objects.filter(**params)
+        for signal in signals:
             signal.try_to_close()
 
 
-class EntryPoint(SystemBaseModel):
+class EntryPoint(BaseEntryPoint):
     signal = models.ForeignKey(to=Signal,
                                related_name='entry_points',
                                on_delete=models.CASCADE)
@@ -1022,7 +1055,7 @@ class EntryPoint(SystemBaseModel):
         return f"{self.signal.symbol}:{self.value}"
 
 
-class TakeProfit(SystemBaseModel):
+class TakeProfit(BaseTakeProfit):
     signal = models.ForeignKey(to=Signal,
                                related_name='take_profits',
                                on_delete=models.CASCADE)

@@ -1,5 +1,8 @@
+from decimal import Decimal, Inexact, Context
+
 from django.contrib import admin, messages
 from django.utils.translation import ugettext_lazy as _
+from django.db.models import F, Case, When, ExpressionWrapper, CharField
 
 from apps.market.utils import get_or_create_market
 from utils.admin import InputFilter
@@ -33,6 +36,19 @@ class TechannelFilter(InputFilter):
             return queryset.filter(techannel__abbr=techannel_abbr)
 
 
+def float_to_decimal(f):
+    "Convert a floating point number to a Decimal with no loss of information"
+    n, d = f.as_integer_ratio()
+    numerator, denominator = Decimal(n), Decimal(d)
+    ctx = Context(prec=60)
+    result = ctx.divide(numerator, denominator)
+    while ctx.flags[Inexact]:
+        ctx.flags[Inexact] = False
+        ctx.prec *= 2
+        result = ctx.divide(numerator, denominator)
+    return result
+
+
 @admin.register(Signal)
 class SignalAdmin(admin.ModelAdmin):
     list_display = ['id',
@@ -45,6 +61,9 @@ class SignalAdmin(admin.ModelAdmin):
                     'techannel',
                     'outer_signal_id',
                     'status',
+                    'amount',
+                    'income',
+                    'perc_inc',
                     'message_date',
                     'created',
                     'all_targets',
@@ -78,6 +97,15 @@ class SignalAdmin(admin.ModelAdmin):
                     messages.success(request, msg)
             return applicator
         return decorate
+
+    def get_queryset(self, request):
+        qs = super(SignalAdmin, self).get_queryset(request)
+        return qs.annotate(perc_inc=Case(
+            When(amount=0, then=0),
+            default=F('income') / F('amount') * 100))
+
+    def perc_inc(self, obj):
+          return round(obj.perc_inc, 2)
 
     @staticmethod
     def take_profits(signal):

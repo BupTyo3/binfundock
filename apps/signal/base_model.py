@@ -3,7 +3,10 @@ import logging
 from abc import abstractmethod
 from typing import Optional, TYPE_CHECKING, Union
 
+from django.db import models
+
 from utils.framework.models import SystemBaseModel, SystemBaseModelWithoutModified
+from tools.tools import debug_input_and_returned
 from .utils import SignalStatus
 
 if TYPE_CHECKING:
@@ -29,6 +32,39 @@ class BaseSignal(SystemBaseModel):
         logger.debug(f'Set Signal status: {self}: {self._status.upper()} -> {value.upper()}')
         BaseHistorySignal.write_in_history(signal=self, status=value)
         self._status = value
+
+
+class BasePoint(SystemBaseModel):
+    value: float
+
+    objects = models.Manager()
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    @debug_input_and_returned
+    def get_min_value(cls, signal: BaseSignal) -> Optional[float]:
+        min_take_profit: Optional[cls] = cls.objects.filter(signal=signal).order_by('-value').last()
+        return min_take_profit.value if min_take_profit else None
+
+    @classmethod
+    @debug_input_and_returned
+    def get_max_value(cls, signal: BaseSignal) -> Optional[float]:
+        max_take_profit: Optional[cls] = cls.objects.filter(signal=signal).order_by('value').last()
+        return max_take_profit.value if max_take_profit else None
+
+
+class BaseEntryPoint(BasePoint):
+
+    class Meta:
+        abstract = True
+
+
+class BaseTakeProfit(BasePoint):
+
+    class Meta:
+        abstract = True
 
 
 class BaseHistorySignal(SystemBaseModelWithoutModified):
