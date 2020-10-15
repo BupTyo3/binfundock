@@ -1,6 +1,6 @@
 PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-*/1 * * * * root cd ../binfun; python manage.py form_buy_orders --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
-*/1 * * * * root cd ../binfun; python manage.py push_job --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
+* * * * * root cd ../binfun; sleep 15; python manage.py form_buy_orders --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
+* * * * * root cd ../binfun; sleep 30; python manage.py push_job --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
 */1 * * * * root cd ../binfun; python manage.py pull_job --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
 */1 * * * * root cd ../binfun; python manage.py bought_worker --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
 */1 * * * * root cd ../binfun; python manage.py sold_worker --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
