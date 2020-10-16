@@ -204,8 +204,8 @@ LOGGING = {
             'level': 'DEBUG',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': f'{BASE_DIR}/logs/binfun.log',
-            'maxBytes': 1024*1024*5,  # 5 Mb
-            'backupCount': 10,
+            'maxBytes': 1024*1024*10,  # 5 Mb
+            'backupCount': 500,
             'formatter': 'verbose'
         },
         'console': {
