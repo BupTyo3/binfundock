@@ -126,7 +126,7 @@ class Telegram(BaseTelegram):
     def parse_tca_origin_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
-        possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in : ', 'Gеt in :', 'Get  in : ']
+        possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in  ', 'Get in : ', 'Gеt in :', 'Get  in : ']
         possible_take_profits_label = ['Sell at: ', 'Targets: ', 'Тargets: ', 'Targеts: ', 'Tаrgets: ']
         possible_stop_label = ['SL: ', 'SL : ']
         pair_label = ['Pair: ', 'Рair: ']
@@ -149,7 +149,7 @@ class Telegram(BaseTelegram):
             if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1])\
                     or line.startswith(possible_entry_label[2]) or line.startswith(possible_entry_label[3])\
                     or line.startswith(possible_entry_label[4]) or line.startswith(possible_entry_label[5])\
-                    or line.startswith(possible_entry_label[6]):
+                    or line.startswith(possible_entry_label[6]) or line.startswith(possible_entry_label[7]):
                 fake_entries = line[8:]
                 possible_entries = fake_entries.split('-')
                 if '(' in line:
