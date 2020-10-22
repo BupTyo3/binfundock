@@ -127,7 +127,7 @@ class Telegram(BaseTelegram):
         signals = []
         splitted_info = message_text.splitlines()
         possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in : ', 'Gеt in :', 'Get  in : ']
-        possible_take_profits_label = ['Sell at: ', 'Targets: ', 'Тargets: ', 'Targеts: ']
+        possible_take_profits_label = ['Sell at: ', 'Targets: ', 'Тargets: ', 'Targеts: ', 'Tаrgets: ']
         possible_stop_label = ['SL: ', 'SL : ']
         pair_label = ['Pair: ', 'Рair: ']
         pair = ''
@@ -158,7 +158,8 @@ class Telegram(BaseTelegram):
                 else:
                     entries = left_numbers(possible_entries)
             if line.startswith(possible_take_profits_label[0]) or line.startswith(possible_take_profits_label[1])\
-                    or line.startswith(possible_take_profits_label[2]) or line.startswith(possible_take_profits_label[3]):
+                    or line.startswith(possible_take_profits_label[2]) or line.startswith(possible_take_profits_label[3])\
+                    or line.startswith(possible_take_profits_label[4]):
                 fake_profits = line[9:]
                 possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
