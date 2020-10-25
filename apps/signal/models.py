@@ -554,7 +554,7 @@ class Signal(BaseSignal):
         """
         # TODO: move it
         logger.debug(f"Updating Sent orders by local_canceled flag")
-        logger.debug(f"LOCAL CANCEL ORDERS: '{sent_orders.all()}'")
+        logger.debug(f"LOCAL CANCEL ORDERS: '{sent_orders}'")
         now_ = timezone.now()
         sent_orders.update(local_canceled=True, local_canceled_time=now_)
 
@@ -922,6 +922,7 @@ class Signal(BaseSignal):
         _statuses = [SignalStatus.FORMED.value,
                      SignalStatus.PUSHED.value,
                      SignalStatus.BOUGHT.value,
+                     SignalStatus.CANCELING.value,
                      SignalStatus.SOLD.value, ]
         params = {'_status__in': _statuses}
         if outer_signal_id:
@@ -940,6 +941,7 @@ class Signal(BaseSignal):
         """
         _statuses = [SignalStatus.PUSHED.value,
                      SignalStatus.BOUGHT.value,
+                     SignalStatus.CANCELING.value,
                      SignalStatus.SOLD.value, ]
         params = {'_status__in': _statuses}
         if outer_signal_id:
@@ -956,6 +958,7 @@ class Signal(BaseSignal):
         from apps.order.utils import OrderStatus
         _statuses = [SignalStatus.PUSHED.value,
                      SignalStatus.BOUGHT.value,
+                     SignalStatus.CANCELING.value,
                      SignalStatus.SOLD.value, ]
         if self._status not in _statuses:
             return
