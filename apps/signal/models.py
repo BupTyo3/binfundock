@@ -537,6 +537,7 @@ class Signal(BaseSignal):
         return BuyOrder.objects.filter(**params).select_for_update()
 
     @staticmethod
+    @transaction.atomic
     def __update_flag_handled_worked_orders(worked_orders: QuerySet):
         """
         Set flag handled_worked
@@ -547,6 +548,7 @@ class Signal(BaseSignal):
 
     @staticmethod
     @debug_input_and_returned
+    @transaction.atomic
     def __cancel_sent_orders(sent_orders: QuerySet):
         """
         Set flag local_cancelled for orders.
