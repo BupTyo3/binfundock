@@ -537,18 +537,18 @@ class Signal(BaseSignal):
         return BuyOrder.objects.filter(**params).select_for_update()
 
     @staticmethod
-    @transaction.atomic
     def __update_flag_handled_worked_orders(worked_orders: QuerySet):
         """
         Set flag handled_worked
         """
         # TODO: move it
         logger.debug(f"Updating Worked orders by handled_worked flag")
-        worked_orders.update(handled_worked=True)
+        for order in worked_orders:
+            order.handled_worked = True
+            order.save()
 
     @staticmethod
     @debug_input_and_returned
-    @transaction.atomic
     def __cancel_sent_orders(sent_orders: QuerySet):
         """
         Set flag local_cancelled for orders.
@@ -558,7 +558,10 @@ class Signal(BaseSignal):
         logger.debug(f"Updating Sent orders by local_canceled flag")
         logger.debug(f"LOCAL CANCEL ORDERS: '{sent_orders}'")
         now_ = timezone.now()
-        sent_orders.update(local_canceled=True, local_canceled_time=now_)
+        for order in sent_orders:
+            order.local_canceled = True
+            order.local_canceled_time = now_
+            order.save()
 
     @debug_input_and_returned
     @rounded_result
