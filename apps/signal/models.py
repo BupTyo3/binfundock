@@ -483,7 +483,7 @@ class Signal(BaseSignal):
             'local_canceled': False,
             '_status__in': statuses
         }
-        return BuyOrder.objects.filter(**params)
+        return BuyOrder.objects.filter(**params).select_for_update()
 
     @debug_input_and_returned
     def __get_sent_sell_orders(self, statuses: Optional[List] = None) -> QuerySet:
@@ -635,6 +635,7 @@ class Signal(BaseSignal):
         return main_orders
 
     @debug_input_and_returned
+    @transaction.atomic
     def _spoil(self, force: bool = False):
         from apps.order.utils import OrderStatus
         market = self.get_market()
@@ -728,8 +729,8 @@ class Signal(BaseSignal):
             self.__form_buy_order(market, coin_quantity, entry_point, index)
         self.save()
 
-    @transaction.atomic
     @debug_input_and_returned
+    @transaction.atomic
     def try_to_spoil(self, force: bool = False):
         """
         Worker spoils the Signal if a current price reaches any of take_profits
@@ -754,8 +755,8 @@ class Signal(BaseSignal):
         else:
             logger.debug(msg + ': No')
 
-    @transaction.atomic
     @debug_input_and_returned
+    @transaction.atomic
     def try_to_close(self) -> bool:
         """
         Worker closes the Signal if it has no opened Buy orders and no opened Sell orders
@@ -820,8 +821,8 @@ class Signal(BaseSignal):
                 self.status = SignalStatus.PUSHED.value
                 self.save()
 
-    @transaction.atomic
     @debug_input_and_returned
+    @transaction.atomic
     def worker_for_bought_orders(self):
         """
         Worker for one signal.
@@ -861,8 +862,8 @@ class Signal(BaseSignal):
             self.status = SignalStatus.BOUGHT.value
             self.save()
 
-    @transaction.atomic
     @debug_input_and_returned
+    @transaction.atomic
     def worker_for_sold_orders(self):
         """
         Worker for one signal.
