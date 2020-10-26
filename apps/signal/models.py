@@ -466,7 +466,7 @@ class Signal(BaseSignal):
         qs = SellOrder.objects.filter(**params)
         qs = qs.exclude(sl_order=None) if not sl_orders else qs
         qs = qs.exclude(tp_order=None) if not tp_orders else qs
-        return qs.select_for_update()
+        return qs
 
     @debug_input_and_returned
     def __get_sent_buy_orders(self, statuses: Optional[List] = None) -> QuerySet:
@@ -483,7 +483,7 @@ class Signal(BaseSignal):
             'local_canceled': False,
             '_status__in': statuses
         }
-        return BuyOrder.objects.filter(**params).select_for_update()
+        return BuyOrder.objects.filter(**params)
 
     @debug_input_and_returned
     def __get_sent_sell_orders(self, statuses: Optional[List] = None) -> QuerySet:
@@ -501,7 +501,7 @@ class Signal(BaseSignal):
             'no_need_push': False,
             '_status__in': statuses
         }
-        return SellOrder.objects.filter(**params).select_for_update()
+        return SellOrder.objects.filter(**params)
 
     @debug_input_and_returned
     def __get_completed_sell_orders(self) -> QuerySet:
@@ -517,7 +517,7 @@ class Signal(BaseSignal):
             # TODO: check these cases
             '_status__in': [OrderStatus.COMPLETED.value, ]
         }
-        return SellOrder.objects.filter(**params).select_for_update()
+        return SellOrder.objects.filter(**params)
 
     @debug_input_and_returned
     def __get_completed_buy_orders(self) -> QuerySet:
@@ -534,7 +534,7 @@ class Signal(BaseSignal):
             # 'local_canceled': False,
             '_status__in': [OrderStatus.COMPLETED.value, ]
         }
-        return BuyOrder.objects.filter(**params).select_for_update()
+        return BuyOrder.objects.filter(**params)
 
     @staticmethod
     def __update_flag_handled_worked_orders(worked_orders: QuerySet):
