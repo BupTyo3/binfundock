@@ -543,7 +543,7 @@ class Signal(BaseSignal):
         qs = SellOrder.objects.filter(**params)
         qs = qs.exclude(sl_order=None) if not sl_orders else qs
         qs = qs.exclude(tp_order=None) if not tp_orders else qs
-        return qs.select_for_update()
+        return qs
 
     @debug_input_and_returned
     def __get_sent_buy_orders(self, statuses: Optional[List] = None) -> QuerySet:
@@ -578,7 +578,7 @@ class Signal(BaseSignal):
             'no_need_push': False,
             '_status__in': statuses
         }
-        return SellOrder.objects.filter(**params).select_for_update()
+        return SellOrder.objects.filter(**params)
 
     @debug_input_and_returned
     def __get_completed_sell_orders(self) -> QuerySet:
@@ -594,7 +594,7 @@ class Signal(BaseSignal):
             # TODO: check these cases
             '_status__in': [OrderStatus.COMPLETED.value, ]
         }
-        return SellOrder.objects.filter(**params).select_for_update()
+        return SellOrder.objects.filter(**params)
 
     @debug_input_and_returned
     def __get_completed_buy_orders(self) -> QuerySet:
@@ -611,29 +611,73 @@ class Signal(BaseSignal):
             # 'local_canceled': False,
             '_status__in': [OrderStatus.COMPLETED.value, ]
         }
-        return BuyOrder.objects.filter(**params).select_for_update()
+        return BuyOrder.objects.filter(**params)
 
     @staticmethod
-    def __update_flag_handled_worked_orders(worked_orders: QuerySet):
+    def __update_flag_handled_worked_buy_orders(worked_orders: QuerySet):
         """
         Set flag handled_worked
         """
         # TODO: move it
+        from apps.order.models import BuyOrder
         logger.debug(f"Updating Worked orders by handled_worked flag")
-        worked_orders.update(handled_worked=True)
+        worked_orders_ids = list(worked_orders.all().values_list('id', flat=True))
+        for order_id in worked_orders_ids:
+            order = BuyOrder.objects.filter(id=order_id).first()
+            order.handled_worked = True
+            order.save()
+
+    @staticmethod
+    def __update_flag_handled_worked_sell_orders(worked_orders: QuerySet):
+        """
+        Set flag handled_worked
+        """
+        # TODO: move it
+        from apps.order.models import SellOrder
+        logger.debug(f"Updating Worked orders by handled_worked flag")
+        worked_orders_ids = list(worked_orders.all().values_list('id', flat=True))
+        for order_id in worked_orders_ids:
+            order = SellOrder.objects.filter(id=order_id).first()
+            order.handled_worked = True
+            order.save()
 
     @staticmethod
     @debug_input_and_returned
-    def __cancel_sent_orders(sent_orders: QuerySet):
+    def __cancel_sent_buy_orders(sent_orders: QuerySet):
         """
         Set flag local_cancelled for orders.
         The orders are ready to cancel
         """
         # TODO: move it
+        from apps.order.models import BuyOrder
         logger.debug(f"Updating Sent orders by local_canceled flag")
-        logger.debug(f"LOCAL CANCEL ORDERS: '{sent_orders.all()}'")
+        logger.debug(f"LOCAL CANCEL ORDERS: '{sent_orders}'")
+        sent_orders_ids = list(sent_orders.all().values_list('id', flat=True))
         now_ = timezone.now()
-        sent_orders.update(local_canceled=True, local_canceled_time=now_)
+        for order_id in sent_orders_ids:
+            order = BuyOrder.objects.filter(id=order_id).first()
+            order.local_canceled = True
+            order.local_canceled_time = now_
+            order.save()
+
+    @staticmethod
+    @debug_input_and_returned
+    def __cancel_sent_sell_orders(sent_orders: QuerySet):
+        """
+        Set flag local_cancelled for orders.
+        The orders are ready to cancel
+        """
+        # TODO: move it
+        from apps.order.models import SellOrder
+        logger.debug(f"Updating Sent orders by local_canceled flag")
+        logger.debug(f"LOCAL CANCEL ORDERS: '{sent_orders}'")
+        sent_orders_ids = list(sent_orders.all().values_list('id', flat=True))
+        now_ = timezone.now()
+        for order_id in sent_orders_ids:
+            order = SellOrder.objects.filter(id=order_id).first()
+            order.local_canceled = True
+            order.local_canceled_time = now_
+            order.save()
 
     @debug_input_and_returned
     @rounded_result
@@ -712,18 +756,19 @@ class Signal(BaseSignal):
         return main_orders
 
     @debug_input_and_returned
+    @transaction.atomic
     def _spoil(self, force: bool = False):
         from apps.order.utils import OrderStatus
         not_completed_buy_orders = self.__get_sent_buy_orders(
             statuses=[OrderStatus.NOT_SENT.value, OrderStatus.SENT.value])
         # Cancel all buy_orders
         if not_completed_buy_orders:
-            self.__cancel_sent_orders(not_completed_buy_orders)
+            self.__cancel_sent_buy_orders(not_completed_buy_orders)
         not_completed_sell_orders = self.__get_sent_sell_orders(
             statuses=[OrderStatus.NOT_SENT.value, OrderStatus.SENT.value])
         if not_completed_sell_orders:
             # Cancel opened sell_orders and form sell_market order
-            self.__cancel_sent_orders(not_completed_sell_orders)
+            self.__cancel_sent_sell_orders(not_completed_sell_orders)
         residual_quantity = self._get_residual_quantity()
         price = self._get_current_price()
         if residual_quantity and\
@@ -805,8 +850,8 @@ class Signal(BaseSignal):
             self.__form_buy_order(coin_quantity, entry_point, index)
         self.save()
 
-    @transaction.atomic
     @debug_input_and_returned
+    @transaction.atomic
     def try_to_spoil(self, force: bool = False):
         """
         Worker spoils the Signal if a current price reaches any of take_profits
@@ -831,8 +876,8 @@ class Signal(BaseSignal):
         else:
             logger.debug(msg + ': No')
 
-    @transaction.atomic
     @debug_input_and_returned
+    @transaction.atomic
     def try_to_close(self) -> bool:
         """
         Worker closes the Signal if it has no opened Buy orders and no opened Sell orders
@@ -897,8 +942,8 @@ class Signal(BaseSignal):
                 self.status = SignalStatus.PUSHED.value
                 self.save()
 
-    @transaction.atomic
     @debug_input_and_returned
+    @transaction.atomic
     def worker_for_bought_orders(self):
         """
         Worker for one signal.
@@ -925,21 +970,21 @@ class Signal(BaseSignal):
         if sent_sell_orders:
             new_bought_quantity = self.__calculate_new_bought_quantity(sent_sell_orders, bought_quantity)
             copied_sent_sell_orders_ids = list(sent_sell_orders.all().values_list('id', flat=True))
-            self.__cancel_sent_orders(sent_sell_orders)
+            self.__cancel_sent_sell_orders(sent_sell_orders)
             self._formation_copied_sell_orders(original_orders_ids=copied_sent_sell_orders_ids,
                                                worked_sell_orders=worked_orders,
                                                sell_quantity=new_bought_quantity)
         # Form sell orders if the signal doesn't have any
         elif not self.sell_orders.exists():
             self._formation_first_sell_orders(sell_quantity=bought_quantity)
-        self.__update_flag_handled_worked_orders(worked_orders)
+        self.__update_flag_handled_worked_buy_orders(worked_orders)
         # Change status
         if self.status not in [SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]:
             self.status = SignalStatus.BOUGHT.value
             self.save()
 
-    @transaction.atomic
     @debug_input_and_returned
+    @transaction.atomic
     def worker_for_sold_orders(self):
         """
         Worker for one signal.
@@ -961,20 +1006,20 @@ class Signal(BaseSignal):
         opened_buy_orders = self.__get_sent_buy_orders()
         # Cancel all buy_orders
         if opened_buy_orders:
-            self.__cancel_sent_orders(opened_buy_orders)
+            self.__cancel_sent_buy_orders(opened_buy_orders)
         # Recreating opened sent sell orders with new stop_loss
         sent_sell_orders = self.__get_sent_sell_orders()
         sent_sell_orders = self.__exclude_sl_or_tp_orders(sent_sell_orders, worked_tp_orders)
         if sent_sell_orders:
             copied_sent_sell_orders_ids = list(sent_sell_orders.all().values_list('id', flat=True))
-            self.__cancel_sent_orders(sent_sell_orders)
+            self.__cancel_sent_sell_orders(sent_sell_orders)
             self._formation_copied_sell_orders(original_orders_ids=copied_sent_sell_orders_ids,
                                                worked_sell_orders=worked_tp_orders)
         # Change status
         if self.status not in [SignalStatus.SOLD.value, ]:
             self.status = SignalStatus.SOLD.value
             self.save()
-        self.__update_flag_handled_worked_orders(worked_tp_orders)
+        self.__update_flag_handled_worked_sell_orders(worked_tp_orders)
         # TODO: Add logic of calculate profit or loss
         pass
 
@@ -999,6 +1044,7 @@ class Signal(BaseSignal):
         _statuses = [SignalStatus.FORMED.value,
                      SignalStatus.PUSHED.value,
                      SignalStatus.BOUGHT.value,
+                     SignalStatus.CANCELING.value,
                      SignalStatus.SOLD.value, ]
         params = {'_status__in': _statuses}
         if outer_signal_id:
@@ -1017,6 +1063,7 @@ class Signal(BaseSignal):
         """
         _statuses = [SignalStatus.PUSHED.value,
                      SignalStatus.BOUGHT.value,
+                     SignalStatus.CANCELING.value,
                      SignalStatus.SOLD.value, ]
         params = {'_status__in': _statuses}
         if outer_signal_id:
@@ -1033,6 +1080,7 @@ class Signal(BaseSignal):
         from apps.order.utils import OrderStatus
         _statuses = [SignalStatus.PUSHED.value,
                      SignalStatus.BOUGHT.value,
+                     SignalStatus.CANCELING.value,
                      SignalStatus.SOLD.value, ]
         if self._status not in _statuses:
             return
