@@ -25,7 +25,6 @@ class BuyOrder(BaseBuyOrder):
     market = models.ForeignKey(to=Market,
                                related_name='buy_orders',
                                on_delete=models.DO_NOTHING)
-    # TODO: remove this field and _bought_quantity and setters, getters and others using
     bought_quantity = models.FloatField(default=0)
     index = models.PositiveIntegerField()
     signal = models.ForeignKey(to=Signal,
@@ -126,7 +125,7 @@ class SellOrder(BaseSellOrder):
     @classmethod
     def _form_sell_stop_loss_order(cls, tp_order: 'SellOrder'):
         """Form Stop Loss order by Take Profit order"""
-        calculated_real_stop_loss = tp_order.signal.get_real_stop_price(tp_order.stop_loss, tp_order.market)
+        calculated_real_stop_loss = tp_order.signal.get_real_stop_price(tp_order.stop_loss)
         custom_sl_order_id = cls.form_sl_order_id(tp_order)
         order = SellOrder.objects.create(
             market=tp_order.market,

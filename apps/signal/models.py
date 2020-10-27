@@ -1,6 +1,6 @@
 import logging
 
-from typing import Optional, List, TYPE_CHECKING, Union
+from typing import Optional, List, TYPE_CHECKING
 
 from django.db import models, transaction
 from django.db.models import QuerySet, Sum, F
@@ -12,10 +12,12 @@ from utils.framework.models import (
 from .base_model import (
     BaseSignal, BaseHistorySignal,
     BaseEntryPoint, BaseTakeProfit,
+    BaseSignalOrig, BasePointOrig,
 )
-from .utils import SignalStatus, SignalPosition
+from .utils import SignalStatus, SignalPosition, calculate_position
 from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket
+from apps.market.models import Market
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
 from tools.tools import (
@@ -31,10 +33,109 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class SignalOrig(BaseSignalOrig):
+    _default_leverage = 1
+    conf = conf_obj
+
+    techannel = models.ForeignKey(to=Techannel,
+                                  related_name='signals_orig',
+                                  on_delete=models.DO_NOTHING)
+    symbol = models.CharField(max_length=24)
+    outer_signal_id = models.PositiveIntegerField()
+    main_coin = models.CharField(max_length=16)
+    stop_loss = models.FloatField()
+    position = models.CharField(max_length=32,
+                                choices=SignalPosition.choices(),
+                                default=SignalPosition.LONG.value, )
+    leverage = models.PositiveIntegerField(default=_default_leverage)
+    message_date = models.DateTimeField(default=timezone.now, blank=True)
+
+    techannel: Techannel
+    entry_points: 'EntryPoint.objects'
+    take_profits: 'TakeProfit.objects'
+
+    objects = models.Manager()
+
+    def __str__(self):
+        return f"SignalOrig:{self.pk}:{self.symbol}:{self.techannel.abbr}:{self.outer_signal_id}"
+
+    class Meta:
+        unique_together = ['techannel', 'outer_signal_id', ]
+
+    def save(self, *args, **kwargs):
+        self.main_coin = self._get_main_coin(self.symbol)
+        super().save(*args, **kwargs)
+
+    @classmethod
+    @transaction.atomic
+    def create_signal(cls, symbol: str, techannel_name: str,
+                      stop_loss: float, outer_signal_id: int,
+                      entry_points: List[float], take_profits: List[float],
+                      leverage: Optional[int] = None,
+                      message_date=timezone.now()):
+        """
+        Create signal
+        """
+        techannel, created = Techannel.objects.get_or_create(name=techannel_name)
+        if created:
+            logger.debug(f"Telegram channel '{techannel}' was created")
+        sm_obj = Signal.objects.filter(outer_signal_id=outer_signal_id, techannel=techannel).first()
+        if sm_obj:
+            logger.warning(f"SignalOrig '{outer_signal_id}':'{techannel_name}' already exists")
+            return
+        position = calculate_position(stop_loss, entry_points, take_profits)
+        sm_obj = cls.objects.create(
+            techannel=techannel,
+            symbol=symbol,
+            stop_loss=stop_loss,
+            outer_signal_id=outer_signal_id,
+            position=position,
+            leverage=leverage if leverage else cls._default_leverage,
+            message_date=message_date)
+        for entry_point in entry_points:
+            EntryPointOrig.objects.create(signal=sm_obj, value=entry_point)
+        for take_profit in take_profits:
+            TakeProfitOrig.objects.create(signal=sm_obj, value=take_profit)
+        logger.debug(f"SignalOrig '{sm_obj}' has been created successfully")
+        return sm_obj
+
+    @transaction.atomic
+    def create_market_signal(self, market: Optional[BaseMarket] = None):
+        signal = Signal.objects.create(
+            techannel=self.techannel,
+            symbol=self.symbol,
+            stop_loss=self.stop_loss,
+            outer_signal_id=self.outer_signal_id,
+            position=self.position,
+            leverage=self.leverage,
+            message_date=self.message_date,
+            market=market,
+        )
+        for entry_point in self.entry_points.all():
+            EntryPoint.objects.create(signal=signal, value=entry_point.value)
+        for take_profit in self.take_profits.all():
+            TakeProfit.objects.create(signal=signal, value=take_profit.value)
+
+    def _get_main_coin(self, symbol) -> str:
+        """
+        Example:
+        symbol = LTCBTC
+        if BTC in [conf.all_accessible_main_coins]:
+        main_coin = BTC
+        """
+        for main_coin in self.conf.all_accessible_main_coins:
+            if symbol[-len(main_coin):] == main_coin:
+                return main_coin
+        raise Exception("Provided main coin is not serviced")
+
+
 class Signal(BaseSignal):
     _default_leverage = 1
     conf = conf_obj
 
+    market = models.ForeignKey(to=Market,
+                               related_name='signals',
+                               on_delete=models.DO_NOTHING)
     techannel = models.ForeignKey(to=Techannel,
                                   related_name='signals',
                                   on_delete=models.DO_NOTHING)
@@ -64,12 +165,14 @@ class Signal(BaseSignal):
     buy_orders: 'BuyOrder.objects'
     sell_orders: 'SellOrder.objects'
     techannel: Techannel
+    market: Market
+    symbol: str
 
     def __str__(self):
         return f"Signal:{self.pk}:{self.symbol}:{self.techannel.abbr}:{self.outer_signal_id}"
 
     class Meta:
-        unique_together = ['techannel', 'outer_signal_id', ]
+        unique_together = ['techannel', 'outer_signal_id', 'market']
 
     def save(self, *args, **kwargs):
         self.main_coin = self._get_main_coin(self.symbol)
@@ -94,8 +197,8 @@ class Signal(BaseSignal):
         if sm_obj:
             logger.warning(f"Signal '{outer_signal_id}':'{techannel_name}' already exists")
             return
-        position = cls._calculate_position(stop_loss, entry_points, take_profits)
-        sm_obj = Signal.objects.create(
+        position = calculate_position(stop_loss, entry_points, take_profits)
+        sm_obj = cls.objects.create(
             techannel=techannel,
             symbol=symbol,
             stop_loss=stop_loss,
@@ -110,9 +213,6 @@ class Signal(BaseSignal):
         logger.debug(f"Signal '{sm_obj}' has been created successfully")
         return sm_obj
 
-    def get_market(self):
-        return self.buy_orders.last().market
-
     @rounded_result
     def __get_calculated_amount(self):
         completed_buy_orders = self.__get_completed_buy_orders()
@@ -125,7 +225,7 @@ class Signal(BaseSignal):
         bought_amount = self.__get_bought_amount(completed_buy_orders)
         completed_sell_orders = self.__get_completed_sell_orders()
         sold_amount = self.__get_sold_amount(completed_sell_orders)
-        sold_amount_subtracted_fee = subtract_fee(sold_amount, self.get_market().market_fee)
+        sold_amount_subtracted_fee = subtract_fee(sold_amount, self._get_market_fee())
         res = sold_amount_subtracted_fee - bought_amount
         logger.debug(f"Income calculating for Signal '{self}': COMPLETED_BUY_ORDERS: {completed_buy_orders}; "
                      f"COMPLETED_SELL_ORDERS: {completed_sell_orders}; "
@@ -141,34 +241,6 @@ class Signal(BaseSignal):
     def _update_amount(self):
         self.amount = self.__get_calculated_amount()
         self.save()
-
-    @classmethod
-    def _calculate_position(cls,
-                            stop_loss: Union[float, str],
-                            entry_points: List[Union[float, str]],
-                            take_profits: List[Union[float, str]]):
-        """
-        Calculate position: LONG or SHORT
-        """
-        entry_points = [float(i) for i in entry_points]
-        take_profits = [float(i) for i in take_profits]
-        stop_loss = float(stop_loss)
-
-        max_entry = max(entry_points)
-        min_entry = min(entry_points)
-        min_take = min(take_profits)
-        max_take = max(take_profits)
-
-        if max_entry < min_take and stop_loss < min_entry:
-            position = SignalPosition.LONG.value
-            logger.debug(f"{position}")
-        elif min_entry > max_take and stop_loss > max_entry:
-            position = SignalPosition.SHORT.value
-            logger.debug(f"{position}")
-        else:
-            logger.error("Wrong info in the signal!")
-            return 'error'
-        return position
 
     def _get_main_coin(self, symbol) -> str:
         """
@@ -188,14 +260,27 @@ class Signal(BaseSignal):
     def __get_sell_distribution(self):
         return self.take_profits.count()
 
+    def _get_current_balance_of_main_coin(self):
+        return self.market.get_current_balance(self.main_coin)
+
+    def _get_current_price(self):
+        return self.market.get_current_price(self.symbol)
+
+    def _get_market_fee(self):
+        return self.market.market_fee
+
+    def _get_pair(self):
+        from apps.pair.models import Pair
+        return Pair.objects.filter(symbol=self.symbol, market=self.market.pk).first()
+
     @debug_input_and_returned
     @rounded_result
-    def __get_turnover_by_coin_pair(self, market: BaseMarket) -> float:
+    def __get_turnover_by_coin_pair(self) -> float:
         """Turnover for one Signal.
         How much money we allocate for one Signal
         If free_balance 1000 usd, 10% - config parameter, so
          result will be 100 usd"""
-        res = (market.get_current_balance(self.main_coin) *
+        res = (self._get_current_balance_of_main_coin() *
                get_or_create_crontask().balance_to_signal_perc /
                self.conf.one_hundred_percent)
         return res
@@ -213,30 +298,26 @@ class Signal(BaseSignal):
         """
         return (value // step) * step
 
-    def _get_pair(self, market: BaseMarket):
-        from apps.pair.models import Pair
-        return Pair.objects.filter(symbol=self.symbol, market=market.pk).first()
-
     @rounded_result
-    def _get_distributed_toc_quantity(self, market: BaseMarket, entry_point_price) -> float:
+    def _get_distributed_toc_quantity(self, entry_point_price) -> float:
         """
         Calculate quantity for one coin
         Fraction by step
         """
         from tools.tools import convert_to_coin_quantity
-        pair = self._get_pair(market)
+        pair = self._get_pair()
         step_quantity = pair.step_quantity
-        quantity = self.__get_turnover_by_coin_pair(market) / self.__get_buy_distribution()
+        quantity = self.__get_turnover_by_coin_pair() / self.__get_buy_distribution()
         coin_quantity = convert_to_coin_quantity(quantity, entry_point_price)
         return self.__find_not_fractional_by_step(coin_quantity, step_quantity)
 
     @rounded_result
-    def _get_distributed_sell_quantity(self, market: BaseMarket, all_quantity: float) -> float:
+    def _get_distributed_sell_quantity(self, all_quantity: float) -> float:
         """
         Get distributed sell quantity.
         Fraction by step
         """
-        pair = self._get_pair(market)
+        pair = self._get_pair()
         # TODO: Check, may be should change to step_quantity = pair.step_price
         step_quantity = pair.step_quantity
         quantity = all_quantity / self.__get_sell_distribution()
@@ -244,7 +325,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @rounded_result
-    def _get_residual_quantity(self, market: BaseMarket) -> float:
+    def _get_residual_quantity(self) -> float:
         """
         Get residual quantity.
         return: (bought_quantity - sold_quantity)
@@ -257,17 +338,17 @@ class Signal(BaseSignal):
         completed_sell_orders = self.__get_completed_sell_orders()
         sold_quantity = self.__get_sold_quantity(completed_sell_orders)
         residual_quantity = bought_quantity - sold_quantity if sold_quantity else bought_quantity
-        pair = self._get_pair(market)
+        pair = self._get_pair()
         step_quantity = pair.step_quantity
         return self.__find_not_fractional_by_step(residual_quantity, step_quantity)
 
     @debug_input_and_returned
-    def __form_buy_order(self, market: BaseMarket, distributed_toc: float,
+    def __form_buy_order(self, distributed_toc: float,
                          entry_point: 'EntryPoint', index: int):
         from apps.order.models import BuyOrder
         from apps.order.utils import OrderType
         order = BuyOrder.objects.create(
-            market=market,
+            market=self.market,
             symbol=self.symbol,
             quantity=distributed_toc,
             price=entry_point.value,
@@ -277,7 +358,7 @@ class Signal(BaseSignal):
         return order
 
     @debug_input_and_returned
-    def __form_oco_sell_order(self, market: BaseMarket, distributed_quantity: float,
+    def __form_oco_sell_order(self, distributed_quantity: float,
                               take_profit: float, index: int, stop_loss: Optional[float] = None,
                               custom_order_id: Optional[str] = None) -> 'SellOrder':
         """
@@ -289,7 +370,7 @@ class Signal(BaseSignal):
             msg += f" with UPDATED STOP_LOSS: '{stop_loss}'"
         logger.debug(msg)
         order = SellOrder.form_sell_oco_order(
-            market=market,
+            market=self.market,
             signal=self,
             quantity=distributed_quantity,
             take_profit=take_profit,
@@ -300,15 +381,14 @@ class Signal(BaseSignal):
         return order
 
     @debug_input_and_returned
-    def __form_sell_market_order(self, market: BaseMarket,
-                                 quantity: float, price: float) -> 'SellOrder':
+    def __form_sell_market_order(self, quantity: float, price: float) -> 'SellOrder':
         """
         Form sell market order for the signal
         """
         from apps.order.models import SellOrder
         logger.debug(f"Form MARKET SELL ORDER for signal {self}")
         order = SellOrder.form_sell_market_order(
-            market=market,
+            market=self.market,
             signal=self,
             quantity=quantity,
             price=price,
@@ -317,22 +397,22 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @rounded_result
-    def __get_amount_quantity(self, market: BaseMarket) -> float:
-        toc_quantity = self.__get_turnover_by_coin_pair(market)
+    def __get_amount_quantity(self) -> float:
+        toc_quantity = self.__get_turnover_by_coin_pair()
         return toc_quantity / (self.__get_buy_distribution() * self.__get_sell_distribution())
 
     @debug_input_and_returned
-    def _check_if_balance_enough_for_signal(self, market: BaseMarket) -> bool:
+    def _check_if_balance_enough_for_signal(self) -> bool:
         """
         Check if balance enough for Signal.
         Enough for create buy orders and then (after one buy order has worked) - sell orders
         """
         # TODO check
         from tools.tools import convert_to_coin_quantity
-        pair = self._get_pair(market)
+        pair = self._get_pair()
         # get amount and subtract fee for buy orders
-        amount_quantity = subtract_fee(self.__get_amount_quantity(market),
-                                       market.market_fee * self.__get_buy_distribution())
+        amount_quantity = subtract_fee(self.__get_amount_quantity(),
+                                       self._get_market_fee() * self.__get_buy_distribution())
         logger.debug(f"'{self}':amount_quantity_subtracted_fee={amount_quantity}")
         if amount_quantity < pair.min_amount:
             logger.debug(f"Bad Check: amount_quantity < min_amount: {amount_quantity} < {pair.min_amount}!")
@@ -346,15 +426,13 @@ class Signal(BaseSignal):
         return False
 
     @debug_input_and_returned
-    def _check_if_quantity_enough_for_sell(self, market: BaseMarket,
-                                           quantity: float,
-                                           price: float) -> bool:
+    def _check_if_quantity_enough_for_sell(self, quantity: float, price: float) -> bool:
         """
         Check if quantity enough for Sell.
         """
         # TODO check
         from tools.tools import convert_to_amount
-        pair = self._get_pair(market)
+        pair = self._get_pair()
         amount_quantity = convert_to_amount(quantity, price)
         logger.debug(f"'{self}':amount_quantity={amount_quantity}")
         if amount_quantity < pair.min_amount:
@@ -366,14 +444,14 @@ class Signal(BaseSignal):
         logger.debug(f"Bad Check: coin_quantity < min_quantity: {quantity} < {pair.min_quantity}!")
         return False
 
-    def _formation_first_sell_orders(self, market: BaseMarket, sell_quantity: float) -> None:
+    def _formation_first_sell_orders(self, sell_quantity: float) -> None:
         """
         Function for creating Sell orders
         """
-        distributed_quantity = self._get_distributed_sell_quantity(market, sell_quantity)
+        distributed_quantity = self._get_distributed_sell_quantity(sell_quantity)
         for index, take_profit in enumerate(self.take_profits.all()):
             self.__form_oco_sell_order(
-                market=market, distributed_quantity=distributed_quantity,
+                distributed_quantity=distributed_quantity,
                 take_profit=take_profit.value, index=index)
 
     @rounded_result
@@ -390,7 +468,7 @@ class Signal(BaseSignal):
             # get price of previous order as a new stop_loss
             previous_order = self.sell_orders.filter(index=(last_worked_sell_order.index - 1)).last()
             res = previous_order.price
-        pair = self._get_pair(self.get_market())
+        pair = self._get_pair()
         return self.__find_not_fractional_by_step(res, pair.step_price)
 
     @debug_input_and_returned
@@ -407,7 +485,6 @@ class Signal(BaseSignal):
         new_custom_order_id = get_increased_leading_number(order.custom_order_id)
         logger.debug(f"New copied SELL order custom_order_id = '{new_custom_order_id}'")
         new_sell_order = self.__form_oco_sell_order(
-            market=order.market,
             distributed_quantity=sell_quantity if sell_quantity is not None else order.quantity,
             custom_order_id=new_custom_order_id,
             take_profit=order.price,
@@ -567,8 +644,8 @@ class Signal(BaseSignal):
         # TODO: move it
         res = worked_orders.aggregate(Sum('bought_quantity'))
         bought_quantity = res['bought_quantity__sum'] or 0
-        res = subtract_fee(bought_quantity, self.get_market().market_fee)
-        pair = self._get_pair(self.get_market())
+        res = subtract_fee(bought_quantity, self._get_market_fee())
+        pair = self._get_pair()
         return self.__find_not_fractional_by_step(res, pair.step_quantity)
 
     @debug_input_and_returned
@@ -617,7 +694,7 @@ class Signal(BaseSignal):
          """
         all_quantity = self.__get_planned_sold_quantity(sent_sell_orders) + addition_quantity
         res = all_quantity / sent_sell_orders.count()
-        pair = self._get_pair(self.get_market())
+        pair = self._get_pair()
         return self.__find_not_fractional_by_step(res, pair.step_quantity)
 
     @staticmethod
@@ -637,7 +714,6 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def _spoil(self, force: bool = False):
         from apps.order.utils import OrderStatus
-        market = self.get_market()
         not_completed_buy_orders = self.__get_sent_buy_orders(
             statuses=[OrderStatus.NOT_SENT.value, OrderStatus.SENT.value])
         # Cancel all buy_orders
@@ -648,10 +724,11 @@ class Signal(BaseSignal):
         if not_completed_sell_orders:
             # Cancel opened sell_orders and form sell_market order
             self.__cancel_sent_orders(not_completed_sell_orders)
-        residual_quantity = self._get_residual_quantity(market)
-        price = market.get_current_price(self.symbol)
-        if residual_quantity and self._check_if_quantity_enough_for_sell(market, residual_quantity, price):
-            self.__form_sell_market_order(quantity=residual_quantity, market=market, price=price)
+        residual_quantity = self._get_residual_quantity()
+        price = self._get_current_price()
+        if residual_quantity and\
+                self._check_if_quantity_enough_for_sell(quantity=residual_quantity, price=price):
+            self.__form_sell_market_order(quantity=residual_quantity, price=price)
         else:
             logger.debug(f"No RESIDUAL QUANTITY for Signal '{self}'")
         if force:
@@ -692,12 +769,12 @@ class Signal(BaseSignal):
         self.save()
 
     @rounded_result
-    def get_real_stop_price(self, price: float, market: BaseMarket) -> float:
+    def get_real_stop_price(self, price: float) -> float:
         """
         Calculate stop price with slip_delta_stop_loss_percentage parameter.
         Fraction by step
         """
-        pair = self._get_pair(market)
+        pair = self._get_pair()
         if get_or_create_crontask().slip_delta_sl_perc:
             real_stop_price = price - (
                     price * get_or_create_crontask().slip_delta_sl_perc /
@@ -707,7 +784,7 @@ class Signal(BaseSignal):
         return self.__find_not_fractional_by_step(real_stop_price, pair.step_price)
 
     @transaction.atomic
-    def formation_buy_orders(self, market: BaseMarket) -> None:
+    def formation_buy_orders(self) -> None:
         """
         Function for forming Buy orders for NEW signal
         """
@@ -718,14 +795,14 @@ class Signal(BaseSignal):
         if self.position != SignalPosition.LONG.value:
             logger.warning(f"Position is not LONG: '{self}'")
             return
-        if not self._check_if_balance_enough_for_signal(market):
+        if not self._check_if_balance_enough_for_signal():
             # TODO: Add sent message to yourself telegram
             logger.debug(f"Not enough money for Signal '{self}'")
             return
         self.status = SignalStatus.FORMED.value
         for index, entry_point in enumerate(self.entry_points.all()):
-            coin_quantity = self._get_distributed_toc_quantity(market, entry_point.value)
-            self.__form_buy_order(market, coin_quantity, entry_point, index)
+            coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
+            self.__form_buy_order(coin_quantity, entry_point, index)
         self.save()
 
     @transaction.atomic
@@ -744,7 +821,7 @@ class Signal(BaseSignal):
         ]
         if self._status not in _statuses:
             return
-        current_price = self.get_market().get_current_price(self.symbol)
+        current_price = self._get_current_price()
         min_profit_price = TakeProfit.get_min_value(self)
         msg = f"Check try_to_spoil '{self}':" \
               f" if: current_price >= min_profit_price: {current_price} >= {min_profit_price}?"
@@ -854,7 +931,7 @@ class Signal(BaseSignal):
                                                sell_quantity=new_bought_quantity)
         # Form sell orders if the signal doesn't have any
         elif not self.sell_orders.exists():
-            self._formation_first_sell_orders(self.get_market(), bought_quantity)
+            self._formation_first_sell_orders(sell_quantity=bought_quantity)
         self.__update_flag_handled_worked_orders(worked_orders)
         # Change status
         if self.status not in [SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]:
@@ -902,7 +979,7 @@ class Signal(BaseSignal):
         pass
 
     @classmethod
-    def handle_new_signals(cls, market: BaseMarket,
+    def handle_new_signals(cls,
                            outer_signal_id: Optional[int] = None,
                            techannel_abbr: Optional[str] = None):
         """Handle all NEW signals: Step 2"""
@@ -912,7 +989,7 @@ class Signal(BaseSignal):
                            'techannel__abbr': techannel_abbr})
         new_signals = Signal.objects.filter(**params)
         for signal in new_signals:
-            signal.formation_buy_orders(market)
+            signal.formation_buy_orders()
 
     @classmethod
     def push_signals(cls,
@@ -1038,6 +1115,23 @@ class Signal(BaseSignal):
             signal.try_to_close()
 
 
+class EntryPointOrig(BasePointOrig):
+    signal = models.ForeignKey(to=SignalOrig,
+                               related_name='entry_points',
+                               on_delete=models.CASCADE)
+    value = models.FloatField()
+
+    objects = models.Manager()
+
+    signal: 'SignalOrig.objects'
+
+    class Meta:
+        unique_together = ['signal', 'value']
+
+    def __str__(self):
+        return f"{self.signal.symbol}:{self.value}"
+
+
 class EntryPoint(BaseEntryPoint):
     signal = models.ForeignKey(to=Signal,
                                related_name='entry_points',
@@ -1047,6 +1141,23 @@ class EntryPoint(BaseEntryPoint):
     objects = models.Manager()
 
     signal: 'Signal.objects'
+
+    class Meta:
+        unique_together = ['signal', 'value']
+
+    def __str__(self):
+        return f"{self.signal.symbol}:{self.value}"
+
+
+class TakeProfitOrig(BasePointOrig):
+    signal = models.ForeignKey(to=SignalOrig,
+                               related_name='take_profits',
+                               on_delete=models.CASCADE)
+    value = models.FloatField()
+
+    objects = models.Manager()
+
+    signal: 'SignalOrig.objects'
 
     class Meta:
         unique_together = ['signal', 'value']
@@ -1089,13 +1200,12 @@ class HistorySignal(BaseHistorySignal):
     @classmethod
     def write_in_history(cls,
                          signal: Signal,
-                         status: str,
-                         current_price: Optional[float] = None):
-        last_buy_order = signal.buy_orders.last() if not current_price else None
-        if last_buy_order:
-            try:
-                current_price = last_buy_order.market.get_current_price(signal.symbol)
-            except Exception:
-                logger.warning(f"Current price for HistorySignal failed to get. Signal '{signal}'")
+                         status: str):
+        current_price = None
+        try:
+            current_price = signal.market.get_current_price(signal.symbol)
+        except Exception as ex:
+            logger.warning(f"Current price for HistorySignal failed to get. Signal '{signal}'"
+                           f": Exception:'{ex}'")
         cls.objects.create(main_signal=signal, status=status, current_price=current_price)
         logger.debug(f"Add HistorySignal Record for Signal '{signal}' status = '{status}'")

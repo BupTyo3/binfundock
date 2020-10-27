@@ -261,6 +261,7 @@ class Config:
         logic = config['Logic']
         signal = config['Signal']
         self.accessible_main_coins: List[str] = signal['accessible_main_coins'].split(',')
+        self.all_accessible_main_coins: List[str] = signal['all_accessible_main_coins'].split(',')
         telegram = config['Telegram']
         self.api_id = telegram.get('api_id', None)
         self.api_hash = telegram.get('api_hash', None)

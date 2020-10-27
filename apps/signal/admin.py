@@ -7,7 +7,15 @@ from django.db.models import F, Case, When, ExpressionWrapper, CharField
 from apps.market.utils import get_or_create_market
 from utils.admin import InputFilter
 
-from .models import Signal, EntryPoint, TakeProfit, HistorySignal
+from .models import (
+    Signal,
+    EntryPoint,
+    TakeProfit,
+    HistorySignal,
+    SignalOrig,
+    EntryPointOrig,
+    TakeProfitOrig,
+)
 
 
 class OuterIDFilter(InputFilter):
@@ -53,6 +61,7 @@ def float_to_decimal(f):
 class SignalAdmin(admin.ModelAdmin):
     list_display = ['id',
                     'symbol',
+                    'market',
                     'position',
                     'leverage',
                     'entry_points',
@@ -145,7 +154,7 @@ class SignalAdmin(admin.ModelAdmin):
 
     @notifications_handling('')
     def _form_one(self, request, signal):
-        signal.formation_buy_orders(get_or_create_market())
+        signal.formation_buy_orders()
 
     @notifications_handling('')
     def _push_order_one(self, request, signal):
@@ -275,3 +284,103 @@ class HistorySignalAdmin(admin.ModelAdmin):
         'status',
         MainSignalIDFilter,
     ]
+
+
+@admin.register(EntryPointOrig)
+class EntryPointOrigAdmin(admin.ModelAdmin):
+    list_display = ['id',
+                    'signal',
+                    'value',
+                    ]
+    select_related_fields = ['signal', 'signal__techannel', ]
+    search_fields = ['id', 'signal__outer_signal_id', 'signal__symbol', 'signal__techannel__abbr', ]
+    list_filter = [
+        SignalIDFilter,
+        PointOuterIDFilter,
+        PointTechannelFilter,
+    ]
+
+
+@admin.register(TakeProfitOrig)
+class TakeProfitOrigAdmin(admin.ModelAdmin):
+    list_display = ['id',
+                    'signal',
+                    'value',
+                    ]
+    select_related_fields = ['signal', 'signal__techannel', ]
+    search_fields = ['id', 'signal__outer_signal_id', 'signal__symbol', 'signal__techannel__abbr', ]
+    list_filter = [
+        SignalIDFilter,
+        PointOuterIDFilter,
+        PointTechannelFilter,
+    ]
+
+
+
+
+
+
+@admin.register(SignalOrig)
+class SignalOrigAdmin(admin.ModelAdmin):
+    list_display = ['id',
+                    'symbol',
+                    'position',
+                    'leverage',
+                    'entry_points',
+                    'take_profits',
+                    'stop_loss',
+                    'techannel',
+                    'outer_signal_id',
+                    'message_date',
+                    'created',
+                    ]
+    select_related_fields = ['techannel', 'entry_points', 'take_profits', ]
+    search_fields = ['id', 'outer_signal_id', 'symbol', 'techannel__abbr', ]
+    list_filter = [
+        OuterIDFilter,
+        TechannelFilter,
+    ]
+    actions = [
+        'bim_spot_create',
+        # 'bim_futures_create',
+    ]
+
+    def notifications_handling(value):
+        def decorate(f):
+            def applicator(self, request, signal):
+                try:
+                    f(self, request, signal)
+                except ValueError as ex:
+                    messages.error(request, f"{ex} T_ID={signal.id}: {signal.outer_signal_id}")
+                else:
+                    msg = f"Successful action for T_ID={signal.id}: {signal.outer_signal_id}"
+                    messages.success(request, msg)
+            return applicator
+        return decorate
+
+    @staticmethod
+    def take_profits(signal):
+        return ' - '.join([str(i.value) for i in signal.take_profits.all()])
+
+    @staticmethod
+    def entry_points(signal):
+        return ' - '.join([str(i.value) for i in signal.entry_points.all()])
+
+    def bim_spot_create(self, request, queryset):
+        for signal in queryset:
+            self._bim_spot_create_one(request, signal)
+
+    def bim_futures_create(self, request, queryset):
+        for signal in queryset:
+            self._bim_futures_create_one(request, signal)
+
+    @notifications_handling('')
+    def _bim_spot_create_one(self, request, signal):
+        market = get_or_create_market()
+        signal.create_market_signal(market=market)
+
+    @notifications_handling('')
+    def _bim_futures_create_one(self, request, signal):
+        # TODO: change after creating Future Bimarket
+        market = None
+        signal.create_market_signal(market=market)
