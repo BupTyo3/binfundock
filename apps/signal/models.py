@@ -185,39 +185,6 @@ class Signal(BaseSignal):
         logger.debug(self)
         HistorySignal.write_in_history(self, self.status)
 
-    @classmethod
-    @transaction.atomic
-    def create_signal(cls, symbol: str, techannel_name: str,
-                      stop_loss: float, outer_signal_id: int,
-                      entry_points: List[float], take_profits: List[float],
-                      leverage: Optional[int] = None,
-                      message_date=timezone.now()):
-        """
-        Create signal
-        """
-        techannel, created = Techannel.objects.get_or_create(name=techannel_name)
-        if created:
-            logger.debug(f"Telegram channel '{techannel}' was created")
-        sm_obj = Signal.objects.filter(outer_signal_id=outer_signal_id, techannel=techannel).first()
-        if sm_obj:
-            logger.warning(f"Signal '{outer_signal_id}':'{techannel_name}' already exists")
-            return
-        position = calculate_position(stop_loss, entry_points, take_profits)
-        sm_obj = cls.objects.create(
-            techannel=techannel,
-            symbol=symbol,
-            stop_loss=stop_loss,
-            outer_signal_id=outer_signal_id,
-            position=position,
-            leverage=leverage if leverage else cls._default_leverage,
-            message_date=message_date)
-        for entry_point in entry_points:
-            EntryPoint.objects.create(signal=sm_obj, value=entry_point)
-        for take_profit in take_profits:
-            TakeProfit.objects.create(signal=sm_obj, value=take_profit)
-        logger.debug(f"Signal '{sm_obj}' has been created successfully")
-        return sm_obj
-
     @rounded_result
     def __get_calculated_amount(self):
         completed_buy_orders = self.__get_completed_buy_orders()
@@ -761,7 +728,7 @@ class Signal(BaseSignal):
         return main_orders
 
     @debug_input_and_returned
-    @transaction.atomic
+    # @transaction.atomic
     def _spoil(self, force: bool = False):
         from apps.order.utils import OrderStatus
         not_completed_buy_orders = self.__get_sent_buy_orders(
@@ -872,7 +839,7 @@ class Signal(BaseSignal):
             real_stop_price = price
         return self.__find_not_fractional_by_step(real_stop_price, pair.step_price)
 
-    @transaction.atomic
+    # @transaction.atomic
     def formation_buy_orders(self) -> None:
         """
         Function for forming Buy orders for NEW signal
@@ -887,7 +854,7 @@ class Signal(BaseSignal):
             return self._formation_spot_orders()
 
     @debug_input_and_returned
-    @transaction.atomic
+    # @transaction.atomic
     def try_to_spoil(self, force: bool = False):
         """
         Worker spoils the Signal if a current price reaches any of take_profits
@@ -913,7 +880,7 @@ class Signal(BaseSignal):
             logger.debug(msg + ': No')
 
     @debug_input_and_returned
-    @transaction.atomic
+    # @transaction.atomic
     def try_to_close(self) -> bool:
         """
         Worker closes the Signal if it has no opened Buy orders and no opened Sell orders
@@ -979,7 +946,7 @@ class Signal(BaseSignal):
                 self.save()
 
     @debug_input_and_returned
-    @transaction.atomic
+    # @transaction.atomic
     def worker_for_bought_orders(self):
         """
         Worker for one signal.
@@ -1020,7 +987,7 @@ class Signal(BaseSignal):
             self.save()
 
     @debug_input_and_returned
-    @transaction.atomic
+    # @transaction.atomic
     def worker_for_sold_orders(self):
         """
         Worker for one signal.

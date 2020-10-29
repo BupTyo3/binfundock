@@ -73,7 +73,7 @@ class BuyOrder(BaseBuyOrder):
         status, bought_quantity = data.get('status'), data.get('executed_quantity')
         self.update_order_api_history(status, bought_quantity)
 
-    @transaction.atomic
+    # @transaction.atomic
     def update_order_api_history(self, status, executed_quantity):
         """
         Create HistoryApiBuyOrder entity if not exists or we got new data (status or executed_quantity).
@@ -237,7 +237,7 @@ class SellOrder(BaseSellOrder):
         status, sold_quantity, price = data.get('status'), data.get('executed_quantity'), data.get('price')
         self.update_order_api_history(status, sold_quantity, price)
 
-    @transaction.atomic
+    # @transaction.atomic
     def update_order_api_history(self, status: str, executed_quantity: float, price: Optional[float] = None):
         """
         Create HistoryApiSellOrder entity if not exists or we got new data (status or executed_quantity).
