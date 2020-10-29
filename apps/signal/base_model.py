@@ -11,6 +11,7 @@ from .utils import SignalStatus
 
 if TYPE_CHECKING:
     from apps.techannel.base_model import TechannelBase
+    from apps.market.base_model import BaseMarket
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +28,14 @@ class BaseSignal(SystemBaseModel):
     status: SignalStatus
     techannel: 'TechannelBase'
     outer_signal_id: int
+    market: 'BaseMarket'
 
     class Meta:
         abstract = True
+
+    @property
+    def market_logic(self):
+        return self.market.logic
 
     @property
     def status(self):

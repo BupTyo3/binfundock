@@ -49,14 +49,14 @@ class BuyOrder(BaseBuyOrder):
         """
         logger.debug(f"Push buy order! {self}")
         self.push_count_increase()
-        self.market.push_buy_limit_order(self)
+        self.market_logic.push_buy_limit_order(self)
 
     def cancel_into_market(self):
         """
         Cancel order into the Market
         """
         logger.debug(f"Cancel BUY order! {self}")
-        data = self.market.cancel_order(self)
+        data = self.market_logic.cancel_order(self)
         # status, bought_quantity = data.get('status'), data.get('executed_quantity', 0)
         # self.update_order_api_history(status, bought_quantity)
 
@@ -69,7 +69,7 @@ class BuyOrder(BaseBuyOrder):
         if self.status not in statuses_:
             return
         logger.debug(f"Get info about BUY order by API: {self}")
-        data = self.market.get_order_info(self.symbol, self.custom_order_id)
+        data = self.market_logic.get_order_info(self.symbol, self.custom_order_id)
         status, bought_quantity = data.get('status'), data.get('executed_quantity')
         self.update_order_api_history(status, bought_quantity)
 
@@ -211,16 +211,16 @@ class SellOrder(BaseSellOrder):
         logger.debug(f"Push sell order! {self}")
         self.push_count_increase()
         if self.type == OrderType.LIMIT_MAKER.value:
-            self.market.push_sell_oco_order(self)
+            self.market_logic.push_sell_oco_order(self)
         elif self.type == OrderType.MARKET.value:
-            self.market.push_sell_market_order(self)
+            self.market_logic.push_sell_market_order(self)
 
     def cancel_into_market(self):
         """
         Cancel order into the Market
         """
         logger.debug(f"Cancel SELL order! {self}")
-        data = self.market.cancel_order(self)
+        data = self.market_logic.cancel_order(self)
         # status, sold_quantity = data.get('status'), data.get('executed_quantity', 0)
         # self.update_order_api_history(status, sold_quantity)
 
@@ -233,7 +233,7 @@ class SellOrder(BaseSellOrder):
         if self.status not in statuses_:
             return
         logger.debug(f"Get info about SELL order by API: {self}")
-        data = self.market.get_order_info(self.symbol, self.custom_order_id)
+        data = self.market_logic.get_order_info(self.symbol, self.custom_order_id)
         status, sold_quantity, price = data.get('status'), data.get('executed_quantity'), data.get('price')
         self.update_order_api_history(status, sold_quantity, price)
 

@@ -257,6 +257,8 @@ class Config:
         market = config['Market']
         self.market_api_key = market.get('market_api_key', None)
         self.market_api_secret = market.get('market_api_secret', None)
+        self.futures_market_api_key = market.get('futures_market_api_key', None)
+        self.futures_market_api_secret = market.get('futures_market_api_secret', None)
         self.market_fee: float = market.getfloat('market_fee')
         logic = config['Logic']
         signal = config['Signal']

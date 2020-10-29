@@ -3,11 +3,12 @@ import logging
 from django.db import models
 from django.contrib.auth import get_user_model
 
-from typing import Tuple, TypedDict, TYPE_CHECKING
+from typing import Tuple, TypedDict, TYPE_CHECKING, Union, Callable, Type, Any
 
 from binance import client
 from apps.order.utils import OrderStatus
-from .base_model import BaseMarket
+from .base_model import BaseMarket, BaseMarketLogic
+from .utils import MarketType
 from .base_client import BaseClient
 from tools.tools import (
     floated_result,
@@ -26,6 +27,20 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+def get_or_create_market() -> BaseMarket:
+    market_obj, created = Market.objects.get_or_create(name=BiMarketLogic.name)
+    if created:
+        logger.debug(f"Market '{market_obj}' has been created")
+    return market_obj
+
+
+def get_or_create_futures_market() -> BaseMarket:
+    market_obj, created = Market.objects.get_or_create(name=BiFuturesMarketLogic.name)
+    if created:
+        logger.debug(f"Market '{market_obj}' has been created")
+    return market_obj
+
+
 class PartialResponse(TypedDict):
     status: str
     status_updated: bool
@@ -40,61 +55,17 @@ class BiClient(client.Client, BaseClient):
     api_secret = conf_obj.market_api_secret
 
 
+class BiFuturesClient(client.Client, BaseClient):
+    api_client_class = client.Client
+    api_key = conf_obj.futures_market_api_key
+    api_secret = conf_obj.futures_market_api_secret
+
+
 class Market(BaseMarket):
     default_name = 'Binance'
-    market_fee = conf_obj.market_fee
     name = models.CharField(max_length=32,
                             unique=True,
                             default=default_name)
-    symbol_ = 'symbol'
-    bidPrice_ = 'bidPrice'
-    askPrice_ = 'askPrice'
-    id_ = 'id'
-    limit_history = 500
-    balances_ = 'balances'
-    asset_ = 'asset'
-    locked_ = 'locked'
-    baseAsset_ = 'baseAsset'
-    quoteAsset_ = 'quoteAsset'
-    filters_ = 'filters'
-    minQty_ = 'minQty'
-    minAmount_ = 'minNotional'
-    stepSize_ = 'stepSize'
-    minPrice_ = 'minPrice'
-    stepPrice_ = 'tickSize'
-    stopPrice_ = 'stopPrice'
-    time_ = 'time'
-    status_ = 'status'
-    type_ = 'type'
-    side_ = 'side'
-    fills_ = 'fills'
-    price_ = 'price'
-    origQty_ = 'origQty'
-    orderId_ = 'orderId'
-    new_ = 'NEW'
-    filled_ = 'FILLED'
-    symbols_ = 'symbols'
-
-    executed_quantity_: str = 'executedQty'
-    free_: str = 'free'
-
-    order_id_separator = 'bim'
-    client_class = BiClient
-
-    ORDER_STATUSES_MATCH: dict = {
-        client_class.ORDER_STATUS_CANCELED:
-            BaseMarket.order_statuses.CANCELED.value,
-        client_class.ORDER_STATUS_FILLED:
-            BaseMarket.order_statuses.COMPLETED.value,
-        client_class.ORDER_STATUS_PARTIALLY_FILLED:
-            BaseMarket.order_statuses.PARTIAL.value,
-        client_class.ORDER_STATUS_NEW:
-            BaseMarket.order_statuses.SENT.value,
-        client_class.ORDER_STATUS_EXPIRED:
-            BaseMarket.order_statuses.EXPIRED.value,
-        BaseMarket.order_statuses.NOT_EXISTS.value:
-            BaseMarket.order_statuses.NOT_EXISTS.value,
-    }
 
     objects = models.Manager()
 
@@ -104,22 +75,50 @@ class Market(BaseMarket):
     def save(self, *args, **kwargs):
         """Addition: Fill DB by Pairs rules data from the Market api"""
         super().save(*args, **kwargs)
-        self.update_pairs_info_api()
+        self.logic.update_pairs_info_api()
 
-    @api_logging
-    def _get_balance_api(self, coin):
-        """Send request to get balance by asset (coin)"""
-        return self.my_client.get_asset_balance(coin)
+    @property
+    def logic(self) -> BaseMarketLogic:
+        if self.name == BiMarketLogic.name:
+            return BiMarketLogic()
+        elif self.name == BiFuturesMarketLogic.name:
+            return BiFuturesMarketLogic()
+
+
+class BinanceDataMixin:
+    askPrice_ = 'askPrice'
+    baseAsset_ = 'baseAsset'
+    bidPrice_ = 'bidPrice'
+    fills_ = 'fills'
+    minAmount_ = 'minNotional'
+    minPrice_ = 'minPrice'
+    minQty_ = 'minQty'
+    orderId_ = 'orderId'
+    origQty_ = 'origQty'
+    price_ = 'price'
+    quoteAsset_ = 'quoteAsset'
+    stepPrice_ = 'tickSize'
+    stepSize_ = 'stepSize'
+    stopPrice_ = 'stopPrice'
+    executed_quantity_ = 'executedQty'
+
+    # Futures
+    available_balance_ = 'availableBalance'
 
     @floated_result
-    def _get_executed_quantity(self, response) -> float:
-        """Get partially data by key executed_quantity"""
-        return response[self.executed_quantity_]
+    def _get_pair_rule(self, data: dict, first: str, order: int, second: str):
+        """Parsing of response about Pairs rules"""
+        return data[first][order][second]
 
     @floated_result
     def _get_price(self, response) -> float:
         """Get partially data by key price"""
         return response.get(self.price_)
+
+    @floated_result
+    def _get_executed_quantity(self, response) -> float:
+        """Get partially data by key executed_quantity"""
+        return response[self.executed_quantity_]
 
     @floated_result
     def _get_avg_sold_price(self, response) -> float:
@@ -132,8 +131,43 @@ class Market(BaseMarket):
             res += self._get_price(order)
         return res / n
 
+
+class BiMarketLogic(BaseMarketLogic, BinanceDataMixin):
+    type = MarketType.SPOT.value
+    name = 'Binance'
+    market_fee = conf_obj.market_fee
+    limit_history = 500
+
+    order_id_separator = 'bim'
+    client_class = BiClient
+
+    ORDER_STATUSES_MATCH: dict = {
+        client_class.ORDER_STATUS_CANCELED:
+            BaseMarketLogic.order_statuses.CANCELED.value,
+        client_class.ORDER_STATUS_FILLED:
+            BaseMarketLogic.order_statuses.COMPLETED.value,
+        client_class.ORDER_STATUS_PARTIALLY_FILLED:
+            BaseMarketLogic.order_statuses.PARTIAL.value,
+        client_class.ORDER_STATUS_NEW:
+            BaseMarketLogic.order_statuses.SENT.value,
+        client_class.ORDER_STATUS_EXPIRED:
+            BaseMarketLogic.order_statuses.EXPIRED.value,
+        BaseMarketLogic.order_statuses.NOT_EXISTS.value:
+            BaseMarketLogic.order_statuses.NOT_EXISTS.value,
+    }
+
+    @property
+    def market(self) -> 'BaseMarket':
+        market, created = Market.objects.get_or_create(name=self.name)
+        return market
+
+    @api_logging
+    def _get_balance_api(self, coin):
+        """Send request to get balance by asset (coin)"""
+        return self.my_client.get_asset_balance(coin)
+
     @catch_exception(
-        code=-2013, alternative={'status': OrderStatus.NOT_EXISTS.value, executed_quantity_: 0.0, price_: 0.0})
+        code=-2013, alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
     @api_logging(text="Getting info by CustomOrderId")
     def _get_order_info_api(self, symbol, custom_order_id):
         """Send request to get order info"""
@@ -201,7 +235,7 @@ class Market(BaseMarket):
         return response
 
     @catch_exception(
-        code=-2011, alternative={'status': OrderStatus.NOT_EXISTS.value, executed_quantity_: 0.0, price_: 0.0})
+        code=-2011, alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
     @api_logging(text="Cancel order into Market")
     def _cancel_order(self, symbol: str, custom_order_id: str):
         """Send request to cancel order"""
@@ -211,11 +245,6 @@ class Market(BaseMarket):
     def _get_rules_api(self):
         """Send request to get Pairs rules info"""
         return self.my_client.get_exchange_info()
-
-    @floated_result
-    def __get_pair_rule(self, data: dict, first: str, order: int, second: str):
-        """Parsing of response about Pairs rules"""
-        return data[first][order][second]
 
     @floated_result
     def get_current_balance(self, coin) -> float:
@@ -237,7 +266,7 @@ class Market(BaseMarket):
     def push_buy_limit_order(self, order: 'BuyOrder'):
         """Push Buy limit order"""
         from apps.pair.models import Pair
-        pair = Pair.objects.filter(symbol=order.symbol, market=self).first()
+        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
         logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_buy_limit_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
@@ -253,7 +282,7 @@ class Market(BaseMarket):
         tp_order, sl_order
         """
         from apps.pair.models import Pair
-        pair = Pair.objects.filter(symbol=order.symbol, market=self).first()
+        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
         logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         # TODO: change to sell order
         response = self._push_sell_oco_order(
@@ -271,7 +300,7 @@ class Market(BaseMarket):
         Push Market order.
         """
         from apps.pair.models import Pair
-        pair = Pair.objects.filter(symbol=order.symbol, market=self).first()
+        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
         logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_sell_market_order(
             symbol=order.symbol, quantity=order.quantity,
@@ -284,8 +313,7 @@ class Market(BaseMarket):
 
     def cancel_order(self, order: 'BaseOrder'):
         """Cancel order"""
-        response = self._cancel_order(order.symbol, order.custom_order_id)
-        # return self._get_partially_order_data_from_response(response)
+        self._cancel_order(order.symbol, order.custom_order_id)
 
     def update_pairs_info_api(self):
         """
@@ -296,12 +324,12 @@ class Market(BaseMarket):
         info = self._get_rules_api()[self.symbols_]
         for i in info:
             symbol = i[self.symbol_]
-            min_price = self.__get_pair_rule(i, self.filters_, 0, self.minPrice_)
-            step_price = self.__get_pair_rule(i, self.filters_, 0, self.stepPrice_)
-            min_quantity = self.__get_pair_rule(i, self.filters_, 2, self.minQty_)
-            min_amount = self.__get_pair_rule(i, self.filters_, 3, self.minAmount_)
-            step_size = self.__get_pair_rule(i, self.filters_, 2, self.stepSize_)
-            if not Pair.objects.filter(symbol=symbol):
+            min_price = self._get_pair_rule(i, self.filters_, 0, self.minPrice_)
+            step_price = self._get_pair_rule(i, self.filters_, 0, self.stepPrice_)
+            min_quantity = self._get_pair_rule(i, self.filters_, 2, self.minQty_)
+            min_amount = self._get_pair_rule(i, self.filters_, 3, self.minAmount_)
+            step_size = self._get_pair_rule(i, self.filters_, 2, self.stepSize_)
+            if not Pair.objects.filter(symbol=symbol, market=self.market):
                 logger.debug(f"Add a new pair rule {symbol}")
                 Pair.objects.create(symbol=symbol,
                                     min_price=min_price,
@@ -309,4 +337,136 @@ class Market(BaseMarket):
                                     step_quantity=step_size,
                                     min_quantity=min_quantity,
                                     min_amount=min_amount,
-                                    market=self)
+                                    market=self.market)
+
+
+class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
+    name = 'BiFutures'
+    order_id_separator = 'bifu'
+    market_fee = conf_obj.market_fee
+    type = MarketType.FUTURES.value
+
+    client_class = BiFuturesClient
+
+    ORDER_STATUSES_MATCH: dict = {
+        client_class.ORDER_STATUS_CANCELED:
+            BaseMarketLogic.order_statuses.CANCELED.value,
+        client_class.ORDER_STATUS_FILLED:
+            BaseMarketLogic.order_statuses.COMPLETED.value,
+        client_class.ORDER_STATUS_PARTIALLY_FILLED:
+            BaseMarketLogic.order_statuses.PARTIAL.value,
+        client_class.ORDER_STATUS_NEW:
+            BaseMarketLogic.order_statuses.SENT.value,
+        client_class.ORDER_STATUS_EXPIRED:
+            BaseMarketLogic.order_statuses.EXPIRED.value,
+        BaseMarketLogic.order_statuses.NOT_EXISTS.value:
+            BaseMarketLogic.order_statuses.NOT_EXISTS.value,
+    }
+
+    @property
+    def market(self) -> 'BaseMarket':
+        market, created = Market.objects.get_or_create(name=self.name)
+        return market
+
+    @floated_result
+    def get_current_price(self, symbol):
+        """Send request to get current average price by pair (symbol)"""
+        response = self.my_client.get_avg_price(symbol=symbol)
+        return response[self.price_]
+
+    @api_logging
+    def _get_balance_api(self):
+        """Send request to get balance"""
+        return self.my_client.futures_account_balance()
+
+    @floated_result
+    def get_current_balance(self, coin) -> float:
+        """Get balance by asset (coin)"""
+        response = self._get_balance_api()
+        for asset_data in response:
+            if asset_data.get(self.asset_) == coin:
+                avail_bal = asset_data.get(self.available_balance_)
+                bal = asset_data.get(self.balance_)
+                return avail_bal if avail_bal else bal
+
+    def _convert_to_our_order_status(self, market_order_status: str) -> Tuple[OrderStatus, bool]:
+        """Function to transform response orders statuses to our"""
+        if market_order_status in self.ORDER_STATUSES_MATCH.keys():
+            return self.ORDER_STATUSES_MATCH[market_order_status], True
+        logger.debug(f"Status {market_order_status} not in ORDER_STATUSES_MATCH")
+        return self.order_statuses.UNKNOWN.value, False
+
+    @catch_exception(
+        code=-2013, alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
+    @api_logging(text="Getting info by CustomOrderId")
+    def _get_order_info_api(self, symbol, custom_order_id):
+        """Send request to get order info"""
+        return self.my_client.futures_get_order(symbol=symbol, origClientOrderId=custom_order_id)
+
+    def _get_partially_order_data_from_response(self, response) -> PartialResponse:
+        """Get partially order data"""
+        order_status, updated = self._convert_to_our_order_status(response[self.status_])
+        res = dict()
+        res.update({
+            'status': order_status,
+            'status_updated': updated,
+            'price': self._get_price(response) if response.get(self.price_) else None,
+            'avg_sold_market_price': self._get_avg_sold_price(response) if response.get(self.fills_) else None,
+            'executed_quantity': self._get_executed_quantity(response)
+        })
+        return res
+
+    @debug_input_and_returned
+    def get_order_info(self, symbol: Union[str, models.CharField], custom_order_id: str) -> PartialResponse:
+        """Get transformed order info from the Market by api"""
+        response = self._get_order_info_api(symbol, custom_order_id)
+        return self._get_partially_order_data_from_response(response)
+
+    def push_buy_limit_order(self, order):
+        pass
+
+    def push_sell_market_order(self, order):
+        pass
+
+    def push_sell_oco_order(self, order):
+        pass
+
+    @catch_exception(
+        code=-2011, alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
+    @api_logging(text="Cancel order into Market")
+    def _cancel_order(self, symbol: str, custom_order_id: str):
+        """Send request to cancel order"""
+        return self.my_client.futures_cancel_order(symbol=symbol, origClientOrderId=custom_order_id)
+
+    def cancel_order(self, order: 'BaseOrder'):
+        """Cancel order"""
+        self._cancel_order(order.symbol, order.custom_order_id)
+
+    # @api_logging
+    def _get_rules_api(self):
+        """Send request to get Pairs rules info"""
+        return self.my_client.futures_exchange_info()
+
+    def update_pairs_info_api(self) -> None:
+        """
+        Create pairs rules info by info from the Market
+        """
+        from apps.pair.models import Pair
+        min_amount = 0.00000001
+
+        info = self._get_rules_api()[self.symbols_]
+        for i in info:
+            symbol = i[self.symbol_]
+            min_price = self._get_pair_rule(i, self.filters_, 0, self.minPrice_)
+            step_price = self._get_pair_rule(i, self.filters_, 0, self.stepPrice_)
+            min_quantity = self._get_pair_rule(i, self.filters_, 1, self.minQty_)
+            step_size = self._get_pair_rule(i, self.filters_, 1, self.stepSize_)
+            if not Pair.objects.filter(symbol=symbol, market=self.market):
+                logger.debug(f"Add a new pair rule {symbol}")
+                Pair.objects.create(symbol=symbol,
+                                    min_price=min_price,
+                                    step_price=step_price,
+                                    step_quantity=step_size,
+                                    min_quantity=min_quantity,
+                                    min_amount=min_amount,
+                                    market=self.market)

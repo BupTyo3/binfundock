@@ -2,7 +2,7 @@
 from django.db import transaction, migrations, models
 import django.utils.timezone
 
-from apps.market.utils import get_or_create_market
+from apps.market.models import get_or_create_market
 
 
 def copy_to_signal_orig(apps, schema_editor):
@@ -25,6 +25,8 @@ def copy_to_signal_orig(apps, schema_editor):
             EntryPointOrig.objects.create(signal=so, value=ep.value)
         for tp in signal.take_profits.all():
             TakeProfitOrig.objects.create(signal=so, value=tp.value)
+        signal.signal_orig = so
+        signal.save()
 
 
 def fill_signal_by_market_default(apps, schema_editor):

@@ -17,4 +17,9 @@ class Migration(migrations.Migration):
             name='market',
             field=models.ForeignKey(on_delete=django.db.models.deletion.DO_NOTHING, related_name='signals', to='market.Market'),
         ),
+        migrations.AlterField(
+            model_name='signal',
+            name='signal_orig',
+            field=models.ForeignKey(on_delete=django.db.models.deletion.DO_NOTHING, related_name='market_signals', to='signal.SignalOrig'),
+        ),
     ]

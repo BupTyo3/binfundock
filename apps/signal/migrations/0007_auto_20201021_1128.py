@@ -39,6 +39,12 @@ class Migration(migrations.Migration):
             name='market',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='signals', to='market.Market'),
         ),
+        migrations.AddField(
+            model_name='signal',
+            name='signal_orig',
+            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='market_signals', to='signal.SignalOrig'),
+            preserve_default=False,
+        ),
         migrations.AlterUniqueTogether(
             name='signal',
             unique_together={('techannel', 'outer_signal_id', 'market')},

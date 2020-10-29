@@ -18,6 +18,7 @@ from .utils import SignalStatus, SignalPosition, calculate_position
 from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket
 from apps.market.models import Market
+from apps.market.utils import MarketType
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
 from tools.tools import (
@@ -110,6 +111,7 @@ class SignalOrig(BaseSignalOrig):
             leverage=self.leverage,
             message_date=self.message_date,
             market=market,
+            signal_orig=self,
         )
         for entry_point in self.entry_points.all():
             EntryPoint.objects.create(signal=signal, value=entry_point.value)
@@ -133,6 +135,9 @@ class Signal(BaseSignal):
     _default_leverage = 1
     conf = conf_obj
 
+    signal_orig = models.ForeignKey(to=SignalOrig,
+                                    related_name='market_signals',
+                                    on_delete=models.DO_NOTHING)
     market = models.ForeignKey(to=Market,
                                related_name='signals',
                                on_delete=models.DO_NOTHING)
@@ -261,13 +266,13 @@ class Signal(BaseSignal):
         return self.take_profits.count()
 
     def _get_current_balance_of_main_coin(self):
-        return self.market.get_current_balance(self.main_coin)
+        return self.market_logic.get_current_balance(self.main_coin)
 
     def _get_current_price(self):
-        return self.market.get_current_price(self.symbol)
+        return self.market_logic.get_current_price(self.symbol)
 
     def _get_market_fee(self):
-        return self.market.market_fee
+        return self.market_logic.market_fee
 
     def _get_pair(self):
         from apps.pair.models import Pair
@@ -813,6 +818,45 @@ class Signal(BaseSignal):
         self.status = SignalStatus.CLOSED.value
         self.save()
 
+    def _formation_futures_long_orders(self):
+        for index, entry_point in enumerate(self.entry_points.all()):
+            coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
+            # TODO: Form buy orders
+            self.__form_buy_order(coin_quantity, entry_point, index)
+        pass
+
+    def _formation_futures_short_orders(self):
+        for index, entry_point in enumerate(self.entry_points.all()):
+            coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
+            # TODO: Form sell orders
+            # self.__form_buy_order(coin_quantity, entry_point, index)
+        pass
+
+    def _formation_futures_orders(self):
+        if not self._get_pair():
+            logger.debug(f"Pair {self.symbol} does not exist in Futures")
+            return
+        if self.position == SignalPosition.LONG.value:
+            logger.debug(f"Form Futures LONG: '{self}'")
+            self._formation_futures_long_orders()
+        elif self.position == SignalPosition.SHORT.value:
+            logger.debug(f"Form Futures SHORT: '{self}'")
+            self._formation_futures_short_orders()
+
+    def _formation_spot_orders(self):
+        if self.position != SignalPosition.LONG.value:
+            logger.warning(f"Position is not LONG: '{self}'")
+            return
+        if not self._check_if_balance_enough_for_signal():
+            # TODO: Add sent message to yourself telegram
+            logger.debug(f"Not enough money for Signal '{self}'")
+            return
+        self.status = SignalStatus.FORMED.value
+        for index, entry_point in enumerate(self.entry_points.all()):
+            coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
+            self.__form_buy_order(coin_quantity, entry_point, index)
+        self.save()
+
     @rounded_result
     def get_real_stop_price(self, price: float) -> float:
         """
@@ -837,18 +881,10 @@ class Signal(BaseSignal):
             logger.warning(f"Not valid Signal status for formation BUY order: "
                            f"{self._status} : {SignalStatus.NEW.value}")
             return
-        if self.position != SignalPosition.LONG.value:
-            logger.warning(f"Position is not LONG: '{self}'")
-            return
-        if not self._check_if_balance_enough_for_signal():
-            # TODO: Add sent message to yourself telegram
-            logger.debug(f"Not enough money for Signal '{self}'")
-            return
-        self.status = SignalStatus.FORMED.value
-        for index, entry_point in enumerate(self.entry_points.all()):
-            coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
-            self.__form_buy_order(coin_quantity, entry_point, index)
-        self.save()
+        if self.market.logic.type == MarketType.FUTURES.value:
+            return self._formation_futures_orders()
+        else:
+            return self._formation_spot_orders()
 
     @debug_input_and_returned
     @transaction.atomic
@@ -1251,7 +1287,7 @@ class HistorySignal(BaseHistorySignal):
                          status: str):
         current_price = None
         try:
-            current_price = signal.market.get_current_price(signal.symbol)
+            current_price = signal.market_logic.get_current_price(signal.symbol)
         except Exception as ex:
             logger.warning(f"Current price for HistorySignal failed to get. Signal '{signal}'"
                            f": Exception:'{ex}'")

@@ -2,9 +2,9 @@ from decimal import Decimal, Inexact, Context
 
 from django.contrib import admin, messages
 from django.utils.translation import ugettext_lazy as _
-from django.db.models import F, Case, When, ExpressionWrapper, CharField
+from django.db.models import F, Case, When, ExpressionWrapper, CharField, Count
 
-from apps.market.utils import get_or_create_market
+from apps.market.models import get_or_create_market, get_or_create_futures_market
 from utils.admin import InputFilter
 
 from .models import (
@@ -76,9 +76,10 @@ class SignalAdmin(admin.ModelAdmin):
                     'message_date',
                     'created',
                     'all_targets',
+                    'signal_orig',
                     ]
-    select_related_fields = ['techannel', 'entry_points', 'take_profits', ]
-    search_fields = ['id', 'outer_signal_id', 'symbol', 'techannel__abbr', ]
+    select_related_fields = ['techannel', 'entry_points', 'take_profits', 'market', ]
+    search_fields = ['id', 'outer_signal_id', 'symbol', 'techannel__abbr', 'market__name', ]
     list_filter = [
         '_status',
         OuterIDFilter,
@@ -331,6 +332,7 @@ class SignalOrigAdmin(admin.ModelAdmin):
                     'stop_loss',
                     'techannel',
                     'outer_signal_id',
+                    'sig_count',
                     'message_date',
                     'created',
                     ]
@@ -342,7 +344,7 @@ class SignalOrigAdmin(admin.ModelAdmin):
     ]
     actions = [
         'bim_spot_create',
-        # 'bim_futures_create',
+        'bim_futures_create',
     ]
 
     def notifications_handling(value):
@@ -357,6 +359,13 @@ class SignalOrigAdmin(admin.ModelAdmin):
                     messages.success(request, msg)
             return applicator
         return decorate
+
+    def get_queryset(self, request):
+        qs = super(SignalOrigAdmin, self).get_queryset(request)
+        return qs.annotate(sig_count=Count('market_signals'))
+
+    def sig_count(self, obj):
+        return obj.sig_count
 
     @staticmethod
     def take_profits(signal):
@@ -381,6 +390,5 @@ class SignalOrigAdmin(admin.ModelAdmin):
 
     @notifications_handling('')
     def _bim_futures_create_one(self, request, signal):
-        # TODO: change after creating Future Bimarket
-        market = None
+        market = get_or_create_futures_market()
         signal.create_market_signal(market=market)
