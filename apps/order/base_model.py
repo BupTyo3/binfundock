@@ -99,9 +99,9 @@ class BaseOrder(SystemBaseModel):
                       index: Optional[int]) -> str:
         start_number_of_copies = 0
         if not (message_id or index or techannel_abbr):
-            return f'{start_number_of_copies}{self.market_logic.order_id_separator}' \
+            return f'{start_number_of_copies}{self.market_logic.order_id_separator}_' \
                    f'{self.order_type_separator}_{gen_short_uuid()}'
-        return f'{start_number_of_copies}{self.market_logic.order_id_separator}' \
+        return f'{start_number_of_copies}{self.market_logic.order_id_separator}_' \
                f'{self.order_type_separator}_{techannel_abbr}_{message_id}_{index}'
 
     @classmethod
