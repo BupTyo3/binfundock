@@ -4,9 +4,6 @@ from typing import List
 from apps.crontask.utils import get_or_create_crontask
 from apps.signal.models import Signal
 from apps.signal.utils import SignalStatus
-from apps.market.models import Market
-from apps.market.utils import get_or_create_market
-# from binfun.settings import conf_obj
 from utils.framework.models import SystemCommand
 
 logger = logging.getLogger(__name__)
@@ -39,13 +36,10 @@ class Command(SystemCommand):
                 logger.debug("You typed No - The End")
                 quit()
 
-        market_obj = get_or_create_market()
-
         if not get_or_create_crontask().form_buy_orders_enabled:
             return
 
         Signal.handle_new_signals(
-            market_obj,
             outer_signal_id=outer_signal_id,
             techannel_abbr=techannel)
 

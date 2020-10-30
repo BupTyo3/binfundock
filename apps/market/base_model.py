@@ -1,7 +1,7 @@
 import logging
 
 from abc import ABC, abstractmethod
-from typing import Tuple, Union, Optional, Callable
+from typing import Tuple, Union, Optional, Callable, Type
 
 from django.db import models
 
@@ -13,21 +13,46 @@ from .base_client import BaseClient
 logger = logging.getLogger(__name__)
 
 
-class BaseMarket(SystemBaseModel):
-    price_: str = 'price'
-    quantity_: str = 'quantity'
-    executed_quantity_: str = 'executed_quantity'
-    status_: str = 'status'
-    market_fee: float
+class BaseMarketLogic(ABC):
+    asset_ = 'asset'
+    balance_ = 'balance'
+    balances_ = 'balances'
+    filters_ = 'filters'
+    free_ = 'free'
+    locked_ = 'locked'
+    quantity_ = 'quantity'
+    side_ = 'side'
+    status_ = 'status'
+    symbol_ = 'symbol'
+    symbols_ = 'symbols'
+    time_ = 'time'
+    type_ = 'type'
 
     order_statuses: OrderStatus = OrderStatus
 
-    class Meta:
-        abstract = True
+    @property
+    @abstractmethod
+    def market(self) -> 'BaseMarket':
+        pass
 
     @property
     @abstractmethod
-    def client_class(self) -> BaseClient:
+    def type(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def market_fee(self) -> float:
+        pass
+
+    @property
+    @abstractmethod
+    def client_class(self) -> Type[BaseClient]:
         pass
 
     @property
@@ -39,6 +64,10 @@ class BaseMarket(SystemBaseModel):
     def my_client(self):
         logger.debug('Get MY_CLIENT')
         return self.client_class.activate_connection()
+
+    @abstractmethod
+    def update_pairs_info_api(self) -> None:
+        pass
 
     @abstractmethod
     def get_current_price(self, symbol: str) -> float:
@@ -54,4 +83,28 @@ class BaseMarket(SystemBaseModel):
 
     @abstractmethod
     def push_buy_limit_order(self, order):
+        pass
+
+    @abstractmethod
+    def push_sell_market_order(self, order):
+        pass
+
+    @abstractmethod
+    def push_sell_oco_order(self, order):
+        pass
+
+    @abstractmethod
+    def cancel_order(self, order):
+        pass
+
+
+class BaseMarket(SystemBaseModel):
+    name: str
+
+    class Meta:
+        abstract = True
+
+    @property
+    @abstractmethod
+    def logic(self) -> BaseMarketLogic:
         pass

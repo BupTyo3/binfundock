@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from apps.signal.models import Signal, EntryPoint, TakeProfit
+from apps.signal.models import SignalOrig
 # from binfun.settings import conf_obj
 from utils.framework.models import SystemCommand
 
@@ -62,12 +62,12 @@ class Command(SystemCommand):
             else:
                 logger.debug("You typed No - The End")
                 quit()
-        sm_obj = Signal.create_signal(techannel_name=techannel,
-                                      symbol=symbol,
-                                      stop_loss=stop_loss,
-                                      entry_points=entry_points,
-                                      take_profits=take_profits,
-                                      outer_signal_id=outer_signal_id)
+        sm_obj = SignalOrig.create_signal(techannel_name=techannel,
+                                          symbol=symbol,
+                                          stop_loss=stop_loss,
+                                          entry_points=entry_points,
+                                          take_profits=take_profits,
+                                          outer_signal_id=outer_signal_id)
 
         if sm_obj:
             self.log_success(f"Signal '{outer_signal_id}':'{techannel}' created successfully")

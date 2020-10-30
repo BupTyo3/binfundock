@@ -13,6 +13,7 @@ from tools.tools import gen_short_uuid, debug_input_and_returned
 
 if TYPE_CHECKING:
     from apps.signal.base_model import BaseSignal
+    from apps.market.base_model import BaseMarket
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,8 @@ class BaseOrder(SystemBaseModel):
     stop_loss: Optional[float]
     status: str
     signal: "BaseSignal"
+    market: "BaseMarket"
+    market_id: int
 
     symbol = models.CharField(max_length=16)
     quantity = models.FloatField()
@@ -71,6 +74,12 @@ class BaseOrder(SystemBaseModel):
         super().save(*args, **kwargs)
 
     @property
+    def market_logic(self):
+        from apps.market.models import Market
+        market = Market.objects.get(id=self.market_id)
+        return market.logic
+
+    @property
     def status(self):
         return self._status
 
@@ -90,8 +99,10 @@ class BaseOrder(SystemBaseModel):
                       index: Optional[int]) -> str:
         start_number_of_copies = 0
         if not (message_id or index or techannel_abbr):
-            return f'{start_number_of_copies}{self.order_type_separator}_{gen_short_uuid()}'
-        return f'{start_number_of_copies}{self.order_type_separator}_{techannel_abbr}_{message_id}_{index}'
+            return f'{start_number_of_copies}{self.market_logic.order_id_separator}_' \
+                   f'{self.order_type_separator}_{gen_short_uuid()}'
+        return f'{start_number_of_copies}{self.market_logic.order_id_separator}_' \
+               f'{self.order_type_separator}_{techannel_abbr}_{message_id}_{index}'
 
     @classmethod
     def form_sl_order_id(cls, main_order: 'BaseOrder') -> str:
