@@ -1,12 +1,15 @@
 import logging
 
-from apps.market.models import Market
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
 
-def get_or_create_market() -> Market:
-    market_obj, created = Market.objects.get_or_create()
-    if created:
-        logger.debug(f"Market '{market_obj}' has been created")
-    return market_obj
+class MarketType(Enum):
+    SPOT = 'spot'
+    FUTURES = 'futures'
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+

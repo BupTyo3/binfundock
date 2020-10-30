@@ -25,7 +25,6 @@ class BuyOrder(BaseBuyOrder):
     market = models.ForeignKey(to=Market,
                                related_name='buy_orders',
                                on_delete=models.DO_NOTHING)
-    # TODO: remove this field and _bought_quantity and setters, getters and others using
     bought_quantity = models.FloatField(default=0)
     index = models.PositiveIntegerField()
     signal = models.ForeignKey(to=Signal,
@@ -50,14 +49,14 @@ class BuyOrder(BaseBuyOrder):
         """
         logger.debug(f"Push buy order! {self}")
         self.push_count_increase()
-        self.market.push_buy_limit_order(self)
+        self.market_logic.push_buy_limit_order(self)
 
     def cancel_into_market(self):
         """
         Cancel order into the Market
         """
         logger.debug(f"Cancel BUY order! {self}")
-        data = self.market.cancel_order(self)
+        data = self.market_logic.cancel_order(self)
         # status, bought_quantity = data.get('status'), data.get('executed_quantity', 0)
         # self.update_order_api_history(status, bought_quantity)
 
@@ -70,11 +69,11 @@ class BuyOrder(BaseBuyOrder):
         if self.status not in statuses_:
             return
         logger.debug(f"Get info about BUY order by API: {self}")
-        data = self.market.get_order_info(self.symbol, self.custom_order_id)
+        data = self.market_logic.get_order_info(self.symbol, self.custom_order_id)
         status, bought_quantity = data.get('status'), data.get('executed_quantity')
         self.update_order_api_history(status, bought_quantity)
 
-    @transaction.atomic
+    # @transaction.atomic
     def update_order_api_history(self, status, executed_quantity):
         """
         Create HistoryApiBuyOrder entity if not exists or we got new data (status or executed_quantity).
@@ -126,7 +125,7 @@ class SellOrder(BaseSellOrder):
     @classmethod
     def _form_sell_stop_loss_order(cls, tp_order: 'SellOrder'):
         """Form Stop Loss order by Take Profit order"""
-        calculated_real_stop_loss = tp_order.signal.get_real_stop_price(tp_order.stop_loss, tp_order.market)
+        calculated_real_stop_loss = tp_order.signal.get_real_stop_price(tp_order.stop_loss)
         custom_sl_order_id = cls.form_sl_order_id(tp_order)
         order = SellOrder.objects.create(
             market=tp_order.market,
@@ -212,16 +211,16 @@ class SellOrder(BaseSellOrder):
         logger.debug(f"Push sell order! {self}")
         self.push_count_increase()
         if self.type == OrderType.LIMIT_MAKER.value:
-            self.market.push_sell_oco_order(self)
+            self.market_logic.push_sell_oco_order(self)
         elif self.type == OrderType.MARKET.value:
-            self.market.push_sell_market_order(self)
+            self.market_logic.push_sell_market_order(self)
 
     def cancel_into_market(self):
         """
         Cancel order into the Market
         """
         logger.debug(f"Cancel SELL order! {self}")
-        data = self.market.cancel_order(self)
+        data = self.market_logic.cancel_order(self)
         # status, sold_quantity = data.get('status'), data.get('executed_quantity', 0)
         # self.update_order_api_history(status, sold_quantity)
 
@@ -234,11 +233,11 @@ class SellOrder(BaseSellOrder):
         if self.status not in statuses_:
             return
         logger.debug(f"Get info about SELL order by API: {self}")
-        data = self.market.get_order_info(self.symbol, self.custom_order_id)
+        data = self.market_logic.get_order_info(self.symbol, self.custom_order_id)
         status, sold_quantity, price = data.get('status'), data.get('executed_quantity'), data.get('price')
         self.update_order_api_history(status, sold_quantity, price)
 
-    @transaction.atomic
+    # @transaction.atomic
     def update_order_api_history(self, status: str, executed_quantity: float, price: Optional[float] = None):
         """
         Create HistoryApiSellOrder entity if not exists or we got new data (status or executed_quantity).

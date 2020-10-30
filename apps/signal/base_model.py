@@ -11,17 +11,31 @@ from .utils import SignalStatus
 
 if TYPE_CHECKING:
     from apps.techannel.base_model import TechannelBase
+    from apps.market.base_model import BaseMarket
 
 logger = logging.getLogger(__name__)
 
 
-class BaseSignal(SystemBaseModel):
-    status: SignalStatus
-    techannel: "TechannelBase"
+class BaseSignalOrig(SystemBaseModel):
+    techannel: 'TechannelBase'
     outer_signal_id: int
 
     class Meta:
         abstract = True
+
+
+class BaseSignal(SystemBaseModel):
+    status: SignalStatus
+    techannel: 'TechannelBase'
+    outer_signal_id: int
+    market: 'BaseMarket'
+
+    class Meta:
+        abstract = True
+
+    @property
+    def market_logic(self):
+        return self.market.logic
 
     @property
     def status(self):
@@ -32,6 +46,15 @@ class BaseSignal(SystemBaseModel):
         logger.debug(f'Set Signal status: {self}: {self._status.upper()} -> {value.upper()}')
         BaseHistorySignal.write_in_history(signal=self, status=value)
         self._status = value
+
+
+class BasePointOrig(SystemBaseModel):
+    value: float
+
+    objects = models.Manager()
+
+    class Meta:
+        abstract = True
 
 
 class BasePoint(SystemBaseModel):
@@ -81,6 +104,5 @@ class BaseHistorySignal(SystemBaseModelWithoutModified):
     @abstractmethod
     def write_in_history(cls,
                          signal: BaseSignal,
-                         status: str,
-                         current_price: Optional[float] = None):
+                         status: str):
         pass

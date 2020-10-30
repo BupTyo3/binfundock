@@ -13,7 +13,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from telethon.tl.types import InputPeerChannel, Channel, InputChannel, User
 
-from apps.signal.models import Signal, EntryPoint, TakeProfit
+from apps.signal.models import SignalOrig, EntryPoint, TakeProfit
 from tools.tools import countdown
 from utils.parse_channels.str_parser import left_numbers, check_pair
 from .base_model import BaseTelegram
@@ -63,12 +63,12 @@ class Telegram(BaseTelegram):
         should_close = any(x in should_close_label for x in message)
         if should_close:
             if 'BTC' in message.text:
-                obj = Signal.objects.filter(
+                obj = SignalOrig.objects.filter(
                     symbol='BTCUSDT', techannel__abbr=channel_abbr).order_by('id').last()
                 if obj:
                     logger.debug(f'please close the position: {obj}')
             if 'ETH' in message.text:
-                obj = Signal.objects.filter(
+                obj = SignalOrig.objects.filter(
                     symbol='ETHUSDT', techannel__abbr=channel_abbr).order_by('id').last()
                 if obj:
                     logger.debug(f'please close the position: {obj}')
@@ -81,12 +81,12 @@ class Telegram(BaseTelegram):
         should_move = any(x in should_move_label for x in message)
         if should_move:
             if 'BTC' in message.text:
-                obj = Signal.objects.filter(
+                obj = SignalOrig.objects.filter(
                     symbol='BTCUSDT', techannel__abbr=channel_abbr).order_by('id').last()
                 if obj:
                     logger.debug(f'please close the position: {obj}')
             if 'ETH' in message.text:
-                obj = Signal.objects.filter(
+                obj = SignalOrig.objects.filter(
                     symbol='ETHUSDT', techannel__abbr=channel_abbr).order_by('id').last()
                 if obj:
                     logger.debug(f'please close the position: {obj}')
@@ -388,14 +388,14 @@ class Telegram(BaseTelegram):
 
     @sync_to_async
     def is_signal_handled(self, message_id, channel_abbr):
-        return Signal.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).exists()
+        return SignalOrig.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).exists()
 
     @sync_to_async
     def write_signal_to_db(self, channel_abbr: str, signal, message_id, message_date):
         if not signal[0].pair:
             return
         signal[0].pair = check_pair(signal[0].pair)
-        sm_obj = Signal.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).first()
+        sm_obj = SignalOrig.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).first()
         if sm_obj:
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists")
             quit()
@@ -410,14 +410,14 @@ class Telegram(BaseTelegram):
                      f" Algorithm: '{channel_abbr}'"
                      f" Message ID: '{message_id}'")
         try:
-            Signal.create_signal(techannel_name=channel_abbr,
-                                 leverage=signal[0].leverage,
-                                 symbol=signal[0].pair,
-                                 stop_loss=signal[0].stop_loss,
-                                 entry_points=signal[0].entry_points,
-                                 take_profits=signal[0].take_profits,
-                                 outer_signal_id=message_id,
-                                 message_date=message_date)
+            SignalOrig.create_signal(techannel_name=channel_abbr,
+                                     leverage=signal[0].leverage,
+                                     symbol=signal[0].pair,
+                                     stop_loss=signal[0].stop_loss,
+                                     entry_points=signal[0].entry_points,
+                                     take_profits=signal[0].take_profits,
+                                     outer_signal_id=message_id,
+                                     message_date=message_date)
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
             return 'success'
         except Exception as e:

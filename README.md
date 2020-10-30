@@ -17,9 +17,14 @@ DB_PASSWORD=postgres
 [Market]
 market_api_key=xxx
 market_api_secret=xxx
+futures_market_api_key=xxx
+futures_market_api_secret=xxx
 market_fee=0.1
 [Signal]
+# for table Signal
 accessible_main_coins=USDT,
+# For table SignalOrig
+all_accessible_main_coins=USDT,BTC,ETH
 [Telegram]
 api_id
 api_hash
