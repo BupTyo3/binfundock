@@ -74,7 +74,7 @@ class BuyOrder(BaseBuyOrder):
         self.update_order_api_history(status, bought_quantity)
 
     # @transaction.atomic
-    def update_order_api_history(self, status, executed_quantity):
+    def update_order_api_history(self, status, executed_quantity, price=None):
         """
         Create HistoryApiBuyOrder entity if not exists or we got new data (status or executed_quantity).
         Set Order status (for the first time - SENT)
