@@ -64,7 +64,8 @@ class SignalOrig(BaseSignalOrig):
         unique_together = ['techannel', 'outer_signal_id', ]
 
     def save(self, *args, **kwargs):
-        self.main_coin = self._get_main_coin(self.symbol)
+        if self.pk is None:
+            self.main_coin = self._get_main_coin(self.symbol)
         super().save(*args, **kwargs)
 
     @classmethod
@@ -180,10 +181,11 @@ class Signal(BaseSignal):
         unique_together = ['techannel', 'outer_signal_id', 'market']
 
     def save(self, *args, **kwargs):
-        self.main_coin = self._get_main_coin(self.symbol)
+        if self.pk is None:
+            self.main_coin = self._get_main_coin(self.symbol)
         super().save(*args, **kwargs)
-        logger.debug(self)
-        HistorySignal.write_in_history(self, self.status)
+        if self.pk is None:
+            HistorySignal.write_in_history(self, self.status)
 
     @rounded_result
     def __get_calculated_amount(self):
