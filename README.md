@@ -5,9 +5,9 @@ SECRET_KEY=XXX
 DEBUG=False
 
 DB_HOST=db
-DB_NAME=postgres
-DB_USER=postgres
-DB_PASSWORD=postgres
+DB_NAME=binfun_name
+DB_USER=binfun_user
+DB_PASSWORD=binfun_password_xxx
 ```
 
 ### Sample `config.ini` File
@@ -48,9 +48,14 @@ mkdir parsed-images
 
 ### Docker 
 
-- Start `web` and `db` containers
+- Build containers
 ```bash
-docker-compose -f docker-compose.yml up -d
+docker-compose build
+```
+
+- Start containers (without -d flag - not in daemon mode)
+```bash
+docker-compose up -d
 ```
 
 - Run BASH commands or django SHELL `web` WEB container
