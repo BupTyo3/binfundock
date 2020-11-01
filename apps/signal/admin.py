@@ -86,7 +86,7 @@ class SignalAdmin(admin.ModelAdmin):
         TechannelFilter,
     ]
     actions = [
-        'form_buy_orders',
+        'first_forming',
         'push_orders',
         'run_bought_worker',
         'run_sold_worker',
@@ -125,7 +125,7 @@ class SignalAdmin(admin.ModelAdmin):
     def entry_points(signal):
         return ' - '.join([str(i.value) for i in signal.entry_points.all()])
 
-    def form_buy_orders(self, request, queryset):
+    def first_forming(self, request, queryset):
         for signal in queryset:
             self._form_one(request, signal)
 
