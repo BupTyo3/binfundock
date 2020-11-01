@@ -3,8 +3,8 @@ version: '3.7'
 services:
   db:
     image: postgres:12.3-alpine
-    ports:
-      - 9876:5432
+#    ports:
+#      - 9876:5432
     volumes:
       - ./pgdata:/var/lib/postgresql/data
     environment:
