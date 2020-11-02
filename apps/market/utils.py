@@ -13,3 +13,6 @@ class MarketType(Enum):
     def choices(cls):
         return [(key.value, key.name) for key in cls]
 
+
+MARGIN_TYPE_ISOLATED = "ISOLATED"
+MARGIN_TYPE_CROSSED = "CROSSED"

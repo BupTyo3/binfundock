@@ -378,7 +378,6 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def _check_if_balance_enough_for_signal(self) -> bool:
         """
-        Check if balance enough for Signal.
         Enough for create buy orders and then (after one buy order has worked) - sell orders
         """
         # TODO check
@@ -903,6 +902,16 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     def push_orders(self):
+        from apps.market.utils import MarketType
+        if self.market.logic.type == MarketType.FUTURES.value:
+            return self._push_futures_orders()
+        elif self.market.logic.type == MarketType.SPOT.value:
+            return self._push_spot_orders()
+        else:
+            logger.error(f"Not found Market type. Signal: {self}")
+
+    @debug_input_and_returned
+    def _push_spot_orders(self):
         """
         Function for interaction with the Real Market
         1)Cancel NOT_SENT local_cancelled Buy orders
@@ -959,6 +968,10 @@ class Signal(BaseSignal):
             if self.status not in [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]:
                 self.status = SignalStatus.PUSHED.value
                 self.save()
+
+    @debug_input_and_returned
+    def _push_futures_orders(self):
+        self._push_spot_orders()
 
     @debug_input_and_returned
     # @transaction.atomic
