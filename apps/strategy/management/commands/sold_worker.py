@@ -22,10 +22,10 @@ class Command(SystemCommand):
         techannel = options['techannel']
 
         if outer_signal_id:
-            logger.debug(f"Buy orders will be formed by '{outer_signal_id}' signal")
+            logger.debug(f"Run SOLD_WORKER for '{outer_signal_id}' signal")
         else:
             signal_status = SignalStatus.NEW.value
-            logger.debug(f"Buy orders will be formed by all {signal_status} signals")
+            logger.debug(f"Run SOLD_WORKER for all {signal_status} signals")
         if not options['without_checking']:
             key = input('y/n: ')
             if key.lower() in ['y', 'yes']:

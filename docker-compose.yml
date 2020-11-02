@@ -3,15 +3,15 @@ version: '3.7'
 services:
   db:
     image: postgres:12.3-alpine
-    ports:
-      - 9876:5432
+#    ports:
+#      - 9876:5432
     volumes:
       - ./pgdata:/var/lib/postgresql/data
     environment:
 #    Init db. Just for order
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: "${DB_NAME}"
+      POSTGRES_USER: "${DB_USER}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
   web:
     build:
       context: .

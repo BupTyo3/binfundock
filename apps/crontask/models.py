@@ -12,7 +12,7 @@ class CronTask(CronTaskBase):
     _default_slip_delta_stop_loss_percentage = 0.2
     _default_balance_percentage_by_signal = 0
 
-    form_buy_orders_enabled = models.BooleanField(default=False)
+    first_forming_enabled = models.BooleanField(default=False)
     push_job_enabled = models.BooleanField(default=False)
     pull_job_enabled = models.BooleanField(default=False)
     bought_worker_enabled = models.BooleanField(default=False)
