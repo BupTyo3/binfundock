@@ -173,6 +173,7 @@ class Signal(BaseSignal):
     techannel: Techannel
     market: Market
     symbol: str
+    stop_loss: float
 
     def __str__(self):
         return f"Signal:{self.pk}:{self.symbol}:{self.techannel.abbr}:{self.outer_signal_id}"
@@ -362,6 +363,21 @@ class Signal(BaseSignal):
         from apps.order.models import SellOrder
         logger.debug(f"Form MARKET SELL ORDER for signal {self}")
         order = SellOrder.form_sell_market_order(
+            market=self.market,
+            signal=self,
+            quantity=quantity,
+            price=price,
+        )
+        return order
+
+    @debug_input_and_returned
+    def __form_sell_sl_market_order(self, quantity: float, price: float) -> 'SellOrder':
+        """
+        Form sell market order for the signal
+        """
+        from apps.order.models import SellOrder
+        logger.debug(f"Form MARKET SELL SL ORDER for signal {self}")
+        order = SellOrder.form_sell_sl_market_order(
             market=self.market,
             signal=self,
             quantity=quantity,
@@ -692,7 +708,7 @@ class Signal(BaseSignal):
         return res['sold_quantity__sum'] or 0
 
     @staticmethod
-    def __get_planned_sold_quantity(worked_orders: QuerySet) -> float:
+    def __get_planned_executed_quantity(worked_orders: QuerySet) -> float:
         """
         Get Sum of quantity of orders
         """
@@ -709,7 +725,7 @@ class Signal(BaseSignal):
          (bought quantity of worked buy orders).
         Fraction by step
          """
-        all_quantity = self.__get_planned_sold_quantity(sent_sell_orders) + addition_quantity
+        all_quantity = self.__get_planned_executed_quantity(sent_sell_orders) + addition_quantity
         res = all_quantity / sent_sell_orders.count()
         pair = self._get_pair()
         return self.__find_not_fractional_by_step(res, pair.step_quantity)
@@ -791,7 +807,10 @@ class Signal(BaseSignal):
             coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
             # TODO: Form buy orders
             self.__form_buy_order(coin_quantity, entry_point, index)
-        pass
+        # self.__form_futures_sl_order()
+        # Create Stop_loss Order
+        planned_executed_quantity = self.__get_planned_executed_quantity(self.buy_orders.all())
+        self.__form_sell_market_order(quantity=planned_executed_quantity, price=self.stop_loss)
 
     def _formation_futures_short_orders(self):
         for index, entry_point in enumerate(self.entry_points.all()):

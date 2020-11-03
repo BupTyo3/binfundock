@@ -177,6 +177,24 @@ class SellOrder(BaseSellOrder):
         return order
 
     @classmethod
+    def _form_sell_sl_market_order(cls, market: 'BaseMarket',
+                                   signal: Signal,
+                                   quantity: float,
+                                   price: float,
+                                   custom_order_id: Optional[str]):
+        """Form Take Profit order"""
+        order = SellOrder.objects.create(
+            market=market,
+            symbol=signal.symbol,
+            quantity=quantity,
+            price=price,
+            signal=signal,
+            custom_order_id=custom_order_id,
+            type=OrderType.STOP_LOSS.value,
+            index=cls._MARKET_INDEX)
+        return order
+
+    @classmethod
     def form_sell_oco_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
                             take_profit: float, stop_loss: float,
                             custom_order_id: Optional[str], index: int):
@@ -202,6 +220,19 @@ class SellOrder(BaseSellOrder):
             custom_order_id=custom_order_id)
         return order
 
+    @classmethod
+    def form_sell_sl_market_order(cls, market: 'BaseMarket',
+                                  signal: Signal,
+                                  quantity: float,
+                                  price: float,
+                                  custom_order_id: Optional[str] = None):
+        """Form Market SELL order:
+        """
+        order = cls._form_sell_sl_market_order(
+            market=market, signal=signal, quantity=quantity, price=price,
+            custom_order_id=custom_order_id)
+        return order
+
     def push_to_market(self):
         """
         Push order to the Market by api
@@ -214,6 +245,9 @@ class SellOrder(BaseSellOrder):
             self.market_logic.push_sell_oco_order(self)
         elif self.type == OrderType.MARKET.value:
             self.market_logic.push_sell_market_order(self)
+        # FUTURES for now
+        elif self.type == OrderType.STOP_LOSS.value:
+            self.market_logic.push_sell_sl_market_order(self)
 
     def cancel_into_market(self):
         """
