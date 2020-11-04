@@ -92,8 +92,9 @@ class BuyOrder(BaseBuyOrder):
 
 
 class SellOrder(BaseSellOrder):
-    _SL_APPEND_INDEX = 500
-    _MARKET_INDEX = 300
+    _SL_APPEND_INDEX = 500  # Stop_loss_Limit order
+    _MARKET_INDEX = 300  # For Spoiling signal
+    _GL_SL_INDEX = 600  # Global Stop_loss order (for Futures)
 
     market = models.ForeignKey(to=Market,
                                related_name='sell_orders',
@@ -177,12 +178,12 @@ class SellOrder(BaseSellOrder):
         return order
 
     @classmethod
-    def _form_sell_sl_market_order(cls, market: 'BaseMarket',
-                                   signal: Signal,
-                                   quantity: float,
-                                   price: float,
-                                   custom_order_id: Optional[str]):
-        """Form Take Profit order"""
+    def _form_sell_gl_sl_order(cls, market: 'BaseMarket',
+                               signal: Signal,
+                               quantity: float,
+                               price: float,
+                               custom_order_id: Optional[str]):
+        """Form Sell Global Stop_loss order"""
         order = SellOrder.objects.create(
             market=market,
             symbol=signal.symbol,
@@ -191,7 +192,7 @@ class SellOrder(BaseSellOrder):
             signal=signal,
             custom_order_id=custom_order_id,
             type=OrderType.STOP_LOSS.value,
-            index=cls._MARKET_INDEX)
+            index=cls._GL_SL_INDEX)
         return order
 
     @classmethod
@@ -221,14 +222,14 @@ class SellOrder(BaseSellOrder):
         return order
 
     @classmethod
-    def form_sell_sl_market_order(cls, market: 'BaseMarket',
-                                  signal: Signal,
-                                  quantity: float,
-                                  price: float,
-                                  custom_order_id: Optional[str] = None):
+    def form_sell_gl_sl_order(cls, market: 'BaseMarket',
+                              signal: Signal,
+                              quantity: float,
+                              price: float,
+                              custom_order_id: Optional[str] = None):
         """Form Market SELL order:
         """
-        order = cls._form_sell_sl_market_order(
+        order = cls._form_sell_gl_sl_order(
             market=market, signal=signal, quantity=quantity, price=price,
             custom_order_id=custom_order_id)
         return order
