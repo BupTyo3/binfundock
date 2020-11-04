@@ -468,6 +468,9 @@ class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
         order.update_order_api_history(status, executed_quantity)
         return response
 
+    def push_sell_market_order(self, order):
+        pass
+
     def push_sell_sl_market_order(self, order):
         """
         Push Market order.

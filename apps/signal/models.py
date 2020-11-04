@@ -371,13 +371,13 @@ class Signal(BaseSignal):
         return order
 
     @debug_input_and_returned
-    def __form_sell_sl_market_order(self, quantity: float, price: float) -> 'SellOrder':
+    def __form_sell_gl_sl_order(self, quantity: float, price: float) -> 'SellOrder':
         """
-        Form sell market order for the signal
+        Form Global Sell Stop_loss order for the signal
         """
         from apps.order.models import SellOrder
-        logger.debug(f"Form MARKET SELL SL ORDER for signal {self}")
-        order = SellOrder.form_sell_sl_market_order(
+        logger.debug(f"Form SELL GL SL ORDER for signal {self}")
+        order = SellOrder.form_sell_gl_sl_order(
             market=self.market,
             signal=self,
             quantity=quantity,
@@ -810,7 +810,7 @@ class Signal(BaseSignal):
         # self.__form_futures_sl_order()
         # Create Stop_loss Order
         planned_executed_quantity = self.__get_planned_executed_quantity(self.buy_orders.all())
-        self.__form_sell_market_order(quantity=planned_executed_quantity, price=self.stop_loss)
+        self.__form_sell_gl_sl_order(quantity=planned_executed_quantity, price=self.stop_loss)
 
     def _formation_futures_short_orders(self):
         for index, entry_point in enumerate(self.entry_points.all()):
@@ -829,6 +829,8 @@ class Signal(BaseSignal):
         elif self.position == SignalPosition.SHORT.value:
             logger.debug(f"Form Futures SHORT: '{self}'")
             self._formation_futures_short_orders()
+        self.status = SignalStatus.FORMED.value
+        self.save()
 
     def _formation_spot_orders(self):
         if self.position != SignalPosition.LONG.value:
