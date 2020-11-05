@@ -43,6 +43,8 @@ class BaseOrder(SystemBaseModel):
     type = models.CharField(max_length=32,
                             choices=OrderType.choices(),
                             default=OrderType.LIMIT.value)
+    stop_loss = models.FloatField(default=0)
+    index = models.PositiveIntegerField()
     push_count = models.PositiveIntegerField(default=0)
     custom_order_id = models.CharField(max_length=36)
     handled_worked = models.BooleanField(
