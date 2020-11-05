@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class SignalStatus(Enum):
     NEW = 'new'
-    FORMED = 'formed'  # form_buy_orders
+    FORMED = 'formed'  # first_forming
     PUSHED = 'pushed'
     BOUGHT = 'bought'
     SOLD = 'sold'

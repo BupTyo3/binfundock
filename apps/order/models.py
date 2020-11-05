@@ -74,7 +74,7 @@ class BuyOrder(BaseBuyOrder):
         self.update_order_api_history(status, bought_quantity)
 
     # @transaction.atomic
-    def update_order_api_history(self, status, executed_quantity):
+    def update_order_api_history(self, status, executed_quantity, price=None):
         """
         Create HistoryApiBuyOrder entity if not exists or we got new data (status or executed_quantity).
         Set Order status (for the first time - SENT)
@@ -92,8 +92,9 @@ class BuyOrder(BaseBuyOrder):
 
 
 class SellOrder(BaseSellOrder):
-    _SL_APPEND_INDEX = 500
-    _MARKET_INDEX = 300
+    _SL_APPEND_INDEX = 500  # Stop_loss_Limit order
+    _MARKET_INDEX = 300  # For Spoiling signal
+    _GL_SL_INDEX = 600  # Global Stop_loss order (for Futures)
 
     market = models.ForeignKey(to=Market,
                                related_name='sell_orders',
@@ -177,6 +178,24 @@ class SellOrder(BaseSellOrder):
         return order
 
     @classmethod
+    def _form_sell_gl_sl_order(cls, market: 'BaseMarket',
+                               signal: Signal,
+                               quantity: float,
+                               price: float,
+                               custom_order_id: Optional[str]):
+        """Form Sell Global Stop_loss order"""
+        order = SellOrder.objects.create(
+            market=market,
+            symbol=signal.symbol,
+            quantity=quantity,
+            price=price,
+            signal=signal,
+            custom_order_id=custom_order_id,
+            type=OrderType.STOP_LOSS.value,
+            index=cls._GL_SL_INDEX)
+        return order
+
+    @classmethod
     def form_sell_oco_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
                             take_profit: float, stop_loss: float,
                             custom_order_id: Optional[str], index: int):
@@ -202,6 +221,19 @@ class SellOrder(BaseSellOrder):
             custom_order_id=custom_order_id)
         return order
 
+    @classmethod
+    def form_sell_gl_sl_order(cls, market: 'BaseMarket',
+                              signal: Signal,
+                              quantity: float,
+                              price: float,
+                              custom_order_id: Optional[str] = None):
+        """Form Market SELL order:
+        """
+        order = cls._form_sell_gl_sl_order(
+            market=market, signal=signal, quantity=quantity, price=price,
+            custom_order_id=custom_order_id)
+        return order
+
     def push_to_market(self):
         """
         Push order to the Market by api
@@ -214,6 +246,9 @@ class SellOrder(BaseSellOrder):
             self.market_logic.push_sell_oco_order(self)
         elif self.type == OrderType.MARKET.value:
             self.market_logic.push_sell_market_order(self)
+        # FUTURES for now
+        elif self.type == OrderType.STOP_LOSS.value:
+            self.market_logic.push_sell_sl_market_order(self)
 
     def cancel_into_market(self):
         """

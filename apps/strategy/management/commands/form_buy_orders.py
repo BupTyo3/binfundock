@@ -23,10 +23,10 @@ class Command(SystemCommand):
         techannel = options['techannel']
 
         if outer_signal_id and techannel:
-            logger.debug(f"Buy orders will be formed by '{outer_signal_id}':'{techannel}' signal")
+            logger.debug(f"FIRST_FORMING for '{outer_signal_id}':'{techannel}' signal")
         else:
             signal_status = SignalStatus.NEW.value
-            logger.debug(f"Buy orders will be formed by all {signal_status} signals")
+            logger.debug(f"FIRST_FORMING for all {signal_status} signals")
 
         if not options['without_checking']:
             key = input('y/n: ')
@@ -36,7 +36,7 @@ class Command(SystemCommand):
                 logger.debug("You typed No - The End")
                 quit()
 
-        if not get_or_create_crontask().form_buy_orders_enabled:
+        if not get_or_create_crontask().first_forming_enabled:
             return
 
         Signal.handle_new_signals(

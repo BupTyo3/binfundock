@@ -93,6 +93,10 @@ class BaseOrder(SystemBaseModel):
     def order_type_separator(self) -> str:
         pass
 
+    @abstractmethod
+    def update_order_api_history(self, status: str, executed_quantity: float, price: Optional[float] = None):
+        pass
+
     def form_order_id(self,
                       message_id: Optional[int],
                       techannel_abbr: str,
@@ -111,6 +115,14 @@ class BaseOrder(SystemBaseModel):
     def push_count_increase(self):
         self.push_count = F('push_count') + 1
         self.save()
+
+    def cancel_not_sent_order(self):
+        """
+        Cancel NOT_SENT order
+        """
+        logger.debug(f"Cancel NOT_SENT order locally! {self}")
+        status, quantity = OrderStatus.CANCELED.value, 0
+        self.update_order_api_history(status, quantity)
 
     def _set_updated_by_api_without_saving(self):
         """Update last_updated_by_api field by current time"""

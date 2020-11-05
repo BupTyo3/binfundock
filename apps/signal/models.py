@@ -64,7 +64,8 @@ class SignalOrig(BaseSignalOrig):
         unique_together = ['techannel', 'outer_signal_id', ]
 
     def save(self, *args, **kwargs):
-        self.main_coin = self._get_main_coin(self.symbol)
+        if self.pk is None:
+            self.main_coin = self._get_main_coin(self.symbol)
         super().save(*args, **kwargs)
 
     @classmethod
@@ -172,6 +173,7 @@ class Signal(BaseSignal):
     techannel: Techannel
     market: Market
     symbol: str
+    stop_loss: float
 
     def __str__(self):
         return f"Signal:{self.pk}:{self.symbol}:{self.techannel.abbr}:{self.outer_signal_id}"
@@ -180,10 +182,11 @@ class Signal(BaseSignal):
         unique_together = ['techannel', 'outer_signal_id', 'market']
 
     def save(self, *args, **kwargs):
-        self.main_coin = self._get_main_coin(self.symbol)
+        if self.pk is None:
+            self.main_coin = self._get_main_coin(self.symbol)
         super().save(*args, **kwargs)
-        logger.debug(self)
-        HistorySignal.write_in_history(self, self.status)
+        if self.pk is None:
+            HistorySignal.write_in_history(self, self.status)
 
     @rounded_result
     def __get_calculated_amount(self):
@@ -368,6 +371,21 @@ class Signal(BaseSignal):
         return order
 
     @debug_input_and_returned
+    def __form_sell_gl_sl_order(self, quantity: float, price: float) -> 'SellOrder':
+        """
+        Form Global Sell Stop_loss order for the signal
+        """
+        from apps.order.models import SellOrder
+        logger.debug(f"Form SELL GL SL ORDER for signal {self}")
+        order = SellOrder.form_sell_gl_sl_order(
+            market=self.market,
+            signal=self,
+            quantity=quantity,
+            price=price,
+        )
+        return order
+
+    @debug_input_and_returned
     @rounded_result
     def __get_amount_quantity(self) -> float:
         toc_quantity = self.__get_turnover_by_coin_pair()
@@ -376,7 +394,6 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def _check_if_balance_enough_for_signal(self) -> bool:
         """
-        Check if balance enough for Signal.
         Enough for create buy orders and then (after one buy order has worked) - sell orders
         """
         # TODO check
@@ -691,7 +708,7 @@ class Signal(BaseSignal):
         return res['sold_quantity__sum'] or 0
 
     @staticmethod
-    def __get_planned_sold_quantity(worked_orders: QuerySet) -> float:
+    def __get_planned_executed_quantity(worked_orders: QuerySet) -> float:
         """
         Get Sum of quantity of orders
         """
@@ -708,7 +725,7 @@ class Signal(BaseSignal):
          (bought quantity of worked buy orders).
         Fraction by step
          """
-        all_quantity = self.__get_planned_sold_quantity(sent_sell_orders) + addition_quantity
+        all_quantity = self.__get_planned_executed_quantity(sent_sell_orders) + addition_quantity
         res = all_quantity / sent_sell_orders.count()
         pair = self._get_pair()
         return self.__find_not_fractional_by_step(res, pair.step_quantity)
@@ -790,7 +807,10 @@ class Signal(BaseSignal):
             coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
             # TODO: Form buy orders
             self.__form_buy_order(coin_quantity, entry_point, index)
-        pass
+        # self.__form_futures_sl_order()
+        # Create Stop_loss Order
+        planned_executed_quantity = self.__get_planned_executed_quantity(self.buy_orders.all())
+        self.__form_sell_gl_sl_order(quantity=planned_executed_quantity, price=self.stop_loss)
 
     def _formation_futures_short_orders(self):
         for index, entry_point in enumerate(self.entry_points.all()):
@@ -809,6 +829,8 @@ class Signal(BaseSignal):
         elif self.position == SignalPosition.SHORT.value:
             logger.debug(f"Form Futures SHORT: '{self}'")
             self._formation_futures_short_orders()
+        self.status = SignalStatus.FORMED.value
+        self.save()
 
     def _formation_spot_orders(self):
         if self.position != SignalPosition.LONG.value:
@@ -901,49 +923,76 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     def push_orders(self):
+        from apps.market.utils import MarketType
+        if self.market.logic.type == MarketType.FUTURES.value:
+            return self._push_futures_orders()
+        elif self.market.logic.type == MarketType.SPOT.value:
+            return self._push_spot_orders()
+        else:
+            logger.error(f"Not found Market type. Signal: {self}")
+
+    @debug_input_and_returned
+    def _push_spot_orders(self):
         """
         Function for interaction with the Real Market
-        1)Sent request for local_cancelled Buy orders
-        2)Sent request for local_cancelled Sell orders
-        3)Sent request to create real NOT_SENT Sell orders (NOT_SENT -> SENT)
-        4)Sent request to create real NOT_SENT Buy orders (NOT_SENT -> SENT)
-        5)Change Signal status (NEW -> PUSHED) if this is the first launch
+        1)Cancel NOT_SENT local_cancelled Buy orders
+        2)Sent request for local_cancelled SENT Buy orders
+        3)Cancel NOT_SENT local_cancelled Sell orders
+        4)Sent request for local_cancelled SENT Sell orders
+        5)Sent request to create real Sell orders (NOT_SENT -> SENT)
+        6)Sent request to create real Buy orders (NOT_SENT -> SENT)
+        7)Change Signal status (NEW -> PUSHED) if this is the first launch
 
         """
         from apps.order.utils import OrderStatus
-        statuses_not_for_cancel = [OrderStatus.CANCELED.value,
-                                   OrderStatus.NOT_EXISTS.value,
-                                   ]
         cancelled_params = {
             'local_canceled': True,
+        }
+        no_need_push_params = {
             'no_need_push': False,
         }
-        cancelled_excluded_params = {
-            '_status__in': statuses_not_for_cancel
+        not_sent_params = {
+            '_status__in': [OrderStatus.NOT_SENT.value, ]
         }
-        # cancel local_cancelled buy orders
+        sent_params = {
+            '_status__in': [OrderStatus.SENT.value,
+                            OrderStatus.PARTIAL.value]
+        }
+        # cancel NOT_SENT local_cancelled BUY orders
         for local_cancelled_order in self.buy_orders.filter(
-                **cancelled_params).exclude(**cancelled_excluded_params):
+                **cancelled_params).filter(**not_sent_params):
+            local_cancelled_order.cancel_not_sent_order()
+        # cancel SENT local_cancelled BUY orders
+        for local_cancelled_order in self.buy_orders.filter(
+                **cancelled_params).filter(**sent_params).filter(**no_need_push_params):
             local_cancelled_order.cancel_into_market()
-        # cancel local_cancelled sell orders
+        # cancel NOT_SENT local_cancelled SELL orders
         for local_cancelled_order in self.sell_orders.filter(
-                **cancelled_params).exclude(**cancelled_excluded_params):
+                **cancelled_params).filter(**not_sent_params):
+            local_cancelled_order.cancel_not_sent_order()
+        # cancel SENT local_cancelled SELL orders
+        for local_cancelled_order in self.sell_orders.filter(
+                **cancelled_params).filter(**sent_params).filter(**no_need_push_params):
             local_cancelled_order.cancel_into_market()
-        orders_params = {
+        orders_params_for_pushing = {
             '_status': OrderStatus.NOT_SENT.value,
             'local_canceled': False,
             'no_need_push': False,
         }
-        # push not_sent SELL orders
-        for sell_order in self.sell_orders.filter(**orders_params):
+        # push NOT_SENT SELL orders
+        for sell_order in self.sell_orders.filter(**orders_params_for_pushing):
             sell_order.push_to_market()
-        # push not_sent BUY orders
-        for buy_order in self.buy_orders.filter(**orders_params):
+        # push NOT_SENT BUY orders
+        for buy_order in self.buy_orders.filter(**orders_params_for_pushing):
             buy_order.push_to_market()
             # set status if at least one order has created
             if self.status not in [SignalStatus.PUSHED.value, SignalStatus.BOUGHT.value, SignalStatus.SOLD.value, ]:
                 self.status = SignalStatus.PUSHED.value
                 self.save()
+
+    @debug_input_and_returned
+    def _push_futures_orders(self):
+        self._push_spot_orders()
 
     @debug_input_and_returned
     # @transaction.atomic
