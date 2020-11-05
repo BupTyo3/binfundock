@@ -107,6 +107,7 @@ class BinanceDataMixin:
 
     # Futures
     available_balance_ = 'availableBalance'
+    order_type_stop_market = 'STOP_MARKET'
 
     @floated_result
     def _get_pair_rule(self, data: dict, first: str, order: int, second: str):
@@ -346,7 +347,7 @@ class BiMarketLogic(BaseMarketLogic, BinanceDataMixin):
 class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
     name = 'BiFutures'
     order_id_separator = 'bifu'
-    market_fee = conf_obj.market_fee
+    market_fee = conf_obj.futures_market_fee
     type = MarketType.FUTURES.value
 
     client_class = BiFuturesClient
@@ -471,15 +472,15 @@ class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
     def push_sell_market_order(self, order):
         pass
 
-    def push_sell_sl_market_order(self, order):
+    def push_sell_gl_sl_market_order(self, order):
         """
         Push Market order.
         """
         from apps.pair.models import Pair
         pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
         logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
-        response = self._push_sell_sl_market_order(
-            symbol=order.symbol, quantity=order.quantity,
+        response = self._push_sell_gl_sl_market_order(
+            symbol=order.symbol, quantity=order.quantity, stop_price=order.price,
             custom_order_id=order.custom_order_id)
         data = self._get_partially_order_data_from_response(response)
         status, executed_quantity = data.get('status'), data.get('executed_quantity')
@@ -498,16 +499,18 @@ class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
         return self.my_client.futures_cancel_order(symbol=symbol, origClientOrderId=custom_order_id)
 
     @api_logging
-    def _push_sell_sl_market_order(self,
-                                   symbol: str,
-                                   quantity: float,
-                                   custom_order_id: str):
+    def _push_sell_gl_sl_market_order(self,
+                                      symbol: str,
+                                      quantity: float,
+                                      stop_price: float,
+                                      custom_order_id: str):
         """Send request to create SL Market order.
         """
         response = self.my_client.futures_create_order(
             side=self.my_client.SIDE_SELL,
-            type=self.my_client.ORDER_TYPE_STOP_LOSS,
+            type=self.order_type_stop_market,
             symbol=symbol,
+            stopPrice=price_to_str(stop_price),
             quantity=quantity,
             newClientOrderId=custom_order_id)
         return response
