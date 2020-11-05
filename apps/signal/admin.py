@@ -155,7 +155,7 @@ class SignalAdmin(admin.ModelAdmin):
 
     @notifications_handling('')
     def _form_one(self, request, signal):
-        signal.formation_buy_orders()
+        signal.first_formation_orders()
 
     @notifications_handling('')
     def _push_order_one(self, request, signal):

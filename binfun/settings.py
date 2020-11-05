@@ -260,6 +260,7 @@ class Config:
         self.futures_market_api_key = market.get('futures_market_api_key', None)
         self.futures_market_api_secret = market.get('futures_market_api_secret', None)
         self.market_fee: float = market.getfloat('market_fee')
+        self.futures_market_fee: float = market.getfloat('futures_market_fee')
         logic = config['Logic']
         signal = config['Signal']
         self.accessible_main_coins: List[str] = signal['accessible_main_coins'].split(',')

@@ -20,6 +20,7 @@ market_api_secret=xxx
 futures_market_api_key=xxx
 futures_market_api_secret=xxx
 market_fee=0.1
+futures_market_fee=0.03
 [Signal]
 # for table Signal
 accessible_main_coins=USDT,
