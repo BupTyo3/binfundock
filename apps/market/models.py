@@ -439,9 +439,13 @@ class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
     def _push_buy_limit_order(self, symbol: str, quantity: float, price: float, custom_order_id: str):
         """Send request to create Buy limit order"""
         response = self.my_client.futures_create_order(
-            symbol=symbol, side=self.my_client.SIDE_BUY, type=self.my_client.ORDER_TYPE_LIMIT,
-            quantity=quantity, price=price_to_str(price),
-            newClientOrderId=custom_order_id, timeInForce=self.my_client.TIME_IN_FORCE_GTC)
+            symbol=symbol,
+            side=self.my_client.SIDE_BUY,
+            type=self.my_client.ORDER_TYPE_LIMIT,
+            quantity=quantity,
+            price=price_to_str(price),
+            newClientOrderId=custom_order_id,
+            timeInForce=self.my_client.TIME_IN_FORCE_GTC)
         return response
 
     @debug_input_and_returned
@@ -505,7 +509,7 @@ class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
             symbol=symbol,
             quantity=quantity,
             price=price_to_str(price),
-            ClientOrderId=custom_order_id,
+            newClientOrderId=custom_order_id,
             stopPrice=price_to_str(stop_trigger),
             stopLimitTimeInForce=self.my_client.TIME_IN_FORCE_GTC)
         return response
