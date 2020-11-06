@@ -21,6 +21,51 @@ class SignalStatus(Enum):
         return [(key.value, key.name) for key in cls]
 
 
+FORMED__SIG_STATS = [
+    SignalStatus.FORMED.value,
+]
+FORMED_PUSHED__SIG_STATS = [
+    SignalStatus.FORMED.value,
+    SignalStatus.PUSHED.value,
+]
+FORMED_PUSHED_BOUGHT__SIG_STATS = [
+    SignalStatus.FORMED.value,
+    SignalStatus.PUSHED.value,
+    SignalStatus.BOUGHT.value,
+]
+FORMED_PUSHED_BOUGHT_SOLD__SIG_STATS = [
+    SignalStatus.FORMED.value,
+    SignalStatus.PUSHED.value,
+    SignalStatus.BOUGHT.value,
+    SignalStatus.SOLD.value,
+]
+FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS = [
+    SignalStatus.FORMED.value,
+    SignalStatus.PUSHED.value,
+    SignalStatus.BOUGHT.value,
+    SignalStatus.SOLD.value,
+    SignalStatus.CANCELING.value,
+]
+PUSHED_BOUGHT_SOLD__SIG_STATS = [
+    SignalStatus.PUSHED.value,
+    SignalStatus.BOUGHT.value,
+    SignalStatus.SOLD.value,
+]
+PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS = [
+    SignalStatus.PUSHED.value,
+    SignalStatus.BOUGHT.value,
+    SignalStatus.SOLD.value,
+    SignalStatus.CANCELING.value,
+]
+BOUGHT_SOLD__SIG_STATS = [
+    SignalStatus.BOUGHT.value,
+    SignalStatus.SOLD.value,
+]
+SOLD__SIG_STATS = [
+    SignalStatus.SOLD.value,
+]
+
+
 class SignalPosition(Enum):
     LONG = 'long'  # BUY
     SHORT = 'short'  # SELL

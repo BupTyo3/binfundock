@@ -491,6 +491,40 @@ class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
     def push_sell_oco_order(self, order):
         pass
 
+    @api_logging
+    def _push_sell_tp_order(self, symbol: str,
+                            quantity: float, price: float,
+                            stop_trigger: float, custom_order_id: str):
+        """Send request to create OCO order.
+        We push one request to the Market, but two orders will be created:
+        tp_order, sl_order
+        """
+        response = self.my_client.futures_create_order(
+            side=self.my_client.SIDE_SELL,
+            type=self.my_client.ORDER_TYPE_TAKE_PROFIT,
+            symbol=symbol,
+            quantity=quantity,
+            price=price_to_str(price),
+            ClientOrderId=custom_order_id,
+            stopPrice=price_to_str(stop_trigger),
+            stopLimitTimeInForce=self.my_client.TIME_IN_FORCE_GTC)
+        return response
+
+    def push_sell_tp_order(self, order: 'SellOrder'):
+        """
+        Push TP order.
+        """
+        from apps.pair.models import Pair
+        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
+        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
+        response = self._push_sell_tp_order(
+            symbol=order.symbol, quantity=order.quantity, price=order.price,
+            custom_order_id=order.custom_order_id, stop_trigger=order.stop_loss)
+        default_executed_quantity = 0.0
+        default_status = OrderStatus.SENT.value
+        order.update_order_api_history(default_status, default_executed_quantity)
+        return response
+
     @catch_exception(
         code=-2011, alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
     @api_logging(text="Cancel order into Market")
