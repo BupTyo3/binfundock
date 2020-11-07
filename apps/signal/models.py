@@ -385,7 +385,8 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     def __form_sell_tp_order(self, quantity: float, price: float, index: int,
-                             custom_order_id: Optional[str] = None) -> 'SellOrder':
+                             custom_order_id: Optional[str] = None,
+                             trigger_price: Optional[float] = None) -> 'SellOrder':
         """
         Form sell limit order for the signal
         """
@@ -398,6 +399,7 @@ class Signal(BaseSignal):
             price=price,
             index=index,
             custom_order_id=custom_order_id,
+            trigger_price=trigger_price,
         )
         return order
 
@@ -517,10 +519,10 @@ class Signal(BaseSignal):
         return self.__find_not_fractional_by_step(res, pair.step_price)
 
     @debug_input_and_returned
-    def _formation_copied_sell_order(self,
-                                     original_order_id: int,
-                                     sell_quantity: Optional[float] = None,
-                                     new_stop_loss: Optional[float] = None):
+    def _formation_copied_sell_order_spot(self,
+                                          original_order_id: int,
+                                          sell_quantity: Optional[float] = None,
+                                          new_stop_loss: Optional[float] = None):
         """
         Form one copied Sell order by original Sell order (with updated quantity or stop_loss)
         """
@@ -538,11 +540,11 @@ class Signal(BaseSignal):
         return new_sell_order
 
     @debug_input_and_returned
-    def _formation_copied_sell_orders(self,
-                                      original_orders_ids: List[int],
-                                      worked_sell_orders: QuerySet,
-                                      sell_quantity: Optional[float] = None,
-                                      new_stop_loss: Optional[float] = None) -> List['SellOrder']:
+    def _formation_copied_sell_orders_spot(self,
+                                           original_orders_ids: List[int],
+                                           worked_sell_orders: QuerySet,
+                                           sell_quantity: Optional[float] = None,
+                                           new_stop_loss: Optional[float] = None) -> List['SellOrder']:
         """
         Form copied Sell orders with new stop_loss or new sell_quantity
         """
@@ -551,9 +553,61 @@ class Signal(BaseSignal):
         res = list()
         original_orders_ids.sort()
         for order_id in original_orders_ids:
-            res.append(self._formation_copied_sell_order(
+            res.append(self._formation_copied_sell_order_spot(
                 original_order_id=order_id, new_stop_loss=new_stop_loss, sell_quantity=sell_quantity))
         return res
+
+    @debug_input_and_returned
+    def _formation_copied_sell_order_futures(self,
+                                             original_order_id: int,
+                                             sell_quantity: Optional[float] = None):
+        """
+        Form one copied Sell order by original Sell order (with updated quantity)
+        """
+        from apps.order.models import SellOrder
+
+        order = SellOrder.objects.filter(id=original_order_id).first()
+        new_custom_order_id = get_increased_leading_number(order.custom_order_id)
+        logger.debug(f"New copied SELL order custom_order_id = '{new_custom_order_id}'")
+        new_sell_order = self.__form_sell_tp_order(
+            custom_order_id=new_custom_order_id,
+            quantity=sell_quantity if sell_quantity is not None else order.quantity,
+            price=order.price,
+            index=order.index,
+            trigger_price=order.stop_loss)
+        return new_sell_order
+
+    @debug_input_and_returned
+    def _formation_copied_sell_orders_futures(self,
+                                              original_orders_ids: List[int],
+                                              sell_quantity: Optional[float] = None) -> List['SellOrder']:
+        """
+        Form copied Sell orders with new stop_loss or new sell_quantity
+        """
+        res = list()
+        original_orders_ids.sort()
+        for order_id in original_orders_ids:
+            res.append(self._formation_copied_sell_order_futures(
+                original_order_id=order_id, sell_quantity=sell_quantity))
+        return res
+
+    @debug_input_and_returned
+    def _formation_copied_sell_orders(self,
+                                      original_orders_ids: List[int],
+                                      worked_sell_orders: QuerySet,
+                                      sell_quantity: Optional[float] = None,
+                                      new_stop_loss: Optional[float] = None,
+                                      futures: bool = False) -> List['SellOrder']:
+        if futures:
+            return self._formation_copied_sell_orders_futures(
+                original_orders_ids=original_orders_ids,
+                sell_quantity=sell_quantity)
+        else:
+            return self._formation_copied_sell_orders_spot(
+                original_orders_ids=original_orders_ids,
+                worked_sell_orders=worked_sell_orders,
+                sell_quantity=sell_quantity,
+                new_stop_loss=new_stop_loss)
 
     def __get_not_handled_worked_buy_orders(self) -> QuerySet:
         """
@@ -572,7 +626,8 @@ class Signal(BaseSignal):
 
     def __get_not_handled_worked_sell_orders(self,
                                              sl_orders: bool = False,
-                                             tp_orders: bool = False) -> QuerySet:
+                                             tp_orders: bool = False,
+                                             excluded_indexes: Optional[List[int]] = None) -> QuerySet:
         """
         Function to get not handled worked Sell orders
         """
@@ -588,6 +643,10 @@ class Signal(BaseSignal):
         qs = SellOrder.objects.filter(**params)
         qs = qs.exclude(sl_order=None) if not sl_orders else qs
         qs = qs.exclude(tp_order=None) if not tp_orders else qs
+        if not excluded_indexes:
+            return qs
+        for index in excluded_indexes:
+            qs = qs.exclude(index=index)
         return qs
 
     @debug_input_and_returned
@@ -1045,7 +1104,8 @@ class Signal(BaseSignal):
             self.__cancel_sent_sell_orders(opened_sell_orders)
             self._formation_copied_sell_orders(original_orders_ids=copied_sent_sell_orders_ids,
                                                worked_sell_orders=worked_orders,
-                                               sell_quantity=new_bought_quantity)
+                                               sell_quantity=new_bought_quantity,
+                                               futures=futures)
         # Form sell orders if the signal doesn't have any
         elif not self.__get_sell_orders_exclude_indexes(excluded_indexes=[SellOrder.GL_SM_INDEX, ]).exists():
             self._formation_first_sell_orders(sell_quantity=bought_quantity, futures=futures)
@@ -1073,15 +1133,15 @@ class Signal(BaseSignal):
         1)Cancel BUY orders
         2)Recreating opened (sent) SELL orders with updated stop_loss
         3)Calculate profit (stop_loss or take_profit)
+        PS:
+        If SL(oco) order has worked, corresponding TP order becomes expired automatically into Market
+        If TP(oco) order has worked, corresponding SL order becomes expired automatically into Market
         """
         # TODO: Check
         worked_tp_orders = self.__get_not_handled_worked_sell_orders(tp_orders=True)
         if not worked_tp_orders:
             return
-        opened_buy_orders = self.__get_opened_buy_orders()
-        # Cancel all buy_orders
-        if opened_buy_orders:
-            self.__cancel_sent_buy_orders(opened_buy_orders)
+        self._cancel_opened_orders(buy=True)
         # Recreating opened sent sell orders with new stop_loss
         opened_sell_orders = self.__get_opened_sell_orders()
         opened_sell_orders = self.__exclude_sl_or_tp_orders(opened_sell_orders, worked_tp_orders)
@@ -1102,21 +1162,24 @@ class Signal(BaseSignal):
         """
         Worker for one signal.
         Run if at least one Sell order has worked.
-        1)Cancel BUY orders
-        2)Recreating opened (sent) SELL GL SL order with updated price
-        3)Cancel SELL GL SL order if there are no opened_sell_orders
+        1.GL SL order has worked:
+          1)Cancel all opened tp sell orders and all opened buy orders
+        2.At least one Sell order has worked
+          1)Cancel BUY orders
+          2)Recreating opened (sent) SELL GL SL order with updated price
+          3)Cancel SELL GL SL order if there are no opened_sell_orders
         """
         from apps.order.models import SellOrder
         from apps.order.utils import OPENED_ORDER_STATUSES
         # TODO: change this function (remove tp_orders, sl_orders). Make it is more universal
-        worked_tp_orders = self.__get_not_handled_worked_sell_orders(tp_orders=True, sl_orders=True)
+        self.__try_cancel_opened_orders_if_gl_sl_order_has_been_worked()
+
+        worked_tp_orders = self.__get_not_handled_worked_sell_orders(
+            tp_orders=True, sl_orders=True, excluded_indexes=[SellOrder.GL_SM_INDEX, ])
         if not worked_tp_orders:
             return
-        opened_buy_orders = self.__get_opened_buy_orders()
+        self._cancel_opened_orders(buy=True)
         opened_sell_orders = self.__get_opened_sell_orders(excluded_indexes=[SellOrder.GL_SM_INDEX, ])
-        # Cancel all buy_orders
-        if opened_buy_orders:
-            self.__cancel_sent_buy_orders(opened_buy_orders)
         # Recreating opened sent sell orders with new stop_loss
         opened_gl_sl_orders = self.__get_gl_sl_sell_orders(statuses=OPENED_ORDER_STATUSES)
         if opened_gl_sl_orders.exists():
@@ -1174,8 +1237,6 @@ class Signal(BaseSignal):
         """
         Worker closes the Signal if it has no opened Buy orders and no opened Sell orders
         """
-        self.__try_cancel_opened_orders_if_gl_sl_order_has_been_worked()
-
         if self._check_is_ready_to_be_closed():
             self.__close_futures()
 

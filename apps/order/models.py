@@ -213,15 +213,16 @@ class SellOrder(BaseSellOrder):
                             quantity: float,
                             price: float,
                             custom_order_id: Optional[str],
-                            index: int):
+                            index: int,
+                            trigger_price: Optional[float] = None):
         """Form SELL TAKE PROFIT order"""
-        calculated_real_stop_price = signal.get_real_stop_price(price)
+        calculated_real_trigger_price = signal.get_real_stop_price(price) if trigger_price is None else trigger_price
         order = SellOrder.objects.create(
             market=market,
             symbol=signal.symbol,
             quantity=quantity,
             price=price,
-            stop_loss=calculated_real_stop_price,
+            stop_loss=calculated_real_trigger_price,
             signal=signal,
             custom_order_id=custom_order_id,
             type=OrderType.TAKE_PROFIT.value,
@@ -278,12 +279,13 @@ class SellOrder(BaseSellOrder):
                            quantity: float,
                            price: float,
                            custom_order_id: Optional[str],
-                           index: int):
+                           index: int,
+                           trigger_price: Optional[float] = None):
         """Form Market SELL order:
         """
         order = cls._form_sell_tp_order(
             market=market, signal=signal, quantity=quantity, price=price,
-            custom_order_id=custom_order_id, index=index)
+            custom_order_id=custom_order_id, index=index, trigger_price=trigger_price)
         return order
 
     @classmethod
