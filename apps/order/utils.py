@@ -16,6 +16,18 @@ class OrderStatus(Enum):
         return [(key.value, key.name) for key in cls]
 
 
+OPENED_ORDER_STATUSES = [
+    OrderStatus.NOT_SENT.value,
+    OrderStatus.SENT.value,
+]
+SENT_ORDER_STATUSES = [
+    OrderStatus.SENT.value,
+]
+COMPLETED_ORDER_STATUSES = [
+    OrderStatus.COMPLETED.value,
+]
+
+
 class OrderType(Enum):
     LIMIT = 'limit'
     MARKET = 'market'

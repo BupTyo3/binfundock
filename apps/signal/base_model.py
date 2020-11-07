@@ -29,6 +29,7 @@ class BaseSignal(SystemBaseModel):
     techannel: 'TechannelBase'
     outer_signal_id: int
     market: 'BaseMarket'
+    leverage: int
 
     class Meta:
         abstract = True

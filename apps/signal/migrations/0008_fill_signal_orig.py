@@ -44,13 +44,13 @@ class Migration(migrations.Migration):
 
     operations = [
 
-        migrations.RunPython(
-            code=fill_signal_by_market_default,
-            reverse_code=migrations.RunPython.noop,
-        ),
-        migrations.RunPython(
-            code=copy_to_signal_orig,
-            reverse_code=migrations.RunPython.noop,
-        ),
+        # migrations.RunPython(
+        #     code=fill_signal_by_market_default,
+        #     reverse_code=migrations.RunPython.noop,
+        # ),
+        # migrations.RunPython(
+        #     code=copy_to_signal_orig,
+        #     reverse_code=migrations.RunPython.noop,
+        # ),
 
     ]
