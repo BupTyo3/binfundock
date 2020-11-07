@@ -10,7 +10,6 @@ from apps.order.utils import OrderStatus
 from .base_model import BaseMarket, BaseMarketLogic
 from .utils import (
     MarketType,
-    MARGIN_TYPE_ISOLATED,
 )
 from .base_client import BaseClient
 from tools.tools import (
@@ -105,10 +104,6 @@ class BinanceDataMixin:
     stopPrice_ = 'stopPrice'
     executed_quantity_ = 'executedQty'
 
-    # Futures
-    available_balance_ = 'availableBalance'
-    order_type_stop_market = 'STOP_MARKET'
-
     @floated_result
     def _get_pair_rule(self, data: dict, first: str, order: int, second: str):
         """Parsing of response about Pairs rules"""
@@ -136,7 +131,15 @@ class BinanceDataMixin:
         return res / n
 
 
-class BiMarketLogic(BaseMarketLogic, BinanceDataMixin):
+class BinanceFuturesDataMixin:
+    available_balance_ = 'availableBalance'
+    order_type_stop_market = 'STOP_MARKET'
+    margin_type_isolated = "ISOLATED"
+    margin_type_crossed = "CROSSED"
+
+
+class BiMarketLogic(BaseMarketLogic,
+                    BinanceDataMixin):
     type = MarketType.SPOT.value
     name = 'Binance'
     market_fee = conf_obj.market_fee
@@ -344,7 +347,9 @@ class BiMarketLogic(BaseMarketLogic, BinanceDataMixin):
                                     market=self.market)
 
 
-class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
+class BiFuturesMarketLogic(BaseMarketLogic,
+                           BinanceDataMixin,
+                           BinanceFuturesDataMixin):
     name = 'BiFutures'
     order_id_separator = 'bifu'
     market_fee = conf_obj.futures_market_fee
@@ -408,14 +413,14 @@ class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
         return self.my_client.futures_get_order(symbol=symbol, origClientOrderId=custom_order_id)
 
     @api_logging
-    def set_leverage(self, symbol, leverage):
+    def _set_leverage(self, symbol, leverage):
         self.my_client.futures_change_leverage(symbol=symbol, leverage=leverage)
 
     @catch_exception(
         # TODO: change alternative if needs
         code=-4066, alternative={})
     @api_logging
-    def change_margin_type(self, symbol, margin_type):
+    def _change_margin_type(self, symbol, margin_type):
         """
         Types margin: crossed (high risks, all money you are able to lose)
         isolated (use money are allocated only for the order)
@@ -448,53 +453,6 @@ class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
             timeInForce=self.my_client.TIME_IN_FORCE_GTC)
         return response
 
-    @debug_input_and_returned
-    def get_order_info(self, symbol: Union[str, models.CharField], custom_order_id: str) -> PartialResponse:
-        """Get transformed order info from the Market by api"""
-        response = self._get_order_info_api(symbol, custom_order_id)
-        return self._get_partially_order_data_from_response(response)
-
-    def push_buy_limit_order(self, order: 'BuyOrder'):
-        """Push Buy limit order to Futures"""
-        from apps.pair.models import Pair
-
-        # Set leverage
-        self.set_leverage(order.symbol, order.signal.leverage)
-
-        # Set margin type
-        self.change_margin_type(order.symbol, MARGIN_TYPE_ISOLATED)
-
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
-        response = self._push_buy_limit_order(
-            symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
-        data = self._get_partially_order_data_from_response(response)
-        status, executed_quantity = data.get('status'), data.get('executed_quantity')
-        order.update_order_api_history(status, executed_quantity)
-        return response
-
-    def push_sell_market_order(self, order):
-        pass
-
-    def push_sell_gl_sl_market_order(self, order):
-        """
-        Push Market order.
-        """
-        from apps.pair.models import Pair
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
-        response = self._push_sell_gl_sl_market_order(
-            symbol=order.symbol, quantity=order.quantity, stop_price=order.price,
-            custom_order_id=order.custom_order_id)
-        data = self._get_partially_order_data_from_response(response)
-        status, executed_quantity = data.get('status'), data.get('executed_quantity')
-        avg_sold_market_price = data.get('avg_sold_market_price')
-        order.update_order_api_history(status, executed_quantity, avg_sold_market_price)
-        return response
-
-    def push_sell_oco_order(self, order):
-        pass
-
     @api_logging
     def _push_sell_tp_order(self, symbol: str,
                             quantity: float, price: float,
@@ -514,28 +472,6 @@ class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
             stopLimitTimeInForce=self.my_client.TIME_IN_FORCE_GTC)
         return response
 
-    def push_sell_tp_order(self, order: 'SellOrder'):
-        """
-        Push TP order.
-        """
-        from apps.pair.models import Pair
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
-        response = self._push_sell_tp_order(
-            symbol=order.symbol, quantity=order.quantity, price=order.price,
-            custom_order_id=order.custom_order_id, stop_trigger=order.stop_loss)
-        default_executed_quantity = 0.0
-        default_status = OrderStatus.SENT.value
-        order.update_order_api_history(default_status, default_executed_quantity)
-        return response
-
-    @catch_exception(
-        code=-2011, alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
-    @api_logging(text="Cancel order into Market")
-    def _cancel_order(self, symbol: str, custom_order_id: str):
-        """Send request to cancel order"""
-        return self.my_client.futures_cancel_order(symbol=symbol, origClientOrderId=custom_order_id)
-
     @api_logging
     def _push_sell_gl_sl_market_order(self,
                                       symbol: str,
@@ -551,6 +487,110 @@ class BiFuturesMarketLogic(BaseMarketLogic, BinanceDataMixin):
             stopPrice=price_to_str(stop_price),
             quantity=quantity,
             newClientOrderId=custom_order_id)
+        return response
+
+    @api_logging
+    def _push_sell_market_order(self,
+                                symbol: str,
+                                quantity: float,
+                                custom_order_id: str):
+        """Send request to create SL Market order.
+        """
+        response = self.my_client.futures_create_order(
+            side=self.my_client.SIDE_SELL,
+            type=self.my_client.ORDER_TYPE_MARKET,
+            symbol=symbol,
+            quantity=quantity,
+            newClientOrderId=custom_order_id)
+        return response
+
+    @catch_exception(
+        code=-2011, alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
+    @api_logging(text="Cancel order into Market")
+    def _cancel_order(self, symbol: str, custom_order_id: str):
+        """Send request to cancel order"""
+        return self.my_client.futures_cancel_order(symbol=symbol, origClientOrderId=custom_order_id)
+
+    @debug_input_and_returned
+    def get_order_info(self, symbol: Union[str, models.CharField], custom_order_id: str) -> PartialResponse:
+        """Get transformed order info from the Market by api"""
+        response = self._get_order_info_api(symbol, custom_order_id)
+        return self._get_partially_order_data_from_response(response)
+
+    def _push_preconditions(self, order: 'BaseOrder'):
+        # Set leverage
+        self._set_leverage(order.symbol, order.signal.leverage)
+        # Set margin type
+        self._change_margin_type(order.symbol, self.margin_type_isolated)
+
+    def push_buy_limit_order(self, order: 'BuyOrder'):
+        """Push Buy limit order to Futures"""
+        from apps.pair.models import Pair
+        self._push_preconditions(order=order)
+
+        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
+        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
+        response = self._push_buy_limit_order(
+            symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
+        data = self._get_partially_order_data_from_response(response)
+        status, executed_quantity = data.get('status'), data.get('executed_quantity')
+        order.update_order_api_history(status, executed_quantity)
+        return response
+
+    def push_sell_market_order(self, order):
+        """
+        Push Stop Market order.
+        """
+        from apps.pair.models import Pair
+        self._push_preconditions(order=order)
+
+        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
+        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
+        response = self._push_sell_market_order(
+            symbol=order.symbol, quantity=order.quantity,
+            custom_order_id=order.custom_order_id)
+        data = self._get_partially_order_data_from_response(response)
+        status, executed_quantity = data.get('status'), data.get('executed_quantity')
+        avg_sold_market_price = data.get('avg_sold_market_price')
+        order.update_order_api_history(status, executed_quantity, avg_sold_market_price)
+        return response
+
+    def push_sell_gl_sl_market_order(self, order):
+        """
+        Push Stop Market order.
+        """
+        from apps.pair.models import Pair
+        self._push_preconditions(order=order)
+
+        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
+        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
+        response = self._push_sell_gl_sl_market_order(
+            symbol=order.symbol, quantity=order.quantity, stop_price=order.price,
+            custom_order_id=order.custom_order_id)
+        data = self._get_partially_order_data_from_response(response)
+        status, executed_quantity = data.get('status'), data.get('executed_quantity')
+        avg_sold_market_price = data.get('avg_sold_market_price')
+        order.update_order_api_history(status, executed_quantity, avg_sold_market_price)
+        return response
+
+    def push_sell_oco_order(self, order):
+        pass
+
+    def push_sell_tp_order(self, order: 'SellOrder'):
+        """
+        Push TP order.
+        """
+        from apps.pair.models import Pair
+        self._push_preconditions(order=order)
+
+        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
+        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
+        response = self._push_sell_tp_order(
+            symbol=order.symbol, quantity=order.quantity, price=order.price,
+            custom_order_id=order.custom_order_id, stop_trigger=order.stop_loss)
+        default_executed_quantity = 0.0
+        default_status = OrderStatus.SENT.value
+        order.update_order_api_history(default_status, default_executed_quantity)
         return response
 
     def cancel_order(self, order: 'BaseOrder'):

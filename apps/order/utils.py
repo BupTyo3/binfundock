@@ -23,6 +23,9 @@ OPENED_ORDER_STATUSES = [
 SENT_ORDER_STATUSES = [
     OrderStatus.SENT.value,
 ]
+COMPLETED_ORDER_STATUSES = [
+    OrderStatus.COMPLETED.value,
+]
 
 
 class OrderType(Enum):

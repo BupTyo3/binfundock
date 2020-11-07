@@ -30,7 +30,7 @@ class BuyOrder(BaseBuyOrder):
     bought_quantity = models.FloatField(default=0)
     signal = models.ForeignKey(to=Signal,
                                related_name='buy_orders',
-                               on_delete=models.DO_NOTHING)
+                               on_delete=models.CASCADE)
     handled_worked = models.BooleanField(
         help_text="Did something if the order has worked",
         default=False)
@@ -124,7 +124,7 @@ class BuyOrder(BaseBuyOrder):
 
 class SellOrder(BaseSellOrder):
     SL_APPEND_INDEX = 500  # Stop_loss_Limit order
-    MARKET_INDEX = 300  # For Spoiling signal
+    MARKET_INDEX = 300  # For Spoiling signal or Sell residual quantity for futures
     TAKE_PROFIT_INDEX = 700  # TAKE_PROFIT order
     GL_SM_INDEX = 600  # Global STOP_MARKET order (for Futures)
 
@@ -134,7 +134,7 @@ class SellOrder(BaseSellOrder):
     sold_quantity = models.FloatField(default=0)
     signal = models.ForeignKey(to=Signal,
                                related_name='sell_orders',
-                               on_delete=models.DO_NOTHING)
+                               on_delete=models.CASCADE)
     tp_order = models.OneToOneField(to='self',
                                     related_name='sl_order',
                                     null=True,
