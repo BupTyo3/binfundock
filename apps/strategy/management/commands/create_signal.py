@@ -16,6 +16,7 @@ class Command(SystemCommand):
         parser.add_argument('--entry_points', nargs='+', type=float, required=True, help='Entry points values')
         parser.add_argument('--take_profits', nargs='+', type=float, required=True, help='Take profits values')
         parser.add_argument('--stop_loss', type=float, required=True, help='Stop loss value')
+        parser.add_argument('--leverage', type=int, default=1, help='Leverage for futures')
         parser.add_argument('--techannel', type=str, required=True,
                             help='Unique abbreviation of Telegram channel in lowercase')
         parser.add_argument('--outer_signal_id', type=int, required=True)
@@ -48,6 +49,7 @@ class Command(SystemCommand):
         entry_points = options['entry_points']
         take_profits = options['take_profits']
         stop_loss = options['stop_loss']
+        leverage = options['leverage']
         outer_signal_id = options['outer_signal_id']
         techannel = options['techannel']
 
@@ -67,6 +69,7 @@ class Command(SystemCommand):
                                           stop_loss=stop_loss,
                                           entry_points=entry_points,
                                           take_profits=take_profits,
+                                          leverage=leverage,
                                           outer_signal_id=outer_signal_id)
 
         if sm_obj:
