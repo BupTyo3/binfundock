@@ -47,7 +47,7 @@ class BuyOrder(BaseBuyOrder):
     @classmethod
     def _form_buy_limit_order(cls, market: 'BaseMarket', signal: Signal,
                               quantity: float, entry_point: float,
-                              stop_loss: float, custom_order_id: Optional[str],
+                              trigger: float, custom_order_id: Optional[str],
                               index: int):
         """Form BUY LIMIT order"""
         default_stop_loss = 0
@@ -56,7 +56,7 @@ class BuyOrder(BaseBuyOrder):
             symbol=signal.symbol,
             quantity=quantity,
             price=entry_point,
-            stop_loss=stop_loss if stop_loss else default_stop_loss,
+            trigger=trigger if trigger else default_stop_loss,
             signal=signal,
             custom_order_id=custom_order_id,
             type=OrderType.LIMIT.value,
@@ -65,13 +65,13 @@ class BuyOrder(BaseBuyOrder):
 
     @classmethod
     def form_buy_limit_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
-                             entry_point: float, stop_loss: Optional[float],
+                             entry_point: float, trigger: Optional[float],
                              custom_order_id: Optional[str], index: int):
         """Form BUY LIMIT order
         """
         ep_order = cls._form_buy_limit_order(
             market=market, signal=signal, quantity=quantity, entry_point=entry_point,
-            stop_loss=stop_loss, custom_order_id=custom_order_id, index=index)
+            trigger=trigger, custom_order_id=custom_order_id, index=index)
         return ep_order
 
     def push_to_market(self):
@@ -146,7 +146,6 @@ class SellOrder(BaseSellOrder):
     index: int
     tp_order: 'SellOrder.objects'
     sl_order: 'SellOrder.objects'
-    stop_loss: float
 
     objects = models.Manager()
 
@@ -163,7 +162,7 @@ class SellOrder(BaseSellOrder):
             symbol=tp_order.symbol,
             quantity=tp_order.quantity,
             price=calculated_real_stop_loss,
-            stop_loss=stop_loss_trigger,
+            trigger=stop_loss_trigger,
             tp_order=tp_order,
             no_need_push=True,
             signal=tp_order.signal,
@@ -181,7 +180,7 @@ class SellOrder(BaseSellOrder):
             symbol=signal.symbol,
             quantity=quantity,
             price=take_profit,
-            stop_loss=0,
+            trigger=0,
             signal=signal,
             custom_order_id=custom_order_id,
             type=OrderType.LIMIT_MAKER.value,
@@ -221,7 +220,7 @@ class SellOrder(BaseSellOrder):
             symbol=signal.symbol,
             quantity=quantity,
             price=price,
-            stop_loss=calculated_real_trigger_price,
+            trigger=calculated_real_trigger_price,
             signal=signal,
             custom_order_id=custom_order_id,
             type=OrderType.TAKE_PROFIT.value,
