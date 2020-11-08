@@ -332,7 +332,7 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def __form_buy_order(self, distributed_toc: float,
                          entry_point: float, index: int,
-                         stop_loss: Optional[float] = None,
+                         trigger: Optional[float] = None,
                          custom_order_id: Optional[str] = None):
         from apps.order.models import BuyOrder
         order = BuyOrder.form_buy_limit_order(
@@ -340,7 +340,7 @@ class Signal(BaseSignal):
             signal=self,
             quantity=distributed_toc,
             entry_point=entry_point,
-            stop_loss=stop_loss,
+            trigger=trigger,
             custom_order_id=custom_order_id,
             index=index)
         return order
@@ -536,7 +536,7 @@ class Signal(BaseSignal):
             custom_order_id=new_custom_order_id,
             take_profit=order.price,
             index=order.index,
-            stop_loss_trigger=order.sl_order.stop_loss if new_stop_loss is None else new_stop_loss)
+            stop_loss_trigger=order.sl_order.trigger if new_stop_loss is None else new_stop_loss)
         return new_sell_order
 
     @debug_input_and_returned
@@ -574,7 +574,7 @@ class Signal(BaseSignal):
             quantity=sell_quantity if sell_quantity is not None else order.quantity,
             price=order.price,
             index=order.index,
-            trigger_price=order.stop_loss)
+            trigger_price=order.trigger)
         return new_sell_order
 
     @debug_input_and_returned
@@ -960,7 +960,7 @@ class Signal(BaseSignal):
             # Multiply quantity to leverage
             coin_quantity *= self.leverage
             # TODO: Form buy orders
-            self.__form_buy_order(coin_quantity, entry_point.value, index)
+            self.__form_buy_order(distributed_toc=coin_quantity, entry_point=entry_point.value, index=index)
         # self.__form_futures_sl_order()
         # Create Global Stop_loss Order
         planned_executed_quantity = self.__get_planned_executed_quantity(self.buy_orders.all())
@@ -1003,7 +1003,7 @@ class Signal(BaseSignal):
         self.status = SignalStatus.FORMED.value
         for index, entry_point in enumerate(self.entry_points.all()):
             coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
-            self.__form_buy_order(coin_quantity, entry_point.value, index)
+            self.__form_buy_order(distributed_toc=coin_quantity, entry_point=entry_point.value, index=index)
         self.save()
 
     # POINT PUSH JOB

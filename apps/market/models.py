@@ -210,7 +210,7 @@ class BiMarketLogic(BaseMarketLogic,
     @api_logging
     def _push_sell_oco_order(self, symbol: str,
                              quantity: float, price: float,
-                             stop_loss: float, custom_order_id: str,
+                             trigger: float, custom_order_id: str,
                              custom_sl_order_id: str,
                              stop_limit_price: float):
         """Send request to create OCO order.
@@ -223,7 +223,7 @@ class BiMarketLogic(BaseMarketLogic,
             price=price_to_str(price),
             limitClientOrderId=custom_order_id,
             stopClientOrderId=custom_sl_order_id,
-            stopPrice=price_to_str(stop_loss),
+            stopPrice=price_to_str(trigger),
             stopLimitPrice=price_to_str(stop_limit_price),
             stopLimitTimeInForce=self.my_client.TIME_IN_FORCE_GTC)
         return response
@@ -295,7 +295,7 @@ class BiMarketLogic(BaseMarketLogic,
         response = self._push_sell_oco_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price,
             custom_order_id=order.custom_order_id, custom_sl_order_id=order.sl_order.custom_order_id,
-            stop_loss=order.sl_order.stop_loss, stop_limit_price=order.sl_order.price)
+            trigger=order.sl_order.trigger, stop_limit_price=order.sl_order.price)
         default_executed_quantity = 0.0
         default_status = OrderStatus.SENT.value
         order.update_order_api_history(default_status, default_executed_quantity)
@@ -587,7 +587,7 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_sell_tp_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price,
-            custom_order_id=order.custom_order_id, stop_trigger=order.stop_loss)
+            custom_order_id=order.custom_order_id, stop_trigger=order.trigger)
         default_executed_quantity = 0.0
         default_status = OrderStatus.SENT.value
         order.update_order_api_history(default_status, default_executed_quantity)
