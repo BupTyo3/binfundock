@@ -126,7 +126,8 @@ class Telegram(BaseTelegram):
     def parse_tca_origin_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
-        possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in  ', 'Get in : ', 'Gеt in :', 'Get  in : ']
+        possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in  ', 'Get in : ', 'Gеt in :',
+                                'Get  in : ']
         possible_take_profits_label = ['Sell at: ', 'Targets: ', 'Тargets: ', 'Targеts: ', 'Tаrgets: ']
         possible_stop_label = ['SL: ', 'SL : ']
         pair_label = ['Pair: ', 'Рair: ']
@@ -146,9 +147,9 @@ class Telegram(BaseTelegram):
                 position_info = list(filter(None, possible_position_info))
                 pair = ''.join(filter(str.isalpha, position_info[1]))
                 position = ''.join(filter(str.isalpha, position_info[2]))
-            if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1])\
-                    or line.startswith(possible_entry_label[2]) or line.startswith(possible_entry_label[3])\
-                    or line.startswith(possible_entry_label[4]) or line.startswith(possible_entry_label[5])\
+            if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1]) \
+                    or line.startswith(possible_entry_label[2]) or line.startswith(possible_entry_label[3]) \
+                    or line.startswith(possible_entry_label[4]) or line.startswith(possible_entry_label[5]) \
                     or line.startswith(possible_entry_label[6]) or line.startswith(possible_entry_label[7]):
                 fake_entries = line[8:]
                 possible_entries = fake_entries.split('-')
@@ -157,8 +158,9 @@ class Telegram(BaseTelegram):
                     entries = left_numbers(possible_entries[:-1] + last_entry[:-1])
                 else:
                     entries = left_numbers(possible_entries)
-            if line.startswith(possible_take_profits_label[0]) or line.startswith(possible_take_profits_label[1])\
-                    or line.startswith(possible_take_profits_label[2]) or line.startswith(possible_take_profits_label[3])\
+            if line.startswith(possible_take_profits_label[0]) or line.startswith(possible_take_profits_label[1]) \
+                    or line.startswith(possible_take_profits_label[2]) or line.startswith(
+                possible_take_profits_label[3]) \
                     or line.startswith(possible_take_profits_label[4]):
                 fake_profits = line[9:]
                 possible_profits = fake_profits.split('-')
@@ -171,8 +173,8 @@ class Telegram(BaseTelegram):
                 else:
                     stop_loss = line[4:]
                     stop_loss = left_numbers([stop_loss])
-            if line.startswith(leverage_label[0]) or line.startswith(leverage_label[1])\
-                    or line.startswith(leverage_label[2]) or line.startswith(leverage_label[3])\
+            if line.startswith(leverage_label[0]) or line.startswith(leverage_label[1]) \
+                    or line.startswith(leverage_label[2]) or line.startswith(leverage_label[3]) \
                     or line.startswith(leverage_label[4]):
                 possible_leverage = line.split(' ')
                 possible_leverage = list(filter(None, possible_leverage))
@@ -256,6 +258,14 @@ class Telegram(BaseTelegram):
                                                         f"please check logs for '{signal[0].pair}' "
                                                         f"related to the '{channel_abbr}' algorithm: "
                                                         f"{inserted_to_db}")
+                else:
+                    await self.send_message_to_someone('Aleksandr_Maidaniuk',
+                                                       f" Pair: '{signal[0].pair}'\n"
+                                                       f" Leverage: '{signal[0].leverage}'\n"
+                                                       f" Entry Points: '{signal[0].entry_points}'\n"
+                                                       f" Take Profits: '{signal[0].take_profits}'\n"
+                                                       f" Stop Loss: '{signal[0].stop_loss}'\n"
+                                                       f" Algorithm: '{channel_abbr}'")
 
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
@@ -284,7 +294,7 @@ class Telegram(BaseTelegram):
         current_price = ''
         is_margin = False
         position = None
-        leverage = None
+        leverage = 1
         entries = ''
         profits = ''
         stop_loss = ''
@@ -306,6 +316,69 @@ class Telegram(BaseTelegram):
                     stop_loss = f'{min(float(s) for s in stop_loss)}'
                 except:
                     stop_loss = '0'
+        signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        return signals
+
+    async def parse_white_bull_channel(self):
+        channel_id = int(conf_obj.white_bull)
+        access_hash = -169664420124732255
+        # entity = await self.client.get_entity('@WhiteBullsVip_bot')
+        channel_entity = User(id=channel_id, access_hash=access_hash)
+        channel_abbr = 'white_bull'
+        short_channel_abbr = 'whbl'
+        async for message in self.client.iter_messages(entity=channel_entity, limit=7):
+            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            should_handle_msg = not exists
+            if message.text and should_handle_msg:
+                signal = self.parse_white_bull_message(message.text, message.id)
+                if signal[0].pair:
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                    if inserted_to_db != 'success':
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                            f"please check logs for '{signal[0].pair}' "
+                                                            f"related to the '{channel_abbr}' algorithm: "
+                                                            f"{inserted_to_db}")
+
+    def parse_white_bull_message(self, message_text, message_id):
+        signals = []
+        splitted_info = message_text.splitlines()
+        pair_label = '#'
+        buy_label = ['Buy: ', 'Short', 'short']
+        goals_label = 'Sell'
+        stop_label = 'SL'
+        stop_label_2 = 'Sl'
+        pair = ''
+        current_price = ''
+        is_margin = False
+        position = None
+        leverage = 7
+        entries = ''
+        profits = ''
+        stop_loss = ''
+        for item in splitted_info:
+            if item.startswith(pair_label):
+                possible_pair = item.split(' ')
+                pair = ''.join(filter(str.isalpha, possible_pair[0]))
+        for line in splitted_info:
+            line = line.strip()
+            if line.startswith(buy_label[0]) or line.startswith(buy_label[1]) or line.startswith(buy_label[2]):
+                fake_entries = line[5:]
+                possible_entries = fake_entries.split('-')
+                entries = left_numbers(possible_entries)
+            if line.startswith(goals_label):
+                fake_entries = line[5:]
+                possible_take_profits = fake_entries.split('-')
+                profits = left_numbers(possible_take_profits)
+                """ Remove last two take profits: """
+                profits = profits[:len(profits)-2]
+            if line.startswith(stop_label) or line.startswith(stop_label_2):
+                possible_stop_loss = line[3:]
+                stop_loss = possible_stop_loss.strip().split(' ')
+                if len(stop_loss) > 1:
+                    stop_loss = stop_loss[1]
+                else:
+                    stop_loss = stop_loss[0]
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
@@ -402,12 +475,12 @@ class Telegram(BaseTelegram):
         if signal[0].pair[-3:] == 'USD':
             signal[0].pair = signal[0].pair.replace('USD', 'USDT')
         logger.debug(f"Attempt to write into DB the following signal: "
-                     f" Pair: '{signal[0].pair}'"
-                     f" Leverage: '{signal[0].leverage}'"
-                     f" Entry Points: '{signal[0].entry_points}'"
-                     f" Take Profits: '{signal[0].take_profits}'"
-                     f" Stop Loss: '{signal[0].stop_loss}'"
-                     f" Algorithm: '{channel_abbr}'"
+                     f" Pair: '{signal[0].pair}'\n"
+                     f" Leverage: '{signal[0].leverage}'\n"
+                     f" Entry Points: '{signal[0].entry_points}'\n"
+                     f" Take Profits: '{signal[0].take_profits}'\n"
+                     f" Stop Loss: '{signal[0].stop_loss}'\n"
+                     f" Algorithm: '{channel_abbr}'\n"
                      f" Message ID: '{message_id}'")
         try:
             SignalOrig.create_signal(techannel_name=channel_abbr,
@@ -428,7 +501,10 @@ class Telegram(BaseTelegram):
     async def send_message_to_yourself(self, message):
         await self.client.send_message('me', message)
 
-#
+    async def send_message_to_someone(self, name, message):
+        await self.client.send_message(name, message)
+
+
 #     # @client.on(events.NewMessage)
 #     # async def my_event_handler(event):
 #     #     if 'hello' in event.raw_text:
