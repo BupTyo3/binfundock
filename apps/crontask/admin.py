@@ -17,6 +17,7 @@ class CronTaskAdmin(admin.ModelAdmin):
                     'assist_leverage',
                     'assist_altcoin',
                     'assist_origin',
+                    'white_bull',
                     ]
 
 

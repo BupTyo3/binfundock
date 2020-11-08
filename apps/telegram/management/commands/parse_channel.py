@@ -93,6 +93,17 @@ class Command(SystemCommand):
         finally:
             self._client.disconnect()
 
+    def collect_info_from_white_bull_channel(self):
+        session_name = 'White-Bulls'
+        self.init_telegram(session_name)
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_white_bull_channel())
+        except Exception as e:
+            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+        finally:
+            self._client.disconnect()
+
     def handle(self, *args, **options):
         channel = options['channel']
         china_matches = ["China", "china"]
@@ -101,6 +112,7 @@ class Command(SystemCommand):
         tca_leverage_matches = ["tca_leverage", "leverage"]
         tca_origin_matches = ["tca_origin", "origin"]
         margin_whale_matches = ["margin", "whale", "marginwhale", "margin_whale"]
+        white_bull_matches = ["white_bulls", "whitebull", "white", "margin_whale"]
         if not get_or_create_crontask().ai_algorithm:
             pass
         elif any(x in channel for x in china_matches):
@@ -125,3 +137,7 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in margin_whale_matches):
             self.collect_info_from_margin_whales_channel()
+        if not get_or_create_crontask().margin_whale:
+            pass
+        elif any(x in channel for x in white_bull_matches):
+            self.collect_info_from_white_bull_channel()
