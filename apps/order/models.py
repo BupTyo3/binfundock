@@ -154,16 +154,16 @@ class SellOrder(BaseSellOrder):
         return f"{self.pk}:{self.symbol}:{self.custom_order_id}"
 
     @classmethod
-    def _form_sell_stop_loss_order(cls, tp_order: 'SellOrder'):
+    def _form_sell_stop_loss_order(cls, tp_order: 'SellOrder', stop_loss_trigger: float):
         """Form Stop Loss order by Take Profit order"""
-        calculated_real_stop_loss = tp_order.signal.get_real_stop_price(tp_order.stop_loss)
+        calculated_real_stop_loss = tp_order.signal.get_real_stop_price(stop_loss_trigger)
         custom_sl_order_id = cls.form_sl_order_id(tp_order)
         order = SellOrder.objects.create(
             market=tp_order.market,
             symbol=tp_order.symbol,
             quantity=tp_order.quantity,
             price=calculated_real_stop_loss,
-            stop_loss=0,
+            stop_loss=stop_loss_trigger,
             tp_order=tp_order,
             no_need_push=True,
             signal=tp_order.signal,
@@ -174,15 +174,14 @@ class SellOrder(BaseSellOrder):
 
     @classmethod
     def _form_limit_maker_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
-                                take_profit: float, stop_loss: float,
-                                custom_order_id: Optional[str], index: int):
+                                take_profit: float, custom_order_id: Optional[str], index: int):
         """Form LIMIT MAKER order (TP for OCO) order"""
         order = SellOrder.objects.create(
             market=market,
             symbol=signal.symbol,
             quantity=quantity,
             price=take_profit,
-            stop_loss=stop_loss if stop_loss is not None else signal.stop_loss,
+            stop_loss=0,
             signal=signal,
             custom_order_id=custom_order_id,
             type=OrderType.LIMIT_MAKER.value,
@@ -249,15 +248,15 @@ class SellOrder(BaseSellOrder):
 
     @classmethod
     def form_sell_oco_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
-                            take_profit: float, stop_loss: float,
+                            take_profit: float, stop_loss_trigger: float,
                             custom_order_id: Optional[str], index: int):
         """Form OCO SELL order:
         One - tp_order (Take Profit order),
         Second - sl_order (Stop Loss order)"""
         tp_order = cls._form_limit_maker_order(
             market=market, signal=signal, quantity=quantity, take_profit=take_profit,
-            stop_loss=stop_loss, custom_order_id=custom_order_id, index=index)
-        cls._form_sell_stop_loss_order(tp_order=tp_order)
+            custom_order_id=custom_order_id, index=index)
+        cls._form_sell_stop_loss_order(tp_order=tp_order, stop_loss_trigger=stop_loss_trigger)
         return tp_order
 
     @classmethod

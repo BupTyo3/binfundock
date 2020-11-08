@@ -347,22 +347,22 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     def __form_oco_sell_order(self, distributed_quantity: float,
-                              take_profit: float, index: int, stop_loss: Optional[float] = None,
+                              take_profit: float, index: int, stop_loss_trigger: Optional[float] = None,
                               custom_order_id: Optional[str] = None) -> 'SellOrder':
         """
         Form sell oco order for the signal
         """
         from apps.order.models import SellOrder
         msg = f"Form SELL ORDER for signal {self}"
-        if stop_loss is not None:
-            msg += f" with UPDATED STOP_LOSS: '{stop_loss}'"
+        if stop_loss_trigger is not None:
+            msg += f" with UPDATED STOP_LOSS: '{stop_loss_trigger}'"
         logger.debug(msg)
         order = SellOrder.form_sell_oco_order(
             market=self.market,
             signal=self,
             quantity=distributed_quantity,
             take_profit=take_profit,
-            stop_loss=stop_loss,
+            stop_loss_trigger=self.stop_loss if stop_loss_trigger is None else stop_loss_trigger,
             custom_order_id=custom_order_id,
             index=index
         )
@@ -536,7 +536,7 @@ class Signal(BaseSignal):
             custom_order_id=new_custom_order_id,
             take_profit=order.price,
             index=order.index,
-            stop_loss=order.stop_loss if new_stop_loss is None else new_stop_loss)
+            stop_loss_trigger=order.sl_order.stop_loss if new_stop_loss is None else new_stop_loss)
         return new_sell_order
 
     @debug_input_and_returned

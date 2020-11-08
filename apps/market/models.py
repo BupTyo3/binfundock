@@ -295,7 +295,7 @@ class BiMarketLogic(BaseMarketLogic,
         response = self._push_sell_oco_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price,
             custom_order_id=order.custom_order_id, custom_sl_order_id=order.sl_order.custom_order_id,
-            stop_loss=order.stop_loss, stop_limit_price=order.sl_order.price)
+            stop_loss=order.sl_order.stop_loss, stop_limit_price=order.sl_order.price)
         default_executed_quantity = 0.0
         default_status = OrderStatus.SENT.value
         order.update_order_api_history(default_status, default_executed_quantity)
