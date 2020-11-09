@@ -274,6 +274,7 @@ class Config:
         self.tca_leverage = telegram.get('TCA_Leverage', None)
         self.tca_origin = telegram.get('TCA_Origin', None)
         self.margin_whales = telegram.get('Margin_Whales', None)
+        self.white_bull = telegram.get('white_bull', None)
 
 
 conf_obj = Config()
