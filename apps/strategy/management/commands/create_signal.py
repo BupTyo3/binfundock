@@ -53,7 +53,7 @@ class Command(SystemCommand):
         outer_signal_id = options['outer_signal_id']
         techannel = options['techannel']
 
-        self.check_signal_input(entry_points, take_profits, stop_loss)
+        # self.check_signal_input(entry_points, take_profits, stop_loss)
         logger.debug(f"Signal:{symbol}:EntryPoints:{entry_points}:"
                      f"TakeProfits:{take_profits}:StopLoss:{stop_loss}"
                      f":SignalId:{outer_signal_id}")
