@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 class BuyOrder(BaseBuyOrder):
     EP_LIMIT_INDEX = 200  # Spot Entry_point (LIMIT) order
+    MARKET_INDEX = 300  # For Spoiling signal or Buy residual quantity for futures SHORT
+    GL_SM_INDEX = 600  # Global STOP_MARKET order (for Futures)
 
     market = models.ForeignKey(to=Market,
                                related_name='buy_orders',
@@ -45,13 +47,36 @@ class BuyOrder(BaseBuyOrder):
         return f"{self.pk}:{self.symbol}:{self.custom_order_id}"
 
     @classmethod
+    def _form_buy_tp_order(cls, market: 'BaseMarket',
+                           signal: Signal,
+                           quantity: float,
+                           price: float,
+                           custom_order_id: Optional[str],
+                           index: int,
+                           trigger_price: Optional[float] = None):
+        """Form BUY TAKE PROFIT order"""
+        calculated_real_trigger_price = signal.get_real_stop_price(
+            price=price, lower=False) if trigger_price is None else trigger_price
+        order = cls.objects.create(
+            market=market,
+            symbol=signal.symbol,
+            quantity=quantity,
+            price=price,
+            trigger=calculated_real_trigger_price,
+            signal=signal,
+            custom_order_id=custom_order_id,
+            type=OrderType.TAKE_PROFIT.value,
+            index=index)
+        return order
+
+    @classmethod
     def _form_buy_limit_order(cls, market: 'BaseMarket', signal: Signal,
                               quantity: float, entry_point: float,
                               trigger: float, custom_order_id: Optional[str],
                               index: int):
         """Form BUY LIMIT order"""
         default_stop_loss = 0
-        order = BuyOrder.objects.create(
+        order = cls.objects.create(
             market=market,
             symbol=signal.symbol,
             quantity=quantity,
@@ -61,6 +86,83 @@ class BuyOrder(BaseBuyOrder):
             custom_order_id=custom_order_id,
             type=OrderType.LIMIT.value,
             index=index)
+        return order
+
+    @classmethod
+    def _form_buy_market_order(cls, market: 'BaseMarket',
+                               signal: Signal,
+                               quantity: float,
+                               price: float,
+                               custom_order_id: Optional[str]):
+        """Form BUY MARKET order"""
+        order = cls.objects.create(
+            market=market,
+            symbol=signal.symbol,
+            quantity=quantity,
+            price=price,
+            signal=signal,
+            custom_order_id=custom_order_id,
+            type=OrderType.MARKET.value,
+            index=cls.MARKET_INDEX)
+        return order
+
+    @classmethod
+    def form_buy_market_order(cls, market: 'BaseMarket',
+                              signal: Signal,
+                              quantity: float,
+                              price: float,
+                              custom_order_id: Optional[str] = None):
+        """Form MARKET BUY order:
+        """
+        order = cls._form_buy_market_order(
+            market=market, signal=signal, quantity=quantity, price=price,
+            custom_order_id=custom_order_id)
+        return order
+
+    @classmethod
+    def _form_buy_gl_sl_order(cls, market: 'BaseMarket',
+                              signal: Signal,
+                              quantity: float,
+                              price: float,
+                              custom_order_id: Optional[str]):
+        """Form BUY Global Stop_loss order"""
+        order = cls.objects.create(
+            market=market,
+            symbol=signal.symbol,
+            quantity=quantity,
+            price=price,
+            signal=signal,
+            custom_order_id=custom_order_id,
+            type=OrderType.STOP_MARKET.value,
+            index=cls.GL_SM_INDEX)
+        return order
+
+    @classmethod
+    def form_buy_tp_order(cls, market: 'BaseMarket',
+                          signal: Signal,
+                          quantity: float,
+                          price: float,
+                          custom_order_id: Optional[str],
+                          index: int,
+                          trigger_price: Optional[float] = None):
+        """Form BUY TP order:
+        """
+        order = cls._form_buy_tp_order(
+            market=market, signal=signal, quantity=quantity, price=price,
+            custom_order_id=custom_order_id, index=index, trigger_price=trigger_price)
+        return order
+
+    @classmethod
+    def form_buy_gl_sl_order(cls, market: 'BaseMarket',
+                             signal: Signal,
+                             quantity: float,
+                             price: float,
+                             custom_order_id: Optional[str] = None):
+        """Form GL SL BUY order:
+        """
+        order = cls._form_buy_gl_sl_order(
+            market=market, signal=signal, quantity=quantity, price=price,
+            custom_order_id=custom_order_id)
         return order
 
     @classmethod
@@ -80,7 +182,14 @@ class BuyOrder(BaseBuyOrder):
         """
         logger.debug(f"Push buy order! {self}")
         self.push_count_increase()
-        self.market_logic.push_buy_limit_order(self)
+        if self.type == OrderType.LIMIT.value:
+            self.market_logic.push_buy_limit_order(self)
+        elif self.type == OrderType.MARKET.value:
+            self.market_logic.push_buy_market_order(self)
+        elif self.type == OrderType.STOP_MARKET.value:
+            self.market_logic.push_buy_gl_sl_market_order(self)
+        elif self.type == OrderType.TAKE_PROFIT.value:
+            self.market_logic.push_buy_tp_order(self)
 
     def cancel_into_market(self):
         """
@@ -157,7 +266,7 @@ class SellOrder(BaseSellOrder):
         """Form Stop Loss order by Take Profit order"""
         calculated_real_stop_loss = tp_order.signal.get_real_stop_price(stop_loss_trigger)
         custom_sl_order_id = cls.form_sl_order_id(tp_order)
-        order = SellOrder.objects.create(
+        order = cls.objects.create(
             market=tp_order.market,
             symbol=tp_order.symbol,
             quantity=tp_order.quantity,
@@ -175,7 +284,7 @@ class SellOrder(BaseSellOrder):
     def _form_limit_maker_order(cls, market: 'BaseMarket', signal: Signal, quantity: float,
                                 take_profit: float, custom_order_id: Optional[str], index: int):
         """Form LIMIT MAKER order (TP for OCO) order"""
-        order = SellOrder.objects.create(
+        order = cls.objects.create(
             market=market,
             symbol=signal.symbol,
             quantity=quantity,
@@ -194,7 +303,7 @@ class SellOrder(BaseSellOrder):
                                 price: float,
                                 custom_order_id: Optional[str]):
         """Form Take Profit order"""
-        order = SellOrder.objects.create(
+        order = cls.objects.create(
             market=market,
             symbol=signal.symbol,
             quantity=quantity,
@@ -215,7 +324,7 @@ class SellOrder(BaseSellOrder):
                             trigger_price: Optional[float] = None):
         """Form SELL TAKE PROFIT order"""
         calculated_real_trigger_price = signal.get_real_stop_price(price) if trigger_price is None else trigger_price
-        order = SellOrder.objects.create(
+        order = cls.objects.create(
             market=market,
             symbol=signal.symbol,
             quantity=quantity,
@@ -228,13 +337,32 @@ class SellOrder(BaseSellOrder):
         return order
 
     @classmethod
+    def _form_sell_limit_order(cls, market: 'BaseMarket',
+                               signal: Signal,
+                               quantity: float,
+                               price: float,
+                               custom_order_id: Optional[str],
+                               index: int):
+        """Form SELL LIMIT order"""
+        order = cls.objects.create(
+            market=market,
+            symbol=signal.symbol,
+            quantity=quantity,
+            price=price,
+            signal=signal,
+            custom_order_id=custom_order_id,
+            type=OrderType.LIMIT.value,
+            index=index)
+        return order
+
+    @classmethod
     def _form_sell_gl_sl_order(cls, market: 'BaseMarket',
                                signal: Signal,
                                quantity: float,
                                price: float,
                                custom_order_id: Optional[str]):
-        """Form Sell Global Stop_loss order"""
-        order = SellOrder.objects.create(
+        """Form SELL Global Stop_loss order"""
+        order = cls.objects.create(
             market=market,
             symbol=signal.symbol,
             quantity=quantity,
@@ -287,12 +415,26 @@ class SellOrder(BaseSellOrder):
         return order
 
     @classmethod
+    def form_sell_limit_order(cls, market: 'BaseMarket',
+                              signal: Signal,
+                              quantity: float,
+                              price: float,
+                              custom_order_id: Optional[str],
+                              index: int):
+        """Form SELL LIMIT order:
+        """
+        order = cls._form_sell_limit_order(
+            market=market, signal=signal, quantity=quantity, price=price,
+            custom_order_id=custom_order_id, index=index)
+        return order
+
+    @classmethod
     def form_sell_gl_sl_order(cls, market: 'BaseMarket',
                               signal: Signal,
                               quantity: float,
                               price: float,
                               custom_order_id: Optional[str] = None):
-        """Form Market SELL order:
+        """Form GL SL SELL order:
         """
         order = cls._form_sell_gl_sl_order(
             market=market, signal=signal, quantity=quantity, price=price,
@@ -316,6 +458,8 @@ class SellOrder(BaseSellOrder):
             self.market_logic.push_sell_gl_sl_market_order(self)
         elif self.type == OrderType.TAKE_PROFIT.value:
             self.market_logic.push_sell_tp_order(self)
+        elif self.type == OrderType.LIMIT.value:
+            self.market_logic.push_sell_limit_order(self)
 
     def cancel_into_market(self):
         """

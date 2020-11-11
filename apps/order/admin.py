@@ -83,7 +83,7 @@ class BuyOrderAdmin(admin.ModelAdmin):
                     'price',
                     'quantity',
                     'bought_quantity',
-                    # 'trigger',
+                    'trigger',
                     'custom_order_id',
                     'index',
                     'status',

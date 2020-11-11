@@ -7,7 +7,7 @@ from django.db import models
 
 from utils.framework.models import SystemBaseModel, SystemBaseModelWithoutModified
 from tools.tools import debug_input_and_returned
-from .utils import SignalStatus
+from .utils import SignalStatus, SignalPosition
 
 if TYPE_CHECKING:
     from apps.techannel.base_model import TechannelBase
@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 class BaseSignalOrig(SystemBaseModel):
     techannel: 'TechannelBase'
     outer_signal_id: int
+    leverage: int
+    position: SignalPosition
 
     class Meta:
         abstract = True
@@ -28,8 +30,9 @@ class BaseSignal(SystemBaseModel):
     status: SignalStatus
     techannel: 'TechannelBase'
     outer_signal_id: int
-    market: 'BaseMarket'
     leverage: int
+    position: SignalPosition
+    market: 'BaseMarket'
 
     class Meta:
         abstract = True

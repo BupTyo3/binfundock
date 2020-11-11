@@ -64,6 +64,9 @@ BOUGHT_SOLD__SIG_STATS = [
 SOLD__SIG_STATS = [
     SignalStatus.SOLD.value,
 ]
+BOUGHT__SIG_STATS = [
+    SignalStatus.BOUGHT.value,
+]
 
 
 class SignalPosition(Enum):

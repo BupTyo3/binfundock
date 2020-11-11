@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 class BaseOrder(SystemBaseModel):
+    short_position_separator: str = 'sh'
+    long_position_separator: str = 'sh'
     stop_loss_separator: str = 'sl'
     number_copies_separator: str = 'cc'
     custom_order_id: Optional[str]
@@ -81,6 +83,13 @@ class BaseOrder(SystemBaseModel):
         market = Market.objects.get(id=self.market_id)
         return market.logic
 
+    def get_signal_position(self):
+        from apps.signal.utils import SignalPosition
+        if self.signal.position == SignalPosition.SHORT.value:
+            return self.short_position_separator
+        else:
+            return self.long_position_separator
+
     @property
     def status(self):
         return self._status
@@ -105,9 +114,9 @@ class BaseOrder(SystemBaseModel):
                       index: Optional[int]) -> str:
         start_number_of_copies = 0
         if not (message_id or index or techannel_abbr):
-            return f'{start_number_of_copies}{self.market_logic.order_id_separator}_' \
+            return f'{start_number_of_copies}{self.market_logic.order_id_separator}_{self.get_signal_position()}_' \
                    f'{self.order_type_separator}_{gen_short_uuid()}'
-        return f'{start_number_of_copies}{self.market_logic.order_id_separator}_' \
+        return f'{start_number_of_copies}{self.market_logic.order_id_separator}_{self.get_signal_position()}_' \
                f'{self.order_type_separator}_{techannel_abbr}_{message_id}_{index}'
 
     @classmethod
@@ -158,6 +167,9 @@ class BaseBuyOrder(BaseOrder):
             params.update({'_status__in': statuses})
         return cls.objects.filter(**params).order_by('price').last()
 
+    def update_order_api_history(self, status: str, executed_quantity: float, price: Optional[float] = None):
+        pass
+
 
 class BaseSellOrder(BaseOrder):
     type_: str = 'sell'
@@ -201,6 +213,9 @@ class BaseSellOrder(BaseOrder):
             return cls.objects.filter(**params).exclude(tp_order=None).order_by('price').last()
         else:
             return cls.objects.filter(**params).exclude(sl_order=None).order_by('price').last()
+
+    def update_order_api_history(self, status: str, executed_quantity: float, price: Optional[float] = None):
+        pass
 
 
 class HistoryApiBaseOrder(SystemBaseModelWithoutModified):
