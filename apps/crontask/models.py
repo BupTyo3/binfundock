@@ -27,6 +27,7 @@ class CronTask(CronTaskBase):
     assist_origin = models.BooleanField(default=False)
     margin_whale = models.BooleanField(default=False)
     white_bull = models.BooleanField(default=False)
+    simple_future = models.BooleanField(default=False)
 
     balance_to_signal_perc = models.FloatField(
         default=_default_balance_percentage_by_signal,

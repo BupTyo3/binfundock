@@ -193,7 +193,7 @@ class Telegram(BaseTelegram):
         async for message in self.client.iter_messages(chat_id, limit=5):
             exists = await self.is_signal_handled(message.id, short_channel_abbr)
             should_handle_msg = not exists
-            if should_handle_msg and message.photo:
+            if should_handle_msg:
                 signal = self.parse_margin_whale_message(message.text, message.id)
                 if not signal[0].pair:
                     return
@@ -237,6 +237,64 @@ class Telegram(BaseTelegram):
                 leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
             if line.startswith(goals_label):
                 possible_profits = line.split('-')
+                profits.append(possible_profits[1].replace(' ', ''))
+            if line.startswith(stop_label):
+                stop_loss = line[11:]
+        signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        return signals
+
+    async def parse_simple_future_channel(self):
+        chat_id = int(conf_obj.simple_future)
+        channel_abbr = 'simple_future'
+        short_channel_abbr = 'sifu'
+        async for message in self.client.iter_messages(chat_id, limit=15):
+            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            should_handle_msg = not exists
+            if should_handle_msg:
+                signal = self.parse_simple_future_message(message.text, message.id)
+                if signal[0].entry_points != '':
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                    if inserted_to_db != 'success':
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                            f"please check logs for '{signal[0].pair}' "
+                                                            f"related to the '{channel_abbr}' algorithm: "
+                                                            f"{inserted_to_db}")
+                    else:
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                            message.date, channel_abbr, message.id)
+
+    def parse_simple_future_message(self, message_text, message_id):
+        signals = []
+        splitted_info = message_text.splitlines()
+        buy_label = ['🔸Short:', '🔹Buy:']
+        pair_label = '#'
+        goals_label = '📈Target'
+        stop_label = '📉Stop Loss:'
+        pair = ''
+        current_price = ''
+        is_margin = False
+        position = None
+        leverage = 'Leverage: '
+        entries = ''
+        profits = []
+        stop_loss = ''
+        for line in splitted_info:
+            if line.startswith(pair_label):
+                possible_pair = line.split(' ')
+                pair = ''.join(filter(str.isalpha, possible_pair[0]))
+            if line.startswith(leverage):
+                    possible_leverage = line.split(':')
+                    leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
+            if line.startswith(buy_label[0]) or line.startswith(buy_label[1]):
+                possible_entry = line[5:]
+                entries = [possible_entry.replace(' ', '')]
+                if line.startswith(buy_label[0]):
+                    position = 'Short'
+                if line.startswith(buy_label[1]):
+                    position = 'Long'
+            if line.startswith(goals_label):
+                possible_profits = line.split(':')
                 profits.append(possible_profits[1].replace(' ', ''))
             if line.startswith(stop_label):
                 stop_loss = line[11:]
@@ -474,7 +532,8 @@ class Telegram(BaseTelegram):
     @sync_to_async
     def is_signal_handled(self, message_id, channel_abbr):
         is_exist = SignalOrig.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).exists()
-        logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists in DB")
+        if is_exist:
+            logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists in DB")
         return is_exist
 
     @sync_to_async

@@ -276,6 +276,7 @@ class Config:
         self.margin_whales = telegram.get('Margin_Whales', None)
         self.white_bull = telegram.get('white_bull', None)
         self.lucrative_channel = telegram.get('Lucrative_Recommendations', None)
+        self.simple_future = telegram.get('simple_future', None)
 
 
 conf_obj = Config()
