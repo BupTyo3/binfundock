@@ -1,28 +1,28 @@
-import regex
-import os
-import time
-import shutil
-from datetime import datetime, timedelta
-import pytesseract
 import json
-import urllib.request
 import logging
-import asyncio
-import random
+import os
+import shutil
+import time
+import urllib.request
+from datetime import datetime, timedelta
+from sys import platform
+
+import numpy as np
+import pytesseract
+import regex
+from PIL import Image
 from asgiref.sync import sync_to_async
 from django.conf import settings
-from telethon.tl.types import InputPeerChannel, Channel, InputChannel, User
+from pytesseract import image_to_string
+from telethon.tl.types import User
 
 from apps.signal.models import SignalOrig, EntryPoint, TakeProfit
+from apps.techannel.models import Techannel
+from binfun.settings import conf_obj
 from tools.tools import countdown
 from utils.parse_channels.str_parser import left_numbers, check_pair
 from .base_model import BaseTelegram
 from .init_client import ShtClient
-from pytesseract import image_to_string
-from PIL import Image
-from binfun.settings import conf_obj
-from sys import platform
-from apps.techannel.models import Techannel
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,9 @@ class Telegram(BaseTelegram):
                                                                 f"please check logs for '{signal[0].pair}' "
                                                                 f"related to the '{channel_abbr}' algorithm: "
                                                                 f"{inserted_to_db}")
+                        else:
+                            await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                                message.date, channel_abbr, message.id)
                     else:
                         attention_to_close = self.is_urgent_close_position(message.text, channel_abbr)
                         correct_position = self.is_urgent_correct_position(message.text, channel_abbr)
@@ -200,6 +203,9 @@ class Telegram(BaseTelegram):
                                                         f"please check logs for '{signal[0].pair}' "
                                                         f"related to the '{channel_abbr}' algorithm: "
                                                         f"{inserted_to_db}")
+                else:
+                    await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                        message.date, channel_abbr, message.id)
 
     def parse_margin_whale_message(self, message_text, message_id):
         signals = []
@@ -243,7 +249,7 @@ class Telegram(BaseTelegram):
         verify_signal = SignalVerification()
         chat_id = int(conf_obj.chat_china_id)
         channel_abbr = 'ai'
-        async for message in self.client.iter_messages(chat_id, limit=5):
+        async for message in self.client.iter_messages(chat_id, limit=27):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg and message.photo:
@@ -259,13 +265,8 @@ class Telegram(BaseTelegram):
                                                         f"related to the '{channel_abbr}' algorithm: "
                                                         f"{inserted_to_db}")
                 else:
-                    await self.send_message_to_someone('Aleksandr_Maidaniuk',
-                                                       f" Pair: '{signal[0].pair}'\n"
-                                                       f" Leverage: '{signal[0].leverage}'\n"
-                                                       f" Entry Points: '{signal[0].entry_points}'\n"
-                                                       f" Take Profits: '{signal[0].take_profits}'\n"
-                                                       f" Stop Loss: '{signal[0].stop_loss}'\n"
-                                                       f" Algorithm: '{channel_abbr}'")
+                    await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                        message.date, channel_abbr, message.id)
 
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
@@ -283,6 +284,9 @@ class Telegram(BaseTelegram):
                                                             f"please check logs for '{signal[0].pair}' "
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
+                    else:
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                            message.date, channel_abbr, message.id)
 
     def parse_angel_message(self, message_text, message_id):
         signals = []
@@ -326,7 +330,7 @@ class Telegram(BaseTelegram):
         # entity = await self.client.get_entity('@WhiteBullsVip_bot')
         channel_entity = User(id=channel_id, access_hash=access_hash)
         channel_abbr = 'white_bull'
-        short_channel_abbr = 'whbl'
+        short_channel_abbr = 'whbu'
         async for message in self.client.iter_messages(entity=channel_entity, limit=7):
             exists = await self.is_signal_handled(message.id, short_channel_abbr)
             should_handle_msg = not exists
@@ -339,6 +343,9 @@ class Telegram(BaseTelegram):
                                                             f"please check logs for '{signal[0].pair}' "
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
+                    else:
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                            message.date, channel_abbr, message.id)
 
     def parse_white_bull_message(self, message_text, message_id):
         signals = []
@@ -352,7 +359,7 @@ class Telegram(BaseTelegram):
         current_price = ''
         is_margin = False
         position = None
-        leverage = 7
+        leverage = 1
         entries = ''
         profits = ''
         stop_loss = ''
@@ -360,6 +367,8 @@ class Telegram(BaseTelegram):
             if item.startswith(pair_label):
                 possible_pair = item.split(' ')
                 pair = ''.join(filter(str.isalpha, possible_pair[0]))
+                if pair.endswith('BTC'):
+                    leverage = 1
         for line in splitted_info:
             line = line.strip()
             if line.startswith(buy_label[0]) or line.startswith(buy_label[1]) or line.startswith(buy_label[2]):
@@ -371,7 +380,7 @@ class Telegram(BaseTelegram):
                 possible_take_profits = fake_entries.split('-')
                 profits = left_numbers(possible_take_profits)
                 """ Remove last two take profits: """
-                profits = profits[:len(profits)-2]
+                profits = profits[:len(profits) - 2]
             if line.startswith(stop_label) or line.startswith(stop_label_2):
                 possible_stop_loss = line[3:]
                 stop_loss = possible_stop_loss.strip().split(' ')
@@ -419,6 +428,9 @@ class Telegram(BaseTelegram):
                                                             f"please check logs for '{signal[0].pair}' "
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
+                    else:
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                            message.date, channel_abbr, message.id)
 
     def parse_tca_message(self, message_text, message_id):
         signals = []
@@ -461,7 +473,9 @@ class Telegram(BaseTelegram):
 
     @sync_to_async
     def is_signal_handled(self, message_id, channel_abbr):
-        return SignalOrig.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).exists()
+        is_exist = SignalOrig.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).exists()
+        logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists in DB")
+        return is_exist
 
     @sync_to_async
     def write_signal_to_db(self, channel_abbr: str, signal, message_id, message_date):
@@ -503,6 +517,20 @@ class Telegram(BaseTelegram):
 
     async def send_message_to_someone(self, name, message):
         await self.client.send_message(name, message)
+
+    async def send_message_by_template(self, channel_name, signal, message_date, channel_abbr, message_id):
+        if not signal.leverage:
+            signal.leverage = 1
+        message = f"Pair: '{signal.pair}'\n" \
+                  f"Position: '{signal.position}'\n" \
+                  f"Leverage: '{signal.leverage}'\n" \
+                  f"Entry Points: '{signal.entry_points}'\n" \
+                  f"Take Profits: '{signal.take_profits}'\n" \
+                  f"Stop Loss: '{signal.stop_loss}'\n" \
+                  f"Time: '{message_date.replace(tzinfo=None) + timedelta(hours=2)}'\n" \
+                  f"Algorithm: '{channel_abbr}'\n" \
+                  f"ID: '{message_id}'"
+        await self.client.send_message(channel_name, message)
 
 
 #     # @client.on(events.NewMessage)
@@ -592,12 +620,11 @@ class ChinaImageToSignal:
                 # print(action, " - ".join(str(x) for x in result))
                 return result
 
-    def find_profits(self, array):
+    def find_profits(self, array, entry_points):
         for item in array:
             result = regex.findall(regexp_numbers, item)
-            if len(result) > 3:
-                # TODO: verify whether the dot is missing in each take profit (loop + conditions)
-                # print('Take profits: ', result)
+            array_equal = np.array_equal(result, entry_points)
+            if len(result) >= 3 and not array_equal:
                 return result
 
     def find_stop(self, array):
@@ -614,7 +641,7 @@ class ChinaImageToSignal:
 
         pair = self.find_pair(array)
         entry_points = self.find_entry_points(array, position, leverage)
-        profits = self.find_profits(array)
+        profits = self.find_profits(array, entry_points)
         stop_loss = self.find_stop(array)
         return SignalModel(pair, None, None, position, leverage, entry_points, profits, stop_loss, message_id)
 
@@ -680,7 +707,13 @@ class SignalVerification:
 
                     pair_info_object = self.client.get_symbol_info(pair_corrected)
                 if usdt_position > 0:
-                    pair_corrected = pair_object.pair[0: usdt_position - 1:] + pair_object.pair[usdt_position::]
+                    pair_corrected = pair_object.pair[0: usdt_position:] + pair_object.pair[usdt_position::]
+                    if pair_corrected == 'COTVUSDT':
+                        pair_corrected = 'COTIUSDT'
+                    if pair_corrected == 'lOSTUSDT':
+                        pair_corrected = 'IOSTUSDT'
+                    if pair_corrected == 'ZILIUSDT':
+                        pair_corrected = 'ZILUSDT'
                     price_json = urllib.request.urlopen(
                         'https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_corrected))
                     pair_info_object = self.client.get_symbol_info(pair_corrected)
@@ -711,7 +744,6 @@ class SignalVerification:
         return signals
 
     def verify_entry(self, pair_object, current_pair_info):
-        import math
 
         verified_entries = []
         dot_position = current_pair_info['price'].index('.')
@@ -734,7 +766,7 @@ class SignalVerification:
         if dot_position:
             for price in pair_object.take_profits:
                 # if price.find('.') > 0 and price.find('.') != dot_position:
-                if price.find('.') != dot_position:
+                if price.find('.') != dot_position and '.' not in price:
                     if current_pair_info['price'].startswith('0') and not price.startswith('0'):
                         price = '0' + price
                     price = price[:dot_position] + "." + price[dot_position:]
