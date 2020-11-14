@@ -115,6 +115,17 @@ class Command(SystemCommand):
         finally:
             self._client.disconnect()
 
+    def collect_info_from_lucrative_trend_channel(self):
+        session_name = 'LucrativeTrend'
+        self.init_telegram(session_name)
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_lucrative_trend_channel())
+        except Exception as e:
+            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+        finally:
+            self._client.disconnect()
+
     def handle(self, *args, **options):
         channel = options['channel']
         china_matches = ["China", "china"]
@@ -125,6 +136,7 @@ class Command(SystemCommand):
         margin_whale_matches = ["margin", "whale", "marginwhale", "margin_whale"]
         white_bull_matches = ["white_bulls", "whitebull", "white", "margin_whale"]
         simple_future_matches = ["simple_future"]
+        lucrative_trend_matches = ["lucrative_trend", "LucrativeTrend"]
         if not get_or_create_crontask().ai_algorithm:
             pass
         elif any(x in channel for x in china_matches):
@@ -164,3 +176,8 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in simple_future_matches):
             self.collect_info_from_simple_future_channel()
+
+        if not get_or_create_crontask().lucrative_trend:
+            pass
+        elif any(x in channel for x in lucrative_trend_matches):
+            self.collect_info_from_lucrative_trend_channel()
