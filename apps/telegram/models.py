@@ -296,6 +296,8 @@ class Telegram(BaseTelegram):
             if line.startswith(goals_label):
                 possible_profits = line.split(':')
                 profits.append(possible_profits[1].replace(' ', ''))
+                """ Remove last two take profits: """
+                profits = profits[:len(profits) - 2]
             if line.startswith(stop_label):
                 stop_loss = line[11:]
         signals.append(SignalModel(pair, current_price, is_margin, position,
