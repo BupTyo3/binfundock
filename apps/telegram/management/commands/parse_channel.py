@@ -104,6 +104,17 @@ class Command(SystemCommand):
         finally:
             self._client.disconnect()
 
+    def collect_info_from_simple_future_channel(self):
+        session_name = 'Simple-Future'
+        self.init_telegram(session_name)
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_simple_future_channel())
+        except Exception as e:
+            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+        finally:
+            self._client.disconnect()
+
     def handle(self, *args, **options):
         channel = options['channel']
         china_matches = ["China", "china"]
@@ -113,31 +124,43 @@ class Command(SystemCommand):
         tca_origin_matches = ["tca_origin", "origin"]
         margin_whale_matches = ["margin", "whale", "marginwhale", "margin_whale"]
         white_bull_matches = ["white_bulls", "whitebull", "white", "margin_whale"]
+        simple_future_matches = ["simple_future"]
         if not get_or_create_crontask().ai_algorithm:
             pass
         elif any(x in channel for x in china_matches):
             self.collect_info_from_china_channel()
+
         if not get_or_create_crontask().crypto_passive:
             pass
         elif any(x in channel for x in angel_matches):
             self.collect_info_from_angel_channel()
+
         if not get_or_create_crontask().assist_altcoin:
             pass
         elif any(x in channel for x in tca_altcoin_matches):
             self.collect_info_from_tca_altcoin_channel()
+
         if not get_or_create_crontask().assist_leverage:
             pass
         elif any(x in channel for x in tca_leverage_matches):
             self.collect_info_from_tca_leverage_channel()
+
         if not get_or_create_crontask().assist_origin:
             pass
         elif any(x in channel for x in tca_origin_matches):
             self.collect_info_from_tca_origin_channel()
+
         if not get_or_create_crontask().margin_whale:
             pass
         elif any(x in channel for x in margin_whale_matches):
             self.collect_info_from_margin_whales_channel()
-        if not get_or_create_crontask().margin_whale:
+
+        if not get_or_create_crontask().white_bull:
             pass
         elif any(x in channel for x in white_bull_matches):
             self.collect_info_from_white_bull_channel()
+
+        if not get_or_create_crontask().simple_future:
+            pass
+        elif any(x in channel for x in simple_future_matches):
+            self.collect_info_from_simple_future_channel()

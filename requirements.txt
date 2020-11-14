@@ -8,8 +8,13 @@ gunicorn==20.0.4
 psycopg2-binary==2.8.5
 python-dotenv==0.14.0
 python-binance==0.7.5
-pytesseract
-telethon
-asyncio
+pytesseract~=0.3.6
+telethon~=1.16.4
+asyncio~=3.4.3
 
 
+
+numpy~=1.19.4
+regex~=2020.7.14
+asgiref~=3.2.10
+Pillow~=7.2.0
