@@ -443,6 +443,10 @@ class Telegram(BaseTelegram):
                 fake_entries = line[5:]
                 possible_entries = fake_entries.split('-')
                 entries = left_numbers(possible_entries)
+                if line.startswith(buy_label[0]):
+                    position = 'Long'
+                if line.startswith(buy_label[1]) or line.startswith(buy_label[2]):
+                    position = 'Short'
             if line.startswith(goals_label):
                 fake_entries = line[5:]
                 possible_take_profits = fake_entries.split('-')
