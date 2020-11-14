@@ -76,7 +76,7 @@ class Telegram(BaseTelegram):
         return False
 
     def is_urgent_correct_position(self, message, channel_abbr):
-        # TODO: add logic here as it is not relevant
+        # TODO: add logic here as it is not relevant --->>> TRY_TO_SPOIL()
         should_move_label = ['move']
         should_move = any(x in should_move_label for x in message)
         if should_move:
@@ -116,6 +116,8 @@ class Telegram(BaseTelegram):
                                                                 f"{inserted_to_db}")
                         else:
                             await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                                message.date, channel_abbr, message.id)
+                            await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                                 message.date, channel_abbr, message.id)
                     else:
                         attention_to_close = self.is_urgent_close_position(message.text, channel_abbr)
@@ -208,6 +210,8 @@ class Telegram(BaseTelegram):
                 else:
                     await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                         message.date, channel_abbr, message.id)
+                    await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                        message.date, channel_abbr, message.id)
 
     def parse_margin_whale_message(self, message_text, message_id):
         signals = []
@@ -267,6 +271,8 @@ class Telegram(BaseTelegram):
                     else:
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                             message.date, channel_abbr, message.id)
+                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                            message.date, channel_abbr, message.id)
 
     def parse_simple_future_message(self, message_text, message_id):
         signals = []
@@ -310,6 +316,57 @@ class Telegram(BaseTelegram):
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
 
+    async def parse_lucrative_trend_channel(self):
+        chat_id = int(conf_obj.lucrative_channel)
+        channel_abbr = 'lucrative_trend'
+        short_channel_abbr = 'luctr'
+        async for message in self.client.iter_messages(chat_id, limit=15):
+            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            should_handle_msg = not exists
+            if should_handle_msg:
+                signal = self.parse_lucrative_trend_message(message.text, message.id)
+                if signal[0].entry_points != '':
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                    if inserted_to_db != 'success':
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                            f"please check logs for '{signal[0].pair}' "
+                                                            f"related to the '{channel_abbr}' algorithm: "
+                                                            f"{inserted_to_db}")
+
+    def parse_lucrative_trend_message(self, message_text, message_id):
+        signals = []
+        splitted_info = message_text.splitlines()
+        buy_label = 'Entry Points: '
+        pair_label = 'Pair:'
+        goals_label = 'Take Profits: '
+        stop_label = 'Stop Loss: '
+        pair = ''
+        current_price = ''
+        is_margin = False
+        position = 'Position: '
+        leverage = 'Leverage: '
+        entries = ''
+        profits = []
+        stop_loss = ''
+        for line in splitted_info:
+            if line.startswith(pair_label):
+                possible_pair = line.split(' ')
+                pair = ''.join(filter(str.isalpha, possible_pair[1]))
+            if line.startswith(leverage):
+                possible_leverage = line.split(' ')
+                leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
+            if line.startswith(buy_label):
+                possible_entries = line[14:]
+                entries = left_numbers(possible_entries.split(','))
+            if line.startswith(goals_label):
+                possible_profits = line[14:]
+                profits = left_numbers(possible_profits.split(','))
+            if line.startswith(stop_label):
+                stop_loss = line[11:].replace('\'', '')
+        signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        return signals
+
     async def parse_china_channel(self):
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
@@ -333,6 +390,8 @@ class Telegram(BaseTelegram):
                 else:
                     await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                         message.date, channel_abbr, message.id)
+                    await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                        message.date, channel_abbr, message.id)
 
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
@@ -352,6 +411,8 @@ class Telegram(BaseTelegram):
                                                             f"{inserted_to_db}")
                     else:
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                            message.date, channel_abbr, message.id)
+                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_angel_message(self, message_text, message_id):
@@ -414,13 +475,15 @@ class Telegram(BaseTelegram):
                     else:
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                             message.date, channel_abbr, message.id)
+                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                            message.date, channel_abbr, message.id)
 
     def parse_white_bull_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
         pair_label = '#'
-        buy_label = ['Buy: ', 'Short', 'short']
-        goals_label = 'Sell'
+        buy_label = ['Buy: ', 'Short', 'short', 'buy']
+        goals_label = ['Sell', 'sell']
         stop_label = 'SL'
         stop_label_2 = 'Sl'
         pair = ''
@@ -439,15 +502,16 @@ class Telegram(BaseTelegram):
                     leverage = 1
         for line in splitted_info:
             line = line.strip()
-            if line.startswith(buy_label[0]) or line.startswith(buy_label[1]) or line.startswith(buy_label[2]):
-                fake_entries = line[5:]
+            if line.startswith(buy_label[0]) or line.startswith(buy_label[1])\
+                    or line.startswith(buy_label[2]) or line.startswith(buy_label[3]):
+                fake_entries = line[4:]
                 possible_entries = fake_entries.split('-')
                 entries = left_numbers(possible_entries)
-                if line.startswith(buy_label[0]):
+                if line.startswith(buy_label[0]) or line.startswith(buy_label[1]):
                     position = 'Long'
                 if line.startswith(buy_label[1]) or line.startswith(buy_label[2]):
                     position = 'Short'
-            if line.startswith(goals_label):
+            if line.startswith(goals_label[0]) or line.startswith(goals_label[1]):
                 fake_entries = line[5:]
                 possible_take_profits = fake_entries.split('-')
                 profits = left_numbers(possible_take_profits)
@@ -502,6 +566,8 @@ class Telegram(BaseTelegram):
                                                             f"{inserted_to_db}")
                     else:
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                            message.date, channel_abbr, message.id)
+                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_tca_message(self, message_text, message_id):

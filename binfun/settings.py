@@ -277,6 +277,7 @@ class Config:
         self.white_bull = telegram.get('white_bull', None)
         self.lucrative_channel = telegram.get('Lucrative_Recommendations', None)
         self.simple_future = telegram.get('simple_future', None)
+        self.lucrative_trend = telegram.get('Lucrative_Trend', None)
 
 
 conf_obj = Config()

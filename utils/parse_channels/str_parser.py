@@ -4,6 +4,9 @@ from typing import List
 def left_numbers(array: List[str]) -> List[str]:
     """left numbers only (, => .) in array"""
     array = [n.replace('..', '.') for n in array]
+    array = [n.replace('\'', '') for n in array]
+    array = [n.replace('[', '') for n in array]
+    array = [n.replace(']', '') for n in array]
     array = [n.replace(' ', '') for n in array]
     array = [n.replace(':', '') for n in array]
     array = [n.replace(',', '.') for n in array]
