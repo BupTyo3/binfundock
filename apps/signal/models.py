@@ -1257,6 +1257,8 @@ class Signal(BaseSignal):
     def _first_formation_futures_short_orders(self):
         for index, entry_point in enumerate(self.entry_points.all()):
             coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
+            # Multiply quantity to leverage
+            coin_quantity *= self.leverage
             # TODO: Form TP sell orders
             self.__form_sell_limit_order(quantity=coin_quantity, price=entry_point.value, index=index)
         planned_executed_quantity = self.__get_planned_executed_quantity(self.sell_orders.all())
