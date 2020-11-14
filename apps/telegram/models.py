@@ -343,7 +343,8 @@ class Telegram(BaseTelegram):
         pair = ''
         current_price = ''
         is_margin = False
-        position = 'Position: '
+        position_label = 'Position: '
+        position = None
         leverage = 'Leverage: '
         entries = ''
         profits = []
@@ -352,6 +353,9 @@ class Telegram(BaseTelegram):
             if line.startswith(pair_label):
                 possible_pair = line.split(' ')
                 pair = ''.join(filter(str.isalpha, possible_pair[1]))
+            if line.startswith(position_label):
+                position = line[10:]
+                position = position.replace('\'', '')
             if line.startswith(leverage):
                 possible_leverage = line.split(' ')
                 leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
