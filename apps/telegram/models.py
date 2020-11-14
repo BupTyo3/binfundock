@@ -182,6 +182,8 @@ class Telegram(BaseTelegram):
                 possible_leverage = line.split(' ')
                 possible_leverage = list(filter(None, possible_leverage))
                 leverage = ''.join(filter(str.isdigit, possible_leverage[2]))
+        """ Take only first 4 take profits: """
+        profits = profits[:4]
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss[0], message_id))
         return signals
@@ -240,6 +242,8 @@ class Telegram(BaseTelegram):
                 profits.append(possible_profits[1].replace(' ', ''))
             if line.startswith(stop_label):
                 stop_loss = line[11:]
+        """ Take only first 4 take profits: """
+        profits = profits[:4]
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
@@ -287,19 +291,21 @@ class Telegram(BaseTelegram):
                     possible_leverage = line.split(':')
                     leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
             if line.startswith(buy_label[0]) or line.startswith(buy_label[1]):
-                possible_entry = line[5:]
-                entries = [possible_entry.replace(' ', '')]
                 if line.startswith(buy_label[0]):
                     position = 'Short'
+                    possible_entry = line[7:]
+                    entries = [possible_entry.replace(' ', '')]
                 if line.startswith(buy_label[1]):
                     position = 'Long'
+                    possible_entry = line[5:]
+                    entries = [possible_entry.replace(' ', '')]
             if line.startswith(goals_label):
                 possible_profits = line.split(':')
                 profits.append(possible_profits[1].replace(' ', ''))
-                """ Remove last two take profits: """
-                profits = profits[:len(profits) - 2]
             if line.startswith(stop_label):
                 stop_loss = line[11:]
+        """ Take only first 4 take profits: """
+        profits = profits[:4]
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
@@ -380,6 +386,8 @@ class Telegram(BaseTelegram):
                     stop_loss = f'{min(float(s) for s in stop_loss)}'
                 except:
                     stop_loss = '0'
+        """ Take only first 4 take profits: """
+        profits = profits[:4]
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
@@ -439,8 +447,6 @@ class Telegram(BaseTelegram):
                 fake_entries = line[5:]
                 possible_take_profits = fake_entries.split('-')
                 profits = left_numbers(possible_take_profits)
-                """ Remove last two take profits: """
-                profits = profits[:len(profits) - 2]
             if line.startswith(stop_label) or line.startswith(stop_label_2):
                 possible_stop_loss = line[3:]
                 stop_loss = possible_stop_loss.strip().split(' ')
@@ -448,6 +454,8 @@ class Telegram(BaseTelegram):
                     stop_loss = stop_loss[1]
                 else:
                     stop_loss = stop_loss[0]
+        """ Take only first 4 take profits: """
+        profits = profits[:4]
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
@@ -527,6 +535,8 @@ class Telegram(BaseTelegram):
                 profits = left_numbers(possible_profits)
             if line.startswith(stop_label):
                 stop_loss = line[11:]
+        """ Take only first 4 take profits: """
+        profits = profits[:4]
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
