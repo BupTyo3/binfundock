@@ -9,7 +9,7 @@ psycopg2-binary==2.8.5
 python-dotenv==0.14.0
 python-binance==0.7.5
 pytesseract~=0.3.6
-telethon~=1.16.4
+telethon==1.17.5
 asyncio~=3.4.3
 
 
