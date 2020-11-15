@@ -683,7 +683,7 @@ class Signal(BaseSignal):
         """
         [SHORT] Function for creating BUY orders
         """
-        distributed_quantity = self._get_distributed_buy_quantity(buy_quantity)
+        distributed_quantity = self._get_distributed_sell_quantity(buy_quantity)
         for index, take_profit in enumerate(self.take_profits.all()):
             self.__form_buy_tp_order(
                 quantity=distributed_quantity,
