@@ -155,7 +155,9 @@ class SignalAdmin(admin.ModelAdmin):
 
     @notifications_handling('')
     def _form_one(self, request, signal):
-        signal.first_formation_orders()
+        is_success = signal.first_formation_orders()
+        if not is_success:
+            raise ValueError("Couldn't form Signal")
 
     @notifications_handling('')
     def _push_order_one(self, request, signal):
