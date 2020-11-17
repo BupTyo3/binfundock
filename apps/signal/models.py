@@ -111,7 +111,11 @@ class SignalOrig(BaseSignalOrig):
     @transaction.atomic
     def create_market_signal(self, market: Optional[BaseMarket] = None):
         # Set leverage = 1 for Spot Market
-        leverage = self._default_leverage if market.logic.type == MarketType.SPOT.value else self.leverage
+        leverage = self.leverage
+        if market.logic.type == MarketType.SPOT.value:
+            leverage = self._default_leverage
+            if self.position != SignalPosition.LONG.value:
+                raise ValueError(f"Can't create SHORT to SPOT")
         signal = Signal.objects.create(
             techannel=self.techannel,
             symbol=self.symbol,
