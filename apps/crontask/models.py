@@ -44,3 +44,6 @@ class CronTask(CronTaskBase):
     # def __str__(self):
     #     return f"{self.symbol}"
 
+    def change_balance_coefficient(self, value: float):
+        self.balance_to_signal_perc += value
+        self.save()
