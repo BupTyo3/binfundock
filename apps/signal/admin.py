@@ -2,7 +2,12 @@ from decimal import Decimal, Inexact, Context
 
 from django.contrib import admin, messages
 from django.utils.translation import ugettext_lazy as _
-from django.db.models import F, Case, When, ExpressionWrapper, CharField, Count
+from django.db.models import (
+    F, Case, When, ExpressionWrapper,
+    CharField, Count, Sum, Q, Subquery, OuterRef,
+    FloatField, Func, Value,
+)
+from django.db.models.functions import Abs
 
 from apps.market.models import get_or_create_market, get_or_create_futures_market
 from utils.admin import InputFilter
@@ -155,7 +160,9 @@ class SignalAdmin(admin.ModelAdmin):
 
     @notifications_handling('')
     def _form_one(self, request, signal):
-        signal.first_formation_orders()
+        is_success = signal.first_formation_orders()
+        if not is_success:
+            raise ValueError("Couldn't form Signal")
 
     @notifications_handling('')
     def _push_order_one(self, request, signal):
@@ -333,6 +340,8 @@ class SignalOrigAdmin(admin.ModelAdmin):
                     'techannel',
                     'outer_signal_id',
                     'sig_count',
+                    'max_profit',
+                    'max_loss',
                     'message_date',
                     'created',
                     ]
@@ -362,10 +371,39 @@ class SignalOrigAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super(SignalOrigAdmin, self).get_queryset(request)
-        return qs.annotate(sig_count=Count('market_signals'))
+        qs = qs.annotate(sig_count=Count('market_signals'))
+
+        # Annotate by max_loss and max_profit
+        # max_loss (LONG) all buy orders have been worked and sell all by stop_loss
+        # max_profit (LONG) all buy orders have been worked and sell all by all take_profits
+        # for SHORT - reverse
+        entry_points__count_sq = qs.filter(id=OuterRef('pk'))\
+            .annotate(entry_points__cnt=Count('entry_points')).values('entry_points__cnt')
+
+        qs_ep = qs.filter(id=OuterRef('pk'))\
+            .annotate(ep_amoun=Sum(1 / (Subquery(entry_points__count_sq) * F('entry_points__value')),
+                                   output_field=FloatField())).values('ep_amoun')
+
+        take_profits__count_sq = qs.filter(id=OuterRef('pk')) \
+            .annotate(take_profits__cnt=Count('take_profits')).values('take_profits__cnt')
+
+        qs_tp = qs.filter(id=OuterRef('pk'))\
+            .annotate(tp_amoun=Sum(F('take_profits__value') / Subquery(take_profits__count_sq),
+                                   output_field=FloatField())).values('tp_amoun')
+
+        qs = qs.annotate(max_loss=Abs((Subquery(qs_ep) * F('stop_loss') - 1) * 100))
+
+        qs = qs.annotate(max_profit=Abs((Subquery(qs_ep) * Subquery(qs_tp) - 1) * 100))
+        return qs
 
     def sig_count(self, obj):
         return obj.sig_count
+
+    def max_profit(self, obj):
+        return round(obj.max_profit, 2)
+
+    def max_loss(self, obj):
+        return round(obj.max_loss, 2)
 
     @staticmethod
     def take_profits(signal):
