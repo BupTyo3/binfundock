@@ -108,3 +108,11 @@ class BaseMarket(SystemBaseModel):
     @abstractmethod
     def logic(self) -> BaseMarketLogic:
         pass
+
+    @abstractmethod
+    def is_spot_market(self) -> bool:
+        pass
+
+    @abstractmethod
+    def is_futures_market(self) -> bool:
+        pass

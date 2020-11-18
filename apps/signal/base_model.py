@@ -16,22 +16,27 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class BaseSignalOrig(SystemBaseModel):
+class BaseBaseSignal(SystemBaseModel):
     techannel: 'TechannelBase'
     outer_signal_id: int
     leverage: int
     position: SignalPosition
+
+    def is_position_short(self) -> bool:
+        return True if self.position == SignalPosition.SHORT.value else False
 
     class Meta:
         abstract = True
 
 
-class BaseSignal(SystemBaseModel):
+class BaseSignalOrig(BaseBaseSignal):
+
+    class Meta:
+        abstract = True
+
+
+class BaseSignal(BaseBaseSignal):
     status: SignalStatus
-    techannel: 'TechannelBase'
-    outer_signal_id: int
-    leverage: int
-    position: SignalPosition
     market: 'BaseMarket'
 
     class Meta:

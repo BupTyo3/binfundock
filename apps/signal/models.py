@@ -61,6 +61,7 @@ class SignalOrig(BaseSignalOrig):
     techannel: Techannel
     entry_points: 'EntryPoint.objects'
     take_profits: 'TakeProfit.objects'
+    symbol: str
 
     objects = models.Manager()
 
@@ -74,6 +75,16 @@ class SignalOrig(BaseSignalOrig):
         if self.pk is None:
             self.main_coin = self._get_main_coin(self.symbol)
         super().save(*args, **kwargs)
+
+    def _check_if_pair_does_not_exist_in_market(self, market: BaseMarket) -> None:
+        from apps.pair.models import Pair
+        pair = Pair.get_pair(self.symbol, market)
+        if not pair:
+            raise ValueError(f"Pair {self.symbol} does not exist in Market {market}")
+
+    def _check_inappropriate_position_to_market_type(self, market: BaseMarket) -> None:
+        if market.is_spot_market() and self.is_position_short():
+            raise ValueError(f"Can't create SHORT to SPOT. SignalOrig: '{self}'")
 
     @classmethod
     @transaction.atomic
@@ -109,13 +120,12 @@ class SignalOrig(BaseSignalOrig):
         return sm_obj
 
     @transaction.atomic
-    def create_market_signal(self, market: Optional[BaseMarket] = None):
+    def create_market_signal(self, market: BaseMarket):
+        self._check_if_pair_does_not_exist_in_market(market)
+        # ValueError if SPOT & SHORT
+        self._check_inappropriate_position_to_market_type(market)
         # Set leverage = 1 for Spot Market
-        leverage = self.leverage
-        if market.logic.type == MarketType.SPOT.value:
-            leverage = self._default_leverage
-            if self.position != SignalPosition.LONG.value:
-                raise ValueError(f"Can't create SHORT to SPOT")
+        leverage = self._default_leverage if market.is_spot_market() else self.leverage
         signal = Signal.objects.create(
             techannel=self.techannel,
             symbol=self.symbol,
@@ -245,14 +255,14 @@ class Signal(BaseSignal):
         return res
 
     def _update_income(self):
-        if self._is_position_short():
+        if self.is_position_short():
             self.income = self.__get_calculated_income_short()
         else:
             self.income = self.__get_calculated_income_spot_or_long()
         self.save()
 
     def _update_amount(self):
-        if self._is_position_short():
+        if self.is_position_short():
             self.amount = self.__get_calculated_amount_short()
         else:
             self.amount = self.__get_calculated_amount_spot_or_long()
@@ -269,12 +279,6 @@ class Signal(BaseSignal):
             if symbol[-len(main_coin):] == main_coin:
                 return main_coin
         raise Exception("Provided main coin is not serviced")
-
-    def _is_position_short(self) -> bool:
-        return True if self.position == SignalPosition.SHORT.value else False
-
-    def _is_position_long(self) -> bool:
-        return True if self.position == SignalPosition.LONG.value else False
 
     def _is_market_type_futures(self) -> bool:
         return True if self.market.logic.type == MarketType.FUTURES.value else False
@@ -299,7 +303,7 @@ class Signal(BaseSignal):
 
     def _get_pair(self):
         from apps.pair.models import Pair
-        return Pair.objects.filter(symbol=self.symbol, market=self.market.pk).first()
+        return Pair.get_pair(self.symbol, self.market)
 
     @debug_input_and_returned
     @rounded_result
@@ -370,7 +374,7 @@ class Signal(BaseSignal):
         Calculate quantity for one coin
         Fraction by step
         """
-        if self._is_position_short():
+        if self.is_position_short():
             return self._get_distributed_toc_quantity_short(entry_point_price=entry_point_price)
         else:
             # SPOT OR LONG
@@ -408,7 +412,7 @@ class Signal(BaseSignal):
         return: (bought_quantity - sold_quantity)
         Fraction by step
         """
-        if self._is_position_short():
+        if self.is_position_short():
             return self._get_residual_quantity_short(ignore_fee=ignore_fee)
         else:
             return self._get_residual_quantity_long(ignore_fee=ignore_fee)
@@ -1245,7 +1249,7 @@ class Signal(BaseSignal):
         price = self._get_current_price()
         if residual_quantity and\
                 self._check_if_quantity_enough_for_sell(quantity=residual_quantity, price=price):
-            if self._is_position_short():
+            if self.is_position_short():
                 self.__form_buy_market_order(quantity=residual_quantity, price=price)
             else:
                 self.__form_sell_market_order(quantity=residual_quantity, price=price)
@@ -1296,7 +1300,7 @@ class Signal(BaseSignal):
         if not self._get_pair():
             logger.warning(f"Pair {self.symbol} does not exist in Futures")
             return
-        if self._is_position_short():
+        if self.is_position_short():
             logger.debug(f"Form Futures SHORT: '{self}'")
             is_success = self._first_formation_futures_short_orders()
         else:
@@ -1439,10 +1443,7 @@ class Signal(BaseSignal):
         """
         FUTURES Market
         """
-        if not self._get_pair():
-            logger.debug(f"Pair {self.symbol} does not exist in Futures")
-            return
-        if self._is_position_short():
+        if self.is_position_short():
             logger.debug(f"Form Futures SHORT: '{self}'")
             self._bought_worker_futures_short()
         else:
@@ -1538,10 +1539,7 @@ class Signal(BaseSignal):
         """
         FUTURES Market
         """
-        if not self._get_pair():
-            logger.debug(f"Pair {self.symbol} does not exist in Futures")
-            return
-        if self._is_position_short():
+        if self.is_position_short():
             logger.debug(f"Form Futures SHORT: '{self}'")
             self._sold_worker_futures_short()
         else:
@@ -1690,7 +1688,7 @@ class Signal(BaseSignal):
         Worker closes the Signal if it has no opened Buy orders and no opened Sell orders
         """
         if self._check_is_ready_to_be_closed():
-            if self._is_position_short():
+            if self.is_position_short():
                 self.__close_futures_short()
             else:
                 self.__close_futures_long()
@@ -1820,12 +1818,10 @@ class Signal(BaseSignal):
             return False
 
     def _check_is_ready_to_spoil(self) -> bool:
-        if self._is_position_short():
+        if self.is_position_short():
             return self._check_is_ready_to_spoil_futures_short()
-        elif self._is_position_long():
-            return self._check_is_ready_to_spoil_spot_or_long()
         else:
-            logger.error(f"Not found Signal position. Signal: {self}")
+            return self._check_is_ready_to_spoil_spot_or_long()
 
     @debug_input_and_returned
     # @transaction.atomic
