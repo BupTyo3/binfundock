@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_yasg',
 
+    # 'django_extensions',
+
     # Project apps
     'apps.crontask',
     'apps.market',
