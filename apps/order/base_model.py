@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class BaseOrder(SystemBaseModel):
     short_position_separator: str = 'sh'
-    long_position_separator: str = 'sh'
+    long_position_separator: str = 'lo'
     stop_loss_separator: str = 'sl'
     number_copies_separator: str = 'cc'
     custom_order_id: Optional[str]

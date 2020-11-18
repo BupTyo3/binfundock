@@ -110,13 +110,19 @@ class SignalOrig(BaseSignalOrig):
 
     @transaction.atomic
     def create_market_signal(self, market: Optional[BaseMarket] = None):
+        # Set leverage = 1 for Spot Market
+        leverage = self.leverage
+        if market.logic.type == MarketType.SPOT.value:
+            leverage = self._default_leverage
+            if self.position != SignalPosition.LONG.value:
+                raise ValueError(f"Can't create SHORT to SPOT")
         signal = Signal.objects.create(
             techannel=self.techannel,
             symbol=self.symbol,
             stop_loss=self.stop_loss,
             outer_signal_id=self.outer_signal_id,
             position=self.position,
-            leverage=self.leverage,
+            leverage=leverage,
             message_date=self.message_date,
             market=market,
             signal_orig=self,
@@ -181,6 +187,7 @@ class Signal(BaseSignal):
     market: Market
     symbol: str
     stop_loss: float
+    leverage: int
 
     def __str__(self):
         return f"Signal:{self.pk}:{self.symbol}:{self.techannel.abbr}:{self.outer_signal_id}"
@@ -275,10 +282,10 @@ class Signal(BaseSignal):
     def _is_market_type_spot(self) -> bool:
         return True if self.market.logic.type == MarketType.SPOT.value else False
 
-    def __get_buy_distribution(self):
+    def __get_distribution_by_entry_points(self):
         return self.entry_points.count()
 
-    def __get_sell_distribution(self):
+    def __get_distribution_by_take_profits(self):
         return self.take_profits.count()
 
     def _get_current_balance_of_main_coin(self):
@@ -324,6 +331,7 @@ class Signal(BaseSignal):
         value += one_satoshi
         return (value // step) * step
 
+    @debug_input_and_returned
     @rounded_result
     def _get_distributed_toc_quantity_spot_or_long(self, entry_point_price) -> float:
         """
@@ -333,10 +341,13 @@ class Signal(BaseSignal):
         from tools.tools import convert_to_coin_quantity
         pair = self._get_pair()
         step_quantity = pair.step_quantity
-        quantity = self.__get_turnover_by_coin_pair() / self.__get_buy_distribution()
+        toc = self.__get_turnover_by_coin_pair() * self.leverage
+        logger.debug(f"TOC = {toc} (leverage = {self.leverage})")
+        quantity = toc / self.__get_distribution_by_entry_points()
         coin_quantity = convert_to_coin_quantity(quantity, entry_point_price)
         return self.__find_not_fractional_by_step(coin_quantity, step_quantity)
 
+    @debug_input_and_returned
     @rounded_result
     def _get_distributed_toc_quantity_short(self, entry_point_price) -> float:
         """
@@ -347,7 +358,9 @@ class Signal(BaseSignal):
         from tools.tools import convert_to_coin_quantity
         pair = self._get_pair()
         step_quantity = pair.step_quantity
-        quantity = self.__get_turnover_by_coin_pair() / self.__get_sell_distribution()
+        toc = self.__get_turnover_by_coin_pair() * self.leverage
+        logger.debug(f"TOC = {toc} (leverage = {self.leverage})")
+        quantity = toc / self.__get_distribution_by_take_profits()
         coin_quantity = convert_to_coin_quantity(quantity, entry_point_price)
         return self.__find_not_fractional_by_step(coin_quantity, step_quantity)
 
@@ -364,7 +377,7 @@ class Signal(BaseSignal):
             return self._get_distributed_toc_quantity_spot_or_long(entry_point_price=entry_point_price)
 
     @rounded_result
-    def _get_distributed_sell_quantity(self, all_quantity: float) -> float:
+    def _get_distributed_quantity_by_take_profits(self, all_quantity: float) -> float:
         """
         Get distributed sell quantity.
         Fraction by step
@@ -372,11 +385,11 @@ class Signal(BaseSignal):
         pair = self._get_pair()
         # TODO: Check, may be should change to step_quantity = pair.step_price
         step_quantity = pair.step_quantity
-        quantity = all_quantity / self.__get_sell_distribution()
+        quantity = all_quantity / self.__get_distribution_by_take_profits()
         return self.__find_not_fractional_by_step(quantity, step_quantity)
 
     @rounded_result
-    def _get_distributed_buy_quantity(self, all_quantity: float) -> float:
+    def _get_distributed_quantity_by_entry_points(self, all_quantity: float) -> float:
         """
         [SHORT] Get distributed buy quantity.
         Fraction by step
@@ -384,7 +397,7 @@ class Signal(BaseSignal):
         pair = self._get_pair()
         # TODO: Check, may be should change to step_quantity = pair.step_price
         step_quantity = pair.step_quantity
-        quantity = all_quantity / self.__get_buy_distribution()
+        quantity = all_quantity / self.__get_distribution_by_entry_points()
         return self.__find_not_fractional_by_step(quantity, step_quantity)
 
     @debug_input_and_returned
@@ -611,7 +624,7 @@ class Signal(BaseSignal):
     @rounded_result
     def __get_amount_quantity(self) -> float:
         toc_quantity = self.__get_turnover_by_coin_pair()
-        return toc_quantity / (self.__get_buy_distribution() * self.__get_sell_distribution())
+        return toc_quantity / (self.__get_distribution_by_entry_points() * self.__get_distribution_by_take_profits())
 
     @debug_input_and_returned
     def _check_if_balance_enough_for_signal(self) -> bool:
@@ -623,7 +636,7 @@ class Signal(BaseSignal):
         pair = self._get_pair()
         # get amount and subtract fee for buy orders
         amount_quantity = subtract_fee(self.__get_amount_quantity(),
-                                       self._get_market_fee() * self.__get_buy_distribution())
+                                       self._get_market_fee() * self.__get_distribution_by_entry_points())
         logger.debug(f"'{self}':amount_quantity_subtracted_fee={amount_quantity}")
         if amount_quantity < pair.min_amount:
             logger.debug(f"Bad Check: amount_quantity < min_amount: {amount_quantity} < {pair.min_amount}!")
@@ -659,44 +672,44 @@ class Signal(BaseSignal):
         logger.debug(f"Bad Check: coin_quantity < min_quantity: {quantity} < {pair.min_quantity}!")
         return False
 
-    def __formation_first_sell_orders_futures(self, sell_quantity: float) -> None:
+    def __second_formation_sell_orders_futures(self, sell_quantity: float) -> None:
         """
         Function for creating Sell orders
         """
-        distributed_quantity = self._get_distributed_sell_quantity(sell_quantity)
+        distributed_quantity = self._get_distributed_quantity_by_take_profits(sell_quantity)
         for index, take_profit in enumerate(self.take_profits.all()):
             self.__form_sell_tp_order(
                 quantity=distributed_quantity,
                 price=take_profit.value, index=index)
 
-    def __formation_first_sell_orders_spot(self, sell_quantity: float) -> None:
+    def __second_formation_sell_orders_spot(self, sell_quantity: float) -> None:
         """
         Function for creating Sell orders
         """
-        distributed_quantity = self._get_distributed_sell_quantity(sell_quantity)
+        distributed_quantity = self._get_distributed_quantity_by_take_profits(sell_quantity)
         for index, take_profit in enumerate(self.take_profits.all()):
             self.__form_oco_sell_order(
                 distributed_quantity=distributed_quantity,
                 take_profit=take_profit.value, index=index)
 
-    def _formation_first_buy_orders_futures_short(self, buy_quantity: float) -> None:
+    def _second_formation_buy_orders_futures_short(self, buy_quantity: float) -> None:
         """
         [SHORT] Function for creating BUY orders
         """
-        distributed_quantity = self._get_distributed_sell_quantity(buy_quantity)
+        distributed_quantity = self._get_distributed_quantity_by_take_profits(buy_quantity)
         for index, take_profit in enumerate(self.take_profits.all()):
             self.__form_buy_tp_order(
                 quantity=distributed_quantity,
                 price=take_profit.value, index=index)
 
-    def _formation_first_sell_orders(self, sell_quantity: float, futures: bool = False) -> None:
+    def _second_formation_sell_orders(self, sell_quantity: float, futures: bool = False) -> None:
         """
         Function for creating Sell orders
         """
         if futures:
-            self.__formation_first_sell_orders_futures(sell_quantity=sell_quantity)
+            self.__second_formation_sell_orders_futures(sell_quantity=sell_quantity)
         else:
-            self.__formation_first_sell_orders_spot(sell_quantity=sell_quantity)
+            self.__second_formation_sell_orders_spot(sell_quantity=sell_quantity)
 
     @rounded_result
     def _get_new_stop_loss_long_or_spot(self, worked_sell_orders: QuerySet) -> float:
@@ -708,6 +721,10 @@ class Signal(BaseSignal):
         if last_worked_sell_order.index == 0:
             # if the first sell order has worked, new stop_loss is a max of entry_points
             res = self.entry_points.order_by('value').last().value
+            # We increase SL price by slip delta, because
+            # to get more profit after getting the first take_profit
+            # (more than break even)
+            res = self.get_real_stop_price(res, lower=False)
         else:
             # get price of previous order as a new stop_loss
             previous_order = self.sell_orders.filter(index=(last_worked_sell_order.index - 1)).last()
@@ -726,6 +743,10 @@ class Signal(BaseSignal):
         if first_worked_buy_order.index == 0:
             # if the last buy order has worked, new stop_loss is a min of entry_points
             res = self.entry_points.order_by('value').first().value
+            # We decrease SL price by slip delta, because
+            # to get more profit after getting the first take_profit
+            # (more than break even)
+            res = self.get_real_stop_price(res, lower=True)
         else:
             # get price of previous order as a new stop_loss
             # TODO: CHECK !!!! Maybe: .last() -> .first()
@@ -1238,31 +1259,35 @@ class Signal(BaseSignal):
 
     # POINT FIRST FORMATION
 
-    def _first_formation_futures_long_orders(self):
+    def _first_formation_futures_long_orders(self) -> bool:
         """
         FUTURES Market
         LONG Position
         """
         for index, entry_point in enumerate(self.entry_points.all()):
             coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
-            # Multiply quantity to leverage
-            coin_quantity *= self.leverage
+            if not coin_quantity:
+                logger.debug(f"Not enough amount for Signal: '{self}'")
+                return False
             # TODO: Form buy orders
             self.__form_buy_order(distributed_toc=coin_quantity, entry_point=entry_point.value, index=index)
         # self.__form_futures_sl_order()
         # Create Global Stop_loss Order
         planned_executed_quantity = self.__get_planned_executed_quantity(self.buy_orders.all())
         self.__form_sell_gl_sl_order(quantity=planned_executed_quantity, price=self.stop_loss)
+        return True
 
-    def _first_formation_futures_short_orders(self):
+    def _first_formation_futures_short_orders(self) -> bool:
         for index, entry_point in enumerate(self.entry_points.all()):
             coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
-            # Multiply quantity to leverage
-            coin_quantity *= self.leverage
+            if not coin_quantity:
+                logger.debug(f"Not enough amount for Signal: '{self}'")
+                return False
             # TODO: Form TP sell orders
             self.__form_sell_limit_order(quantity=coin_quantity, price=entry_point.value, index=index)
         planned_executed_quantity = self.__get_planned_executed_quantity(self.sell_orders.all())
         self.__form_buy_gl_sl_order(quantity=planned_executed_quantity, price=self.stop_loss)
+        return True
 
     def _first_formation_futures_orders(self):
         """
@@ -1273,26 +1298,32 @@ class Signal(BaseSignal):
             return
         if self._is_position_short():
             logger.debug(f"Form Futures SHORT: '{self}'")
-            self._first_formation_futures_short_orders()
+            is_success = self._first_formation_futures_short_orders()
         else:
             logger.debug(f"Form Futures LONG: '{self}'")
-            self._first_formation_futures_long_orders()
-        self.status = SignalStatus.FORMED.value
-        self.save()
+            is_success = self._first_formation_futures_long_orders()
+        if is_success:
+            self.status = SignalStatus.FORMED.value
+            self.save()
+        return is_success
 
-    def _first_formation_spot_orders(self):
+    def _first_formation_spot_orders(self) -> bool:
         """
         SPOT Market
         """
         if not self._check_if_balance_enough_for_signal():
             # TODO: Add sent message to yourself telegram
-            logger.debug(f"Not enough money for Signal '{self}'")
-            return
+            logger.debug(f"Not enough amount for Signal '{self}'")
+            return False
         self.status = SignalStatus.FORMED.value
         for index, entry_point in enumerate(self.entry_points.all()):
             coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
+            if not coin_quantity:
+                logger.debug(f"Not enough amount for Signal '{self}'")
+                return False
             self.__form_buy_order(distributed_toc=coin_quantity, entry_point=entry_point.value, index=index)
         self.save()
+        return True
 
     # POINT PUSH JOB
 
@@ -1396,7 +1427,7 @@ class Signal(BaseSignal):
                                                futures=futures)
         # Form sell orders if the signal doesn't have any
         elif not self.__get_sell_orders_exclude_indexes(excluded_indexes=[SellOrder.GL_SM_INDEX, ]).exists():
-            self._formation_first_sell_orders(sell_quantity=bought_quantity, futures=futures)
+            self._second_formation_sell_orders(sell_quantity=bought_quantity, futures=futures)
         self.__update_flag_handled_worked_buy_orders(worked_orders)
         # Change status
         if self.status not in BOUGHT_SOLD__SIG_STATS:
@@ -1546,7 +1577,7 @@ class Signal(BaseSignal):
                                                             buy_quantity=new_sold_quantity)
         # Form buy orders if the signal doesn't have any
         elif not self.__get_buy_orders_exclude_indexes(excluded_indexes=[BuyOrder.GL_SM_INDEX, ]).exists():
-            self._formation_first_buy_orders_futures_short(buy_quantity=sold_quantity)
+            self._second_formation_buy_orders_futures_short(buy_quantity=sold_quantity)
         self.__update_flag_handled_worked_sell_orders(worked_orders)
         # Change status
         if self.status not in BOUGHT_SOLD__SIG_STATS:
@@ -1687,14 +1718,14 @@ class Signal(BaseSignal):
     # POINT MAIN FOR ONE SIGNAL
 
     # @transaction.atomic
-    def first_formation_orders(self) -> None:
+    def first_formation_orders(self) -> bool:
         """
         Function for first formation orders for NEW signal
         """
         if self._status != SignalStatus.NEW.value:
             logger.warning(f"Not valid Signal status for formation BUY order: "
                            f"{self._status} : {SignalStatus.NEW.value}")
-            return
+            return False
         if self._is_market_type_futures():
             return self._first_formation_futures_orders()
         else:
