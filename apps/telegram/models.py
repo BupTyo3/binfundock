@@ -512,7 +512,7 @@ class Telegram(BaseTelegram):
                 possible_entries = fake_entries.split('-')
                 entries = left_numbers(possible_entries)
                 if line.startswith(buy_label[0]) or line.startswith(buy_label[1]):
-                    position = 'Long'
+                    position = 'Buy'
                 if line.startswith(buy_label[1]) or line.startswith(buy_label[2]):
                     position = 'Short'
             if line.startswith(goals_label[0]) or line.startswith(goals_label[1]):
