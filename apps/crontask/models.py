@@ -29,6 +29,7 @@ class CronTask(CronTaskBase):
     white_bull = models.BooleanField(default=False)
     simple_future = models.BooleanField(default=False)
     lucrative_trend = models.BooleanField(default=False)
+    raticoin = models.BooleanField(default=False)
 
     balance_to_signal_perc = models.FloatField(
         default=_default_balance_percentage_by_signal,

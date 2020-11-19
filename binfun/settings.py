@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_yasg',
 
+    # 'django_extensions',
+
     # Project apps
     'apps.crontask',
     'apps.market',
@@ -278,6 +280,7 @@ class Config:
         self.lucrative_channel = telegram.get('Lucrative_Recommendations', None)
         self.simple_future = telegram.get('simple_future', None)
         self.lucrative_trend = telegram.get('Lucrative_Trend', None)
+        self.raticoin = telegram.get('Raticoin', None)
 
 
 conf_obj = Config()

@@ -86,6 +86,12 @@ class Market(BaseMarket):
         elif self.name == BiFuturesMarketLogic.name:
             return BiFuturesMarketLogic()
 
+    def is_spot_market(self) -> bool:
+        return True if self.logic.type == MarketType.SPOT.value else False
+
+    def is_futures_market(self) -> bool:
+        return True if self.logic.type == MarketType.FUTURES.value else False
+
 
 class BinanceDataMixin:
     askPrice_ = 'askPrice'
@@ -272,9 +278,6 @@ class BiMarketLogic(BaseMarketLogic,
 
     def push_buy_limit_order(self, order: 'BuyOrder'):
         """Push Buy limit order"""
-        from apps.pair.models import Pair
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_buy_limit_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
         data = self._get_partially_order_data_from_response(response)
@@ -288,9 +291,6 @@ class BiMarketLogic(BaseMarketLogic,
         We push one request to the Market, but two orders will be created:
         tp_order, sl_order
         """
-        from apps.pair.models import Pair
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         # TODO: change to sell order
         response = self._push_sell_oco_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price,
@@ -306,9 +306,6 @@ class BiMarketLogic(BaseMarketLogic,
         """
         Push Market order.
         """
-        from apps.pair.models import Pair
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_sell_market_order(
             symbol=order.symbol, quantity=order.quantity,
             custom_order_id=order.custom_order_id)
@@ -589,11 +586,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
 
     def push_buy_limit_order(self, order: 'BuyOrder'):
         """Push BUY LIMIT order to Futures"""
-        from apps.pair.models import Pair
         self._push_preconditions(order=order)
 
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_buy_limit_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
         data = self._get_partially_order_data_from_response(response)
@@ -603,11 +597,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
 
     def push_sell_limit_order(self, order: 'BuyOrder'):
         """Push SELL LIMIT order to Futures"""
-        from apps.pair.models import Pair
         self._push_preconditions(order=order)
 
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_sell_limit_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
         data = self._get_partially_order_data_from_response(response)
@@ -619,11 +610,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         """
         Push SELL MARKET order.
         """
-        from apps.pair.models import Pair
         self._push_preconditions(order=order)
 
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_sell_market_order(
             symbol=order.symbol, quantity=order.quantity,
             custom_order_id=order.custom_order_id)
@@ -637,11 +625,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         """
         Push BUY MARKET order.
         """
-        from apps.pair.models import Pair
         self._push_preconditions(order=order)
 
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_buy_market_order(
             symbol=order.symbol, quantity=order.quantity,
             custom_order_id=order.custom_order_id)
@@ -655,11 +640,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         """
         Push SELL STOP MARKET order.
         """
-        from apps.pair.models import Pair
         self._push_preconditions(order=order)
 
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_sell_gl_sl_market_order(
             symbol=order.symbol, quantity=order.quantity, stop_price=order.price,
             custom_order_id=order.custom_order_id)
@@ -673,11 +655,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         """
         Push BUY STOP MARKET order.
         """
-        from apps.pair.models import Pair
         self._push_preconditions(order=order)
 
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_buy_gl_sl_market_order(
             symbol=order.symbol, quantity=order.quantity, stop_price=order.price,
             custom_order_id=order.custom_order_id)
@@ -694,11 +673,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         """
         Push TP order.
         """
-        from apps.pair.models import Pair
         self._push_preconditions(order=order)
 
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_sell_tp_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price,
             custom_order_id=order.custom_order_id, stop_trigger=order.trigger)
@@ -711,11 +687,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         """
         Push TP order.
         """
-        from apps.pair.models import Pair
         self._push_preconditions(order=order)
 
-        pair = Pair.objects.filter(symbol=order.symbol, market=self.market).first()
-        logger.debug(f"Rules: {order.symbol}: {pair.__dict__}")
         response = self._push_buy_tp_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price,
             custom_order_id=order.custom_order_id, stop_trigger=order.trigger)
