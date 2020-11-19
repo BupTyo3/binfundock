@@ -294,8 +294,8 @@ class Telegram(BaseTelegram):
                 possible_pair = line.split(' ')
                 pair = ''.join(filter(str.isalpha, possible_pair[0]))
             if line.startswith(leverage):
-                    possible_leverage = line.split(':')
-                    leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
+                possible_leverage = line.split(':')
+                leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
             if line.startswith(buy_label[0]) or line.startswith(buy_label[1]):
                 if line.startswith(buy_label[0]):
                     position = 'Short'
@@ -312,6 +312,92 @@ class Telegram(BaseTelegram):
                 stop_loss = line[11:]
         """ Take only first 4 take profits: """
         profits = profits[:4]
+        signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        return signals
+
+    async def parse_raticoin_channel(self):
+        chat_id = int(conf_obj.raticoin)
+        channel_abbr = 'recoin'
+        short_channel_abbr = 'reco'
+        async for message in self.client.iter_messages(chat_id, limit=15):
+            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            should_handle_msg = not exists
+            if should_handle_msg:
+                signal = self.parse_raticoin_message(message.text, message.id)
+                if signal:
+                    if signal[0].entry_points:
+                        inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                        if inserted_to_db != 'success':
+                            await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                                f"please check logs for '{signal[0].pair}' "
+                                                                f"related to the '{channel_abbr}' algorithm: "
+                                                                f"{inserted_to_db}")
+                        else:
+                            await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                                message.date, channel_abbr, message.id)
+                            await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                            message.date, channel_abbr, message.id)
+
+    def parse_raticoin_message(self, message_text, message_id):
+        signals = []
+        splitted_info = message_text.splitlines()
+        buy_label = '(LONG)'
+        short_label = '(SHORT)'
+        pair_label = '#'
+        entry_label = 'Entry Zone:'
+        goals_label = 'Take-Profit Targets:'
+        stop_label = 'Stop Targets:'
+        pair = ''
+        current_price = ''
+        is_margin = False
+        position = None
+        leverage = 'Leverage: '
+        entries = []
+        profits = []
+        stop_loss = ''
+        for line in splitted_info:
+            if pair_label in line:
+                possible_pair = line.split(' ')
+                pair = ''.join(filter(str.isalpha, possible_pair[1]))
+            if line.startswith(leverage):
+                possible_leverage = line.split(' ')
+                leverage = ''.join(filter(str.isdecimal, possible_leverage[2]))
+            if buy_label in line:
+                position = 'Long'
+            if short_label in line:
+                position = 'Short'
+        try:
+            entry_index = splitted_info.index(entry_label)
+        except ValueError as e:
+            return signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        possible_entries = splitted_info[entry_index + 1:entry_index + 2]
+        for possible_entry in possible_entries:
+            entry = possible_entry.split(' - ')
+            entries.append(entry[1])
+
+        try:
+            take_profits_index = splitted_info.index(goals_label)
+        except ValueError as e:
+            return signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        possible_take_profits = splitted_info[take_profits_index + 1:take_profits_index + 6]
+        for possible_take in possible_take_profits:
+            take_profit = possible_take.split(' ')
+            profits.append(take_profit[1])
+
+        try:
+            stop_index = splitted_info.index(stop_label)
+        except ValueError as e:
+            return signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        possible_stop = splitted_info[stop_index + 1:stop_index + 2]
+        stop_loss = possible_stop[0].split(' ')
+        stop_loss = stop_loss[1]
+
+        """ Take only first 4 take profits: """
+        if profits: profits = profits[:4]
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
@@ -506,7 +592,7 @@ class Telegram(BaseTelegram):
                     leverage = 1
         for line in splitted_info:
             line = line.strip()
-            if line.startswith(buy_label[0]) or line.startswith(buy_label[1])\
+            if line.startswith(buy_label[0]) or line.startswith(buy_label[1]) \
                     or line.startswith(buy_label[2]) or line.startswith(buy_label[3]):
                 fake_entries = line[4:]
                 possible_entries = fake_entries.split('-')
