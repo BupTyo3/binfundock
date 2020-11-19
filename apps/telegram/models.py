@@ -319,7 +319,7 @@ class Telegram(BaseTelegram):
     async def parse_raticoin_channel(self):
         chat_id = int(conf_obj.raticoin)
         channel_abbr = 'recoin'
-        short_channel_abbr = 'reco'
+        short_channel_abbr = 're'
         async for message in self.client.iter_messages(chat_id, limit=15):
             exists = await self.is_signal_handled(message.id, short_channel_abbr)
             should_handle_msg = not exists
@@ -352,7 +352,8 @@ class Telegram(BaseTelegram):
         current_price = ''
         is_margin = False
         position = None
-        leverage = 'Leverage: '
+        leverage_label = 'Leverage: '
+        leverage = ''
         entries = []
         profits = []
         stop_loss = ''
@@ -360,9 +361,11 @@ class Telegram(BaseTelegram):
             if pair_label in line:
                 possible_pair = line.split(' ')
                 pair = ''.join(filter(str.isalpha, possible_pair[1]))
-            if line.startswith(leverage):
+            if line.startswith(leverage_label) and 'X)' in line:
                 possible_leverage = line.split(' ')
-                leverage = ''.join(filter(str.isdecimal, possible_leverage[2]))
+                leverage = left_numbers([possible_leverage[2]])
+                leverage = leverage[0].split('.')
+                leverage = leverage[0]
             if buy_label in line:
                 position = 'Long'
             if short_label in line:
@@ -375,7 +378,8 @@ class Telegram(BaseTelegram):
         possible_entries = splitted_info[entry_index + 1:entry_index + 2]
         for possible_entry in possible_entries:
             entry = possible_entry.split(' - ')
-            entries.append(entry[1])
+            for entr in entry:
+                entries.append(entr)
 
         try:
             take_profits_index = splitted_info.index(goals_label)
@@ -385,7 +389,7 @@ class Telegram(BaseTelegram):
         possible_take_profits = splitted_info[take_profits_index + 1:take_profits_index + 6]
         for possible_take in possible_take_profits:
             take_profit = possible_take.split(' ')
-            profits.append(take_profit[1])
+            profits.append(take_profit[1].replace('-',''))
 
         try:
             stop_index = splitted_info.index(stop_label)
@@ -405,14 +409,14 @@ class Telegram(BaseTelegram):
     async def parse_lucrative_trend_channel(self):
         chat_id = int(conf_obj.lucrative_channel)
         channel_abbr = 'lucrative_trend'
-        short_channel_abbr = 'luctr'
+        short_channel_abbr = 'lutr'
         async for message in self.client.iter_messages(chat_id, limit=15):
             exists = await self.is_signal_handled(message.id, short_channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg:
                 signal = self.parse_lucrative_trend_message(message.text, message.id)
                 if signal[0].entry_points != '':
-                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, signal[0].current_price)
                     if inserted_to_db != 'success':
                         await self.send_message_to_yourself(f"Error during processing the signal to DB, "
                                                             f"please check logs for '{signal[0].pair}' "
@@ -435,6 +439,7 @@ class Telegram(BaseTelegram):
         entries = ''
         profits = []
         stop_loss = ''
+        datetime_label = 'Time:'
         for line in splitted_info:
             if line.startswith(pair_label):
                 possible_pair = line.split(' ')
@@ -453,6 +458,9 @@ class Telegram(BaseTelegram):
                 profits = left_numbers(possible_profits.split(','))
             if line.startswith(stop_label):
                 stop_loss = line[11:].replace('\'', '')
+            if line.startswith(datetime_label):
+                current_price = line[7:].replace('\'', '')
+                current_price = current_price+'+02:00'
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals

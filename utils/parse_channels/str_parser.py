@@ -12,6 +12,9 @@ def left_numbers(array: List[str]) -> List[str]:
     array = [n.replace(',', '.') for n in array]
     array = [n.replace('-', '') for n in array]
     array = [n.replace('+', '') for n in array]
+    array = [n.replace('(', '') for n in array]
+    array = [n.replace(')', '') for n in array]
+    array = [n.replace('X', '') for n in array]
     array = list(dict.fromkeys(array))
     # possible_array = [''.join([n.replace(',', '.') for n in el if n.isdigit()
     #                            or n in ['.', ',']]) for el in array]
