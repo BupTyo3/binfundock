@@ -8,6 +8,8 @@ DB_HOST=db
 DB_NAME=binfun_name
 DB_USER=binfun_user
 DB_PASSWORD=binfun_password_xxx
+
+WEB_GLOB_PORT=8100
 ```
 
 ### Sample `config.ini` File
