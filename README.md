@@ -104,3 +104,27 @@ python manage.py createsuperuser
 ```bash
 rm -r pgdata
 ```
+
+
+### DEVELOPMENT
+#### Sample `binfun/local_settings.py` File
+
+```python
+
+DEBUG = True
+
+# django_extensions
+INTERNAL_IPS = '127.0.0.1'
+
+```
+#### SHELL_PLUS
+
+- shell_plus
+```bash
+python manage.py shell_plus
+```
+
+- shell_plus with sql queries printing
+```bash
+python manage.py shell_plus --print-sql
+```

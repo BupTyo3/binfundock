@@ -38,6 +38,12 @@ urlpatterns = [
     # path('api/', include('api.urls')),
 ]
 
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns = [
+                      url(r'^__debug__/', include(debug_toolbar.urls)),
+                  ] + urlpatterns
+
 urlpatterns.extend([
    url(r'^swagger(?P<format>\.json|\.yaml)$',
        schema_view.without_ui(cache_timeout=0), name='schema-json'),
