@@ -42,7 +42,7 @@ services:
       - static_volume:/binfun/static
       - ./nginx/nginx.binfun.conf:/etc/nginx/conf.d/web.conf
     ports:
-      - 8100:8100
+      - ${WEB_GLOB_PORT}:8100
     depends_on:
       - web
 

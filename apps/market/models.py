@@ -546,6 +546,7 @@ class BiFuturesMarketLogic(BaseMarketLogic,
             side=self.my_client.SIDE_SELL,
             type=self.my_client.ORDER_TYPE_MARKET,
             symbol=symbol,
+            reduceOnly=True,
             quantity=quantity,
             newClientOrderId=custom_order_id)
         return response
@@ -561,6 +562,7 @@ class BiFuturesMarketLogic(BaseMarketLogic,
             side=self.my_client.SIDE_BUY,
             type=self.my_client.ORDER_TYPE_MARKET,
             symbol=symbol,
+            reduceOnly=True,
             quantity=quantity,
             newClientOrderId=custom_order_id)
         return response
