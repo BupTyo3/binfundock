@@ -563,7 +563,7 @@ class Telegram(BaseTelegram):
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_white_bull_message(message.text, message.id)
-                if signal[0].entry_points:
+                if signal[0].entry_points and signal[0].pair:
                     inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                     if inserted_to_db != 'success':
                         await self.send_message_to_yourself(f"Error during processing the signal to DB, "
