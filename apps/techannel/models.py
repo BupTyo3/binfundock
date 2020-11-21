@@ -1,12 +1,21 @@
 import logging
 import copy
 
+from typing import (
+    Optional, List, Set,
+    Callable,
+    TYPE_CHECKING
+)
+
 from django.db import models
 from .base_model import TechannelBase
 from utils.framework.models import (
     left_only_numbers_letters_underscores,
 )
 from tools.tools import gen_short_uuid
+
+if TYPE_CHECKING:
+    from apps.market.base_model import BaseMarket
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +30,14 @@ class Techannel(TechannelBase):
     abbr = models.CharField(max_length=6,
                             unique=True,
                             help_text='unique short abbreviation for custom_order_id')
+    auto_bi_futures = models.BooleanField(
+        default=False,
+        help_text='Auto creating into Signal for BiFutures Market',
+    )
+    auto_bi_spot = models.BooleanField(
+        default=False,
+        help_text='Auto creating into Signal for BiSpot Market',
+    )
 
     objects = models.Manager()
 
@@ -52,3 +69,32 @@ class Techannel(TechannelBase):
         techannel = cls.objects.create(name=name, abbr=abbr)
         logger.debug(f"Telegram channel '{techannel}' has been created successfully")
         return techannel
+
+    def get_bi_futures_market_if_auto_enabled(self) -> Optional['BaseMarket']:
+        """
+        Futures market
+        Get a market, corresponding to the flag:
+        auto creating Signal by SignalOrig
+        """
+        from apps.market.models import get_or_create_futures_market
+        return get_or_create_futures_market() if self.auto_bi_futures else None
+
+    def get_bi_spot_market_if_auto_enabled(self) -> Optional['BaseMarket']:
+        """
+        Spot market
+        Get a market, corresponding to the flag:
+        auto creating Signal by SignalOrig
+        """
+        from apps.market.models import get_or_create_market
+        return get_or_create_market() if self.auto_bi_spot else None
+
+    def get_market_auto_methods(self) -> List[Callable]:
+        """
+        Get list of methods to create markets
+         to auto create into Signal
+         after creating SignalOrig
+        """
+        return [
+            self.get_bi_futures_market_if_auto_enabled,
+            self.get_bi_spot_market_if_auto_enabled,
+        ]

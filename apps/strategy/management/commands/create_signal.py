@@ -73,6 +73,6 @@ class Command(SystemCommand):
                                           outer_signal_id=outer_signal_id)
 
         if sm_obj:
-            self.log_success(f"Signal '{outer_signal_id}':'{techannel}' created successfully")
+            self.log_success(f"SignalOrig '{sm_obj}' created successfully")
         else:
-            self.log_error(f"Signal '{outer_signal_id}':'{techannel}' has not been created")
+            self.log_error(f"SignalOrig '{outer_signal_id}':'{techannel}' has not been created")
