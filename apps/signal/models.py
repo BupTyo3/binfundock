@@ -22,10 +22,16 @@ from .utils import (
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
     PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, BOUGHT_SOLD__SIG_STATS, BOUGHT__SIG_STATS,
 )
+from .exceptions import (
+    MainCoinNotServicedError,
+    ShortSpotCombinationError,
+)
 from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket
 from apps.market.models import Market
 from apps.market.utils import MarketType
+from apps.pair.exceptions import PairNotExistsError
+from apps.pair.models import Pair
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
 from tools.tools import (
@@ -66,7 +72,8 @@ class SignalOrig(BaseSignalOrig):
     objects = models.Manager()
 
     def __str__(self):
-        return f"SignalOrig:{self.pk}:{self.symbol}:{self.techannel.abbr}:{self.outer_signal_id}"
+        return f"SignalOrig:{self.pk}:{self.symbol}:{self.techannel.abbr}" \
+               f":{self.outer_signal_id}:{self.position}"
 
     class Meta:
         unique_together = ['techannel', 'outer_signal_id', ]
@@ -77,22 +84,56 @@ class SignalOrig(BaseSignalOrig):
         super().save(*args, **kwargs)
 
     def _check_if_pair_does_not_exist_in_market(self, market: BaseMarket) -> None:
-        from apps.pair.models import Pair
         pair = Pair.get_pair(self.symbol, market)
         if not pair:
-            raise ValueError(f"Pair {self.symbol} does not exist in Market {market}")
+            raise PairNotExistsError(symbol=self.symbol, market=market)
 
     def _check_inappropriate_position_to_market_type(self, market: BaseMarket) -> None:
         if market.is_spot_market() and self.is_position_short():
-            raise ValueError(f"Can't create SHORT to SPOT. SignalOrig: '{self}'")
+            raise ShortSpotCombinationError(signal=self)
+
+    def _create_into_markets_if_auto(self) -> List['Signal']:
+        """
+        Create Signal for special Markets (if the corresponding flags are enabled)
+        """
+        res = []
+        for market_method in self.techannel.get_market_auto_methods():
+            market = market_method()
+            if market:
+                try:
+                    res.append(self.create_market_signal(market=market))
+                except PairNotExistsError as err:
+                    logger.warning(f"Signal '{self}' doesn't created: '{err}'")
+        return res
 
     @classmethod
-    @transaction.atomic
     def create_signal(cls, symbol: str, techannel_name: str,
                       stop_loss: float, outer_signal_id: int,
                       entry_points: List[float], take_profits: List[float],
                       leverage: Optional[int] = None,
                       message_date=timezone.now()):
+        """
+        Create signal
+        """
+        sig_orig = cls._create_signal(
+            symbol=symbol, techannel_name=techannel_name,
+            stop_loss=stop_loss, outer_signal_id=outer_signal_id,
+            entry_points=entry_points, take_profits=take_profits,
+            leverage=leverage, message_date=message_date)
+        if not sig_orig:
+            return
+        sig_market_list = sig_orig._create_into_markets_if_auto()
+        logger.debug(f"SignalOrig created: '{sig_orig}' and next '{len(sig_market_list)}' "
+                     f"Signals: '{sig_market_list}'")
+        return sig_orig
+
+    @classmethod
+    @transaction.atomic
+    def _create_signal(cls, symbol: str, techannel_name: str,
+                       stop_loss: float, outer_signal_id: int,
+                       entry_points: List[float], take_profits: List[float],
+                       leverage: Optional[int] = None,
+                       message_date=timezone.now()) -> Optional['SignalOrig']:
         """
         Create signal
         """
@@ -120,7 +161,7 @@ class SignalOrig(BaseSignalOrig):
         return sm_obj
 
     @transaction.atomic
-    def create_market_signal(self, market: BaseMarket):
+    def create_market_signal(self, market: BaseMarket) -> 'Signal':
         self._check_if_pair_does_not_exist_in_market(market)
         # ValueError if SPOT & SHORT
         self._check_inappropriate_position_to_market_type(market)
@@ -141,6 +182,7 @@ class SignalOrig(BaseSignalOrig):
             EntryPoint.objects.create(signal=signal, value=entry_point.value)
         for take_profit in self.take_profits.all():
             TakeProfit.objects.create(signal=signal, value=take_profit.value)
+        return signal
 
     def _get_main_coin(self, symbol) -> str:
         """
@@ -152,7 +194,7 @@ class SignalOrig(BaseSignalOrig):
         for main_coin in self.conf.all_accessible_main_coins:
             if symbol[-len(main_coin):] == main_coin:
                 return main_coin
-        raise Exception("Provided main coin is not serviced")
+        raise MainCoinNotServicedError
 
 
 class Signal(BaseSignal):
@@ -200,7 +242,8 @@ class Signal(BaseSignal):
     leverage: int
 
     def __str__(self):
-        return f"Signal:{self.pk}:{self.symbol}:{self.techannel.abbr}:{self.outer_signal_id}"
+        return f"Signal:{self.pk}:{self.symbol}:{self.techannel.abbr}" \
+               f":{self.outer_signal_id}:{self.position}:{self.market}"
 
     class Meta:
         unique_together = ['techannel', 'outer_signal_id', 'market']
@@ -278,7 +321,7 @@ class Signal(BaseSignal):
         for main_coin in self.conf.accessible_main_coins:
             if symbol[-len(main_coin):] == main_coin:
                 return main_coin
-        raise Exception("Provided main coin is not serviced")
+        raise MainCoinNotServicedError
 
     def _is_market_type_futures(self) -> bool:
         return True if self.market.logic.type == MarketType.FUTURES.value else False
@@ -302,7 +345,6 @@ class Signal(BaseSignal):
         return self.market_logic.market_fee
 
     def _get_pair(self):
-        from apps.pair.models import Pair
         return Pair.get_pair(self.symbol, self.market)
 
     @debug_input_and_returned
@@ -1141,6 +1183,7 @@ class Signal(BaseSignal):
         return qs.aggregate(Sum('bought_amount'))['bought_amount__sum'] or 0
 
     @staticmethod
+    @rounded_result
     def __get_sold_amount(worked_orders: QuerySet) -> float:
         """
         """
@@ -1149,6 +1192,7 @@ class Signal(BaseSignal):
         return qs.aggregate(Sum('sold_amount'))['sold_amount__sum'] or 0
 
     @staticmethod
+    @rounded_result
     def __get_sold_quantity(worked_orders: QuerySet) -> float:
         """
         Get Sum of quantity of orders
@@ -1159,6 +1203,7 @@ class Signal(BaseSignal):
 
     @staticmethod
     @debug_input_and_returned
+    @rounded_result
     def __get_planned_executed_quantity(worked_orders: QuerySet) -> float:
         """
         Get Sum of quantity of orders

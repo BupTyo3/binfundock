@@ -49,7 +49,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_yasg',
 
-    # 'django_extensions',
+    'django_extensions',
+    'debug_toolbar',
 
     # Project apps
     'apps.crontask',
@@ -66,6 +67,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -285,3 +287,7 @@ class Config:
 
 conf_obj = Config()
 
+try:
+    from .local_settings import *
+except ImportError:
+    print('local_settings load failed!')

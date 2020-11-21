@@ -5,9 +5,10 @@ from django.utils.translation import ugettext_lazy as _
 from django.db.models import (
     F, Case, When, ExpressionWrapper,
     CharField, Count, Sum, Q, Subquery, OuterRef,
-    FloatField, Func, Value,
+    FloatField, Func, Value, Aggregate,
 )
-from django.db.models.functions import Abs
+from django.db.models.functions import Abs, Concat, Upper, Cast
+from django.contrib.postgres.aggregates.general import StringAgg
 
 from apps.market.models import get_or_create_market, get_or_create_futures_market
 from utils.admin import InputFilter
@@ -69,6 +70,8 @@ class SignalAdmin(admin.ModelAdmin):
                     'market',
                     'position',
                     'leverage',
+                    # 'e_points',
+                    # 't_profits',
                     'entry_points',
                     'take_profits',
                     'stop_loss',
@@ -115,9 +118,28 @@ class SignalAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super(SignalAdmin, self).get_queryset(request)
-        return qs.annotate(perc_inc=Case(
+
+        # UNCOMMENT for only PostgreSQL
+        # decrease in the number of requests
+        # these and other correspondence e_points, t_profits places
+
+        # qs = qs.annotate(t_profits=StringAgg(
+        #     Cast('take_profits__value', output_field=CharField()),
+        #     output_field=CharField(), delimiter='-', distinct=True))
+        # qs = qs.annotate(e_points=StringAgg(
+        #     Cast('entry_points__value', output_field=CharField()),
+        #     output_field=CharField(), delimiter='-', distinct=True))
+
+        res = qs.annotate(perc_inc=Case(
             When(amount=0, then=0),
             default=F('income') / F('amount') * 100))
+        return res
+
+    # def t_profits(self, obj):
+    #     return obj.t_profits
+    #
+    # def e_points(self, obj):
+    #     return obj.e_points
 
     def perc_inc(self, obj):
           return round(obj.perc_inc, 2)
@@ -336,6 +358,8 @@ class SignalOrigAdmin(admin.ModelAdmin):
                     'leverage',
                     'entry_points',
                     'take_profits',
+                    # 'e_points',
+                    # 't_profits',
                     'stop_loss',
                     'techannel',
                     'outer_signal_id',
@@ -373,6 +397,17 @@ class SignalOrigAdmin(admin.ModelAdmin):
         qs = super(SignalOrigAdmin, self).get_queryset(request)
         qs = qs.annotate(sig_count=Count('market_signals'))
 
+        # UNCOMMENT for only PostgreSQL
+        # decrease in the number of requests
+        # these and other correspondence e_points, t_profits places
+
+        # qs = qs.annotate(t_profits=StringAgg(
+        #     Cast('take_profits__value', output_field=CharField()),
+        #     output_field=CharField(), delimiter='-', distinct=True))
+        # qs = qs.annotate(e_points=StringAgg(
+        #     Cast('entry_points__value', output_field=CharField()),
+        #     output_field=CharField(), delimiter='-', distinct=True))
+
         # Annotate by max_loss and max_profit
         # max_loss (LONG) all buy orders have been worked and sell all by stop_loss
         # max_profit (LONG) all buy orders have been worked and sell all by all take_profits
@@ -404,6 +439,12 @@ class SignalOrigAdmin(admin.ModelAdmin):
 
     def max_loss(self, obj):
         return round(obj.max_loss, 2)
+
+    # def t_profits(self, obj):
+    #     return obj.t_profits
+    #
+    # def e_points(self, obj):
+    #     return obj.e_points
 
     @staticmethod
     def take_profits(signal):
