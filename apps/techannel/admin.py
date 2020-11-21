@@ -8,5 +8,7 @@ class TechannelAdmin(admin.ModelAdmin):
     list_display = ['id',
                     'abbr',
                     'name',
+                    'auto_bi_futures',
+                    'auto_bi_spot',
                     ]
 
