@@ -321,7 +321,7 @@ class Telegram(BaseTelegram):
         chat_id = int(conf_obj.raticoin)
         channel_abbr = 'recoin'
         short_channel_abbr = 're'
-        async for message in self.client.iter_messages(chat_id, limit=15):
+        async for message in self.client.iter_messages(chat_id, limit=10):
             exists = await self.is_signal_handled(message.id, short_channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg:
@@ -631,7 +631,7 @@ class Telegram(BaseTelegram):
         channel_id = int(conf_obj.bull_exclusive)
         channel_abbr = 'bull_excl'
         short_channel_abbr = 'buex'
-        async for message in self.client.iter_messages(channel_id, limit=15):
+        async for message in self.client.iter_messages(channel_id, limit=10):
             exists = await self.is_signal_handled(message.id, short_channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
@@ -701,7 +701,7 @@ class Telegram(BaseTelegram):
         channel_id = int(conf_obj.crypto_zone)
         channel_abbr = 'crop_zone'
         short_channel_abbr = 'crzo'
-        async for message in self.client.iter_messages(channel_id, limit=47):
+        async for message in self.client.iter_messages(channel_id, limit=10):
             exists = await self.is_signal_handled(message.id, short_channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
