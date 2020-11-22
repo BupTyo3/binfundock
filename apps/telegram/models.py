@@ -1,5 +1,6 @@
 import json
 import logging
+import random
 import os
 import shutil
 import time
@@ -20,7 +21,7 @@ from apps.signal.models import SignalOrig, EntryPoint, TakeProfit
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
 from tools.tools import countdown
-from utils.parse_channels.str_parser import left_numbers, check_pair
+from utils.parse_channels.str_parser import left_numbers, check_pair, find_number_in_list
 from .base_model import BaseTelegram
 from .init_client import ShtClient
 
@@ -620,6 +621,136 @@ class Telegram(BaseTelegram):
                     stop_loss = stop_loss[1]
                 else:
                     stop_loss = stop_loss[0]
+        """ Take only first 4 take profits: """
+        profits = profits[:4]
+        signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        return signals
+
+    async def parse_bull_exclusive_channel(self):
+        channel_id = int(conf_obj.bull_exclusive)
+        channel_abbr = 'bull_excl'
+        short_channel_abbr = 'buex'
+        async for message in self.client.iter_messages(channel_id, limit=15):
+            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            should_handle_msg = not exists
+            if message.text and should_handle_msg:
+                signal = self.parse_bull_exclusive_message(message.text, message.id)
+                last_chars = signal[0].pair[-3:]
+                is_btc_pair = last_chars == 'BTC'
+                if signal[0].entry_points and signal[0].pair and not is_btc_pair:
+                        inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                        if inserted_to_db != 'success':
+                            await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                                f"please check logs for '{signal[0].pair}' "
+                                                                f"related to the '{channel_abbr}' algorithm: "
+                                                                f"{inserted_to_db}")
+                        else:
+                            await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                                message.date, channel_abbr, message.id)
+                            await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                                message.date, channel_abbr, message.id)
+                elif signal[0].entry_points and signal[0].pair and is_btc_pair:
+                    await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                        message.date, channel_abbr, message.id)
+                    await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                        message.date, channel_abbr, message.id)
+                    await self.send_message_to_yourself(f"Good signal for '{signal[0].pair}'\n"
+                                                        f"Consider to process it to USDT manually")
+
+
+    def parse_bull_exclusive_message(self, message_text, message_id):
+        signals = []
+        splitted_info = message_text.splitlines()
+        buy_label = 'ENTRY'
+        goals_label = 'TARGETS'
+        stop_label = 'STOP LOSS'
+        pair = ''
+        current_price = ''
+        is_margin = False
+        position = None
+        leverage = 5
+        entries = ''
+        profits = ''
+        stop_loss = ''
+        if '/USDT' in splitted_info[0] or '/BTC' in splitted_info[0]:
+            pair_info = splitted_info[0].split(' ')
+            pair = ''.join(filter(str.isalpha, pair_info[0]))
+        for line in splitted_info:
+            line = line.strip()
+            if line.startswith(buy_label):
+                fake_entries = line[5:]
+                possible_entries = fake_entries.split('-')
+                entries = left_numbers(possible_entries)
+            if line.startswith(goals_label):
+                fake_profits = line[7:]
+                possible_take_profits = fake_profits.split(' - ')
+                profits = left_numbers(possible_take_profits)
+            if line.startswith(stop_label):
+                possible_stop_losses = line[9:]
+                possible_stop = possible_stop_losses.split(' ')
+                stop_loss = find_number_in_list(possible_stop)
+
+        """ Take only first 4 take profits: """
+        profits = profits[:4]
+        signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
+        return signals
+
+    async def parse_crypto_zone_channel(self):
+        channel_id = int(conf_obj.crypto_zone)
+        channel_abbr = 'crop_zone'
+        short_channel_abbr = 'crzo'
+        async for message in self.client.iter_messages(channel_id, limit=47):
+            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            should_handle_msg = not exists
+            if message.text and should_handle_msg:
+                signal = self.parse_crypto_zone_message(message.text, message.id)
+                if signal[0].entry_points and signal[0].pair:
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                    if inserted_to_db != 'success':
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                            f"please check logs for '{signal[0].pair}' "
+                                                            f"related to the '{channel_abbr}' algorithm: "
+                                                            f"{inserted_to_db}")
+                    else:
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                            message.date, channel_abbr, message.id)
+                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                            message.date, channel_abbr, message.id)
+
+
+    def parse_crypto_zone_message(self, message_text, message_id):
+        signals = []
+        splitted_info = message_text.splitlines()
+        is_futures_label = '💠#Binance Futures Signals'
+        buy_label = ['Long/Buy', 'Buy', 'Sell']
+        goals_label = 'Targets'
+        stop_label = 'Stop Loss'
+        pair = ''
+        current_price = ''
+        is_margin = False
+        position = None
+        leverage = random.randint(5, 10)
+        entries = ''
+        profits = ''
+        stop_loss = ''
+        if is_futures_label in splitted_info[0]:
+            pair_info = splitted_info[1].split(' ')
+            pair = ''.join(filter(str.isalpha, pair_info[1]))
+            entries = [pair_info[2]]
+            if buy_label[0] in splitted_info[1] or buy_label[1] in splitted_info[1]:
+                position = 'LONG'
+            elif buy_label[2] in splitted_info[1]:
+                position = 'SHORT'
+        for line in splitted_info:
+            if line.startswith(goals_label):
+                fake_profits = line[7:]
+                possible_take_profits = fake_profits.split('-')
+                profits = left_numbers(possible_take_profits)
+            if line.startswith(stop_label):
+                stop_loss = line[9:]
+
         """ Take only first 4 take profits: """
         profits = profits[:4]
         signals.append(SignalModel(pair, current_price, is_margin, position,

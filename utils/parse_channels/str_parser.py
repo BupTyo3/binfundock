@@ -21,6 +21,14 @@ def left_numbers(array: List[str]) -> List[str]:
     return list(filter(None, array))
 
 
+def find_number_in_list(list_of_strings):
+    for string in list_of_strings:
+        try:
+            return float(string)
+        except ValueError:
+            pass
+
+
 def check_pair(string):
     if 'Е' in string:
         string = string.replace('Е', 'E')
@@ -45,6 +53,7 @@ def check_pair(string):
     if 'У' in string:
         string = string.replace('У', 'Y')
     return string
+
 
 def replace_rus_to_eng(string):
     if 'е' in string:
