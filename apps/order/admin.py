@@ -79,6 +79,7 @@ class CustomOrderIDFilter(InputFilter):
 class BuyOrderAdmin(admin.ModelAdmin):
     list_display = ['id',
                     'symbol',
+                    's_id',
                     's_status',
                     'price',
                     'quantity',
@@ -110,11 +111,16 @@ class BuyOrderAdmin(admin.ModelAdmin):
     def s_status(order):
         return order.signal.status
 
+    @staticmethod
+    def s_id(order):
+        return order.signal.id
+
 
 @admin.register(SellOrder)
 class SellOrderAdmin(admin.ModelAdmin):
     list_display = ['id',
                     'symbol',
+                    's_id',
                     's_status',
                     'price',
                     'quantity',
@@ -146,6 +152,10 @@ class SellOrderAdmin(admin.ModelAdmin):
     @staticmethod
     def s_status(order):
         return order.signal.status
+
+    @staticmethod
+    def s_id(order):
+        return order.signal.id
 
 
 @admin.register(HistoryApiBuyOrder)
