@@ -1183,6 +1183,7 @@ class Signal(BaseSignal):
         return qs.aggregate(Sum('bought_amount'))['bought_amount__sum'] or 0
 
     @staticmethod
+    @rounded_result
     def __get_sold_amount(worked_orders: QuerySet) -> float:
         """
         """
@@ -1191,6 +1192,7 @@ class Signal(BaseSignal):
         return qs.aggregate(Sum('sold_amount'))['sold_amount__sum'] or 0
 
     @staticmethod
+    @rounded_result
     def __get_sold_quantity(worked_orders: QuerySet) -> float:
         """
         Get Sum of quantity of orders
@@ -1201,6 +1203,7 @@ class Signal(BaseSignal):
 
     @staticmethod
     @debug_input_and_returned
+    @rounded_result
     def __get_planned_executed_quantity(worked_orders: QuerySet) -> float:
         """
         Get Sum of quantity of orders
