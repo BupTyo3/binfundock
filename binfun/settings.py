@@ -283,11 +283,13 @@ class Config:
         self.simple_future = telegram.get('simple_future', None)
         self.lucrative_trend = telegram.get('Lucrative_Trend', None)
         self.raticoin = telegram.get('Raticoin', None)
+        self.bull_exclusive = telegram.get('TheBullExclusive', None)
+        self.crypto_zone = telegram.get('CryptoZone', None)
 
 
 conf_obj = Config()
 
 try:
-    from .local_settings import *
+    from local_settings import *
 except ImportError:
     print('local_settings load failed!')

@@ -40,6 +40,7 @@ crypto_angel_id
 - Create logs folder
 ```bash
 mkdir logs
+mkdir parsed-images
 ```
 
 ### Others
