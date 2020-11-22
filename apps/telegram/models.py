@@ -651,6 +651,7 @@ class Telegram(BaseTelegram):
                             await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                                 message.date, channel_abbr, message.id)
                 elif signal[0].entry_points and signal[0].pair and is_btc_pair:
+                    signal[0].position = 'Buy'
                     await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                         message.date, channel_abbr, message.id)
                     await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
