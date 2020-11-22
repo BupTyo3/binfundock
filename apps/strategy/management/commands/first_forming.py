@@ -17,10 +17,13 @@ class Command(SystemCommand):
         parser.add_argument('--without_checking', action='store_true')
         parser.add_argument('--techannel', type=str,
                             help='Unique abbreviation of Telegram channel in lowercase')
+        parser.add_argument('--fake_balance', type=float,
+                            help='Fake balance for debugging')
 
     def handle(self, *args, **options):
         outer_signal_id = options['outer_signal_id']
         techannel = options['techannel']
+        fake_balance = options['fake_balance']
 
         if outer_signal_id and techannel:
             logger.debug(f"FIRST_FORMING for '{outer_signal_id}':'{techannel}' signal")
@@ -41,5 +44,6 @@ class Command(SystemCommand):
 
         Signal.handle_new_signals(
             outer_signal_id=outer_signal_id,
-            techannel_abbr=techannel)
+            techannel_abbr=techannel,
+            fake_balance=fake_balance)
 
