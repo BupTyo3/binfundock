@@ -1,6 +1,6 @@
 import logging
 
-from typing import Optional, List, Set, TYPE_CHECKING
+from typing import Optional, List, Set, Union, TYPE_CHECKING
 
 from django.db import models, transaction
 from django.db.models import QuerySet, Sum, F
@@ -43,8 +43,15 @@ from tools.tools import (
 
 if TYPE_CHECKING:
     from apps.order.models import SellOrder, BuyOrder
+    from apps.order.base_model import BaseOrder
 
 logger = logging.getLogger(__name__)
+
+# For typing
+
+QSSellO = Union[QuerySet, List['SellOrder']]
+QSBuyO = Union[QuerySet, List['BuyOrder']]
+QSBaseO = Union[QuerySet, List['BaseOrder']]
 
 
 class SignalOrig(BaseSignalOrig):
@@ -758,7 +765,7 @@ class Signal(BaseSignal):
             self.__second_formation_sell_orders_spot(sell_quantity=sell_quantity)
 
     @rounded_result
-    def _get_new_stop_loss_long_or_spot(self, worked_sell_orders: QuerySet) -> float:
+    def _get_new_stop_loss_long_or_spot(self, worked_sell_orders: QSSellO) -> float:
         """
         Business logic
         Fraction by step
@@ -779,7 +786,7 @@ class Signal(BaseSignal):
         return self.__find_not_fractional_by_step(res, pair.step_price)
 
     @rounded_result
-    def _get_new_stop_loss_futures_short(self, worked_buy_orders: QuerySet) -> float:
+    def _get_new_stop_loss_futures_short(self, worked_buy_orders: QSBuyO) -> float:
         """
         Business logic
         Fraction by step
@@ -839,7 +846,7 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def _formation_copied_sell_orders_spot(self,
                                            original_orders_ids: List[int],
-                                           worked_sell_orders: QuerySet,
+                                           worked_sell_orders: QSSellO,
                                            sell_quantity: Optional[float] = None,
                                            new_stop_loss: Optional[float] = None) -> List['SellOrder']:
         """
@@ -911,7 +918,7 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def _formation_copied_sell_orders(self,
                                       original_orders_ids: List[int],
-                                      worked_sell_orders: QuerySet,
+                                      worked_sell_orders: QSSellO,
                                       sell_quantity: Optional[float] = None,
                                       new_stop_loss: Optional[float] = None,
                                       futures: bool = False) -> List['SellOrder']:
@@ -927,7 +934,7 @@ class Signal(BaseSignal):
                 new_stop_loss=new_stop_loss)
 
     def __get_not_handled_worked_buy_orders(self,
-                                            excluded_indexes: Optional[List[int]] = None) -> QuerySet:
+                                            excluded_indexes: Optional[List[int]] = None) -> QSBuyO:
         """
         Function to get not handled worked Buy orders
         """
@@ -950,7 +957,7 @@ class Signal(BaseSignal):
     def __get_not_handled_worked_sell_orders(self,
                                              sl_orders: bool = False,
                                              tp_orders: bool = False,
-                                             excluded_indexes: Optional[List[int]] = None) -> QuerySet:
+                                             excluded_indexes: Optional[List[int]] = None) -> QSSellO:
         """
         Function to get not handled worked Sell orders
         For FUTURES provide:
@@ -976,7 +983,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     def __get_opened_buy_orders(self, statuses: Optional[List] = None,
-                                excluded_indexes: Optional[List[int]] = None) -> QuerySet:
+                                excluded_indexes: Optional[List[int]] = None) -> QSBuyO:
         """
         Function to get sent Buy orders
         """
@@ -999,7 +1006,7 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def __get_opened_sell_orders(self,
                                  statuses: Optional[List] = None,
-                                 excluded_indexes: Optional[List[int]] = None) -> QuerySet:
+                                 excluded_indexes: Optional[List[int]] = None) -> QSSellO:
         """
         Function to get sent Sell orders
         """
@@ -1021,7 +1028,7 @@ class Signal(BaseSignal):
             qs = qs.exclude(index=index)
         return qs
 
-    def __get_gl_sl_sell_orders(self, statuses: Optional[List] = None):
+    def __get_gl_sl_sell_orders(self, statuses: Optional[List] = None) -> QSSellO:
         from apps.order.models import SellOrder
         params = {
             'signal': self,
@@ -1064,7 +1071,7 @@ class Signal(BaseSignal):
         return qs
 
     @debug_input_and_returned
-    def __get_completed_sell_orders(self) -> QuerySet:
+    def __get_completed_sell_orders(self) -> QSSellO:
         """
         Function to get Completed Sell orders
         """
@@ -1078,7 +1085,7 @@ class Signal(BaseSignal):
         return SellOrder.objects.filter(**params)
 
     @debug_input_and_returned
-    def __get_completed_buy_orders(self) -> QuerySet:
+    def __get_completed_buy_orders(self) -> QSBuyO:
         """
         Function to get Completed Buy orders
         """
@@ -1095,7 +1102,7 @@ class Signal(BaseSignal):
         return BuyOrder.objects.filter(**params)
 
     @staticmethod
-    def __update_flag_handled_worked_buy_orders(worked_orders: QuerySet):
+    def __update_flag_handled_worked_buy_orders(worked_orders: QSBuyO):
         """
         Set flag handled_worked
         """
@@ -1109,7 +1116,7 @@ class Signal(BaseSignal):
             order.save()
 
     @staticmethod
-    def __update_flag_handled_worked_sell_orders(worked_orders: QuerySet):
+    def __update_flag_handled_worked_sell_orders(worked_orders: QSSellO):
         """
         Set flag handled_worked
         """
@@ -1124,7 +1131,7 @@ class Signal(BaseSignal):
 
     @staticmethod
     @debug_input_and_returned
-    def __cancel_sent_buy_orders(sent_orders: QuerySet):
+    def __cancel_sent_buy_orders(sent_orders: QSBuyO):
         """
         Set flag local_cancelled for orders.
         The orders are ready to cancel
@@ -1143,7 +1150,7 @@ class Signal(BaseSignal):
 
     @staticmethod
     @debug_input_and_returned
-    def __cancel_sent_sell_orders(sent_orders: QuerySet):
+    def __cancel_sent_sell_orders(sent_orders: QSSellO):
         """
         Set flag local_cancelled for orders.
         The orders are ready to cancel
@@ -1162,7 +1169,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @rounded_result
-    def __get_bought_quantity(self, worked_orders: QuerySet, ignore_fee: bool = False) -> float:
+    def __get_bought_quantity(self, worked_orders: QSBuyO, ignore_fee: bool = False) -> float:
         """
         Get Sum of bought_quantity of worked Buy orders
         """
@@ -1175,7 +1182,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @rounded_result
-    def __get_bought_amount(self, worked_orders: QuerySet) -> float:
+    def __get_bought_amount(self, worked_orders: QSBuyO) -> float:
         """
         """
         # TODO: move it
@@ -1184,7 +1191,7 @@ class Signal(BaseSignal):
 
     @staticmethod
     @rounded_result
-    def __get_sold_amount(worked_orders: QuerySet) -> float:
+    def __get_sold_amount(worked_orders: QSSellO) -> float:
         """
         """
         # TODO: move it
@@ -1193,7 +1200,7 @@ class Signal(BaseSignal):
 
     @staticmethod
     @rounded_result
-    def __get_sold_quantity(worked_orders: QuerySet) -> float:
+    def __get_sold_quantity(worked_orders: QSSellO) -> float:
         """
         Get Sum of quantity of orders
         """
@@ -1204,7 +1211,7 @@ class Signal(BaseSignal):
     @staticmethod
     @debug_input_and_returned
     @rounded_result
-    def __get_planned_executed_quantity(worked_orders: QuerySet) -> float:
+    def __get_planned_executed_quantity(worked_orders: QSBaseO) -> float:
         """
         Get Sum of quantity of orders
         """
@@ -1215,7 +1222,7 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     @rounded_result
     def __calculate_new_executed_quantity(self,
-                                          sent_orders: QuerySet,
+                                          sent_orders: QSBaseO,
                                           addition_quantity: float) -> float:
         """Calculate new bought_quantity by sent_sell_orders and addition_quantity
          (bought quantity of worked buy orders).
@@ -1227,7 +1234,7 @@ class Signal(BaseSignal):
         return self.__find_not_fractional_by_step(res, pair.step_quantity)
 
     @staticmethod
-    def __exclude_sl_or_tp_orders(main_orders: QuerySet, worked_orders: QuerySet) -> QuerySet:
+    def __exclude_sl_or_tp_orders(main_orders: QSSellO, worked_orders: QSSellO) -> QSSellO:
         """Exclude paired orders
         e.g.:
         main_orders = [order_1_tp, order_1_sl, order_2_tp]
