@@ -650,14 +650,15 @@ class Telegram(BaseTelegram):
                                                                 message.date, channel_abbr, message.id)
                             await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                                 message.date, channel_abbr, message.id)
-                elif signal[0].entry_points and signal[0].pair and is_btc_pair:
-                    signal[0].position = 'Buy'
-                    await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                        message.date, channel_abbr, message.id)
-                    await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                        message.date, channel_abbr, message.id)
-                    await self.send_message_to_yourself(f"Good signal for '{signal[0].pair}'\n"
-                                                        f"Consider to process it to USDT manually")
+                #TODO: CONSIDER TO BUILD LEVELS ON USDT PAIR ACCORDING TO THE BTC PAIR:
+                # elif signal[0].entry_points and signal[0].pair and is_btc_pair:
+                #     signal[0].position = 'Buy'
+                #     await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                #                                         message.date, channel_abbr, message.id)
+                #     await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                #                                         message.date, channel_abbr, message.id)
+                #     await self.send_message_to_yourself(f"Good signal for '{signal[0].pair}'\n"
+                #                                         f"Consider to process it to USDT manually")
 
 
     def parse_bull_exclusive_message(self, message_text, message_id):
