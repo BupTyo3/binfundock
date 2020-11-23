@@ -285,6 +285,7 @@ class Config:
         self.raticoin = telegram.get('Raticoin', None)
         self.bull_exclusive = telegram.get('TheBullExclusive', None)
         self.crypto_zone = telegram.get('CryptoZone', None)
+        self.wcse = telegram.get('wcse', None)
 
 
 conf_obj = Config()
