@@ -1,6 +1,6 @@
 import logging
 
-from typing import Optional, List, Set, TYPE_CHECKING
+from typing import Optional, List, Set, Union, TYPE_CHECKING
 
 from django.db import models, transaction
 from django.db.models import QuerySet, Sum, F
@@ -43,8 +43,15 @@ from tools.tools import (
 
 if TYPE_CHECKING:
     from apps.order.models import SellOrder, BuyOrder
+    from apps.order.base_model import BaseOrder
 
 logger = logging.getLogger(__name__)
+
+# For typing
+
+QSSellO = Union[QuerySet, List['SellOrder']]
+QSBuyO = Union[QuerySet, List['BuyOrder']]
+QSBaseO = Union[QuerySet, List['BaseOrder']]
 
 
 class SignalOrig(BaseSignalOrig):
@@ -335,7 +342,10 @@ class Signal(BaseSignal):
     def __get_distribution_by_take_profits(self):
         return self.take_profits.count()
 
-    def _get_current_balance_of_main_coin(self):
+    def _get_current_balance_of_main_coin(self, fake_balance: Optional[float] = None):
+        if fake_balance is not None:
+            logger.debug(f"FAKE BALANCE: '{fake_balance}'")
+            return fake_balance
         return self.market_logic.get_current_balance(self.main_coin)
 
     def _get_current_price(self):
@@ -349,12 +359,12 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @rounded_result
-    def __get_turnover_by_coin_pair(self) -> float:
+    def __get_turnover_by_coin_pair(self, fake_balance: Optional[float] = None) -> float:
         """Turnover for one Signal.
         How much money we allocate for one Signal
         If free_balance 1000 usd, 10% - config parameter, so
          result will be 100 usd"""
-        res = (self._get_current_balance_of_main_coin() *
+        res = (self._get_current_balance_of_main_coin(fake_balance=fake_balance) *
                get_or_create_crontask().balance_to_signal_perc /
                self.conf.one_hundred_percent)
         return res
@@ -379,7 +389,9 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @rounded_result
-    def _get_distributed_toc_quantity_spot_or_long(self, entry_point_price) -> float:
+    def _get_distributed_toc_quantity_spot_or_long(self,
+                                                   entry_point_price: float,
+                                                   fake_balance: Optional[float] = None) -> float:
         """
         Calculate quantity for one coin
         Fraction by step
@@ -387,7 +399,7 @@ class Signal(BaseSignal):
         from tools.tools import convert_to_coin_quantity
         pair = self._get_pair()
         step_quantity = pair.step_quantity
-        toc = self.__get_turnover_by_coin_pair() * self.leverage
+        toc = self.__get_turnover_by_coin_pair(fake_balance=fake_balance) * self.leverage
         logger.debug(f"TOC = {toc} (leverage = {self.leverage})")
         quantity = toc / self.__get_distribution_by_entry_points()
         coin_quantity = convert_to_coin_quantity(quantity, entry_point_price)
@@ -395,7 +407,9 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @rounded_result
-    def _get_distributed_toc_quantity_short(self, entry_point_price) -> float:
+    def _get_distributed_toc_quantity_short(self,
+                                            entry_point_price: float,
+                                            fake_balance: Optional[float] = None) -> float:
         """
         [SHORT]
         Calculate quantity for one coin
@@ -404,23 +418,29 @@ class Signal(BaseSignal):
         from tools.tools import convert_to_coin_quantity
         pair = self._get_pair()
         step_quantity = pair.step_quantity
-        toc = self.__get_turnover_by_coin_pair() * self.leverage
+        toc = self.__get_turnover_by_coin_pair(fake_balance=fake_balance) * self.leverage
         logger.debug(f"TOC = {toc} (leverage = {self.leverage})")
         quantity = toc / self.__get_distribution_by_take_profits()
         coin_quantity = convert_to_coin_quantity(quantity, entry_point_price)
         return self.__find_not_fractional_by_step(coin_quantity, step_quantity)
 
     @rounded_result
-    def _get_distributed_toc_quantity(self, entry_point_price) -> float:
+    def _get_distributed_toc_quantity(self,
+                                      entry_point_price: float,
+                                      fake_balance: Optional[float] = None) -> float:
         """
         Calculate quantity for one coin
         Fraction by step
         """
         if self.is_position_short():
-            return self._get_distributed_toc_quantity_short(entry_point_price=entry_point_price)
+            return self._get_distributed_toc_quantity_short(
+                entry_point_price=entry_point_price,
+                fake_balance=fake_balance)
         else:
             # SPOT OR LONG
-            return self._get_distributed_toc_quantity_spot_or_long(entry_point_price=entry_point_price)
+            return self._get_distributed_toc_quantity_spot_or_long(
+                entry_point_price=entry_point_price,
+                fake_balance=fake_balance)
 
     @rounded_result
     def _get_distributed_quantity_by_take_profits(self, all_quantity: float) -> float:
@@ -668,12 +688,12 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @rounded_result
-    def __get_amount_quantity(self) -> float:
-        toc_quantity = self.__get_turnover_by_coin_pair()
+    def __get_amount_quantity(self, fake_balance: Optional[float] = None) -> float:
+        toc_quantity = self.__get_turnover_by_coin_pair(fake_balance=fake_balance)
         return toc_quantity / (self.__get_distribution_by_entry_points() * self.__get_distribution_by_take_profits())
 
     @debug_input_and_returned
-    def _check_if_balance_enough_for_signal(self) -> bool:
+    def _check_if_balance_enough_for_signal(self, fake_balance: Optional[float] = None) -> bool:
         """
         Enough for create buy orders and then (after one buy order has worked) - sell orders
         """
@@ -681,7 +701,7 @@ class Signal(BaseSignal):
         from tools.tools import convert_to_coin_quantity
         pair = self._get_pair()
         # get amount and subtract fee for buy orders
-        amount_quantity = subtract_fee(self.__get_amount_quantity(),
+        amount_quantity = subtract_fee(self.__get_amount_quantity(fake_balance=fake_balance),
                                        self._get_market_fee() * self.__get_distribution_by_entry_points())
         logger.debug(f"'{self}':amount_quantity_subtracted_fee={amount_quantity}")
         if amount_quantity < pair.min_amount:
@@ -758,7 +778,7 @@ class Signal(BaseSignal):
             self.__second_formation_sell_orders_spot(sell_quantity=sell_quantity)
 
     @rounded_result
-    def _get_new_stop_loss_long_or_spot(self, worked_sell_orders: QuerySet) -> float:
+    def _get_new_stop_loss_long_or_spot(self, worked_sell_orders: QSSellO) -> float:
         """
         Business logic
         Fraction by step
@@ -779,7 +799,7 @@ class Signal(BaseSignal):
         return self.__find_not_fractional_by_step(res, pair.step_price)
 
     @rounded_result
-    def _get_new_stop_loss_futures_short(self, worked_buy_orders: QuerySet) -> float:
+    def _get_new_stop_loss_futures_short(self, worked_buy_orders: QSBuyO) -> float:
         """
         Business logic
         Fraction by step
@@ -839,7 +859,7 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def _formation_copied_sell_orders_spot(self,
                                            original_orders_ids: List[int],
-                                           worked_sell_orders: QuerySet,
+                                           worked_sell_orders: QSSellO,
                                            sell_quantity: Optional[float] = None,
                                            new_stop_loss: Optional[float] = None) -> List['SellOrder']:
         """
@@ -911,7 +931,7 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def _formation_copied_sell_orders(self,
                                       original_orders_ids: List[int],
-                                      worked_sell_orders: QuerySet,
+                                      worked_sell_orders: QSSellO,
                                       sell_quantity: Optional[float] = None,
                                       new_stop_loss: Optional[float] = None,
                                       futures: bool = False) -> List['SellOrder']:
@@ -927,7 +947,7 @@ class Signal(BaseSignal):
                 new_stop_loss=new_stop_loss)
 
     def __get_not_handled_worked_buy_orders(self,
-                                            excluded_indexes: Optional[List[int]] = None) -> QuerySet:
+                                            excluded_indexes: Optional[List[int]] = None) -> QSBuyO:
         """
         Function to get not handled worked Buy orders
         """
@@ -950,7 +970,7 @@ class Signal(BaseSignal):
     def __get_not_handled_worked_sell_orders(self,
                                              sl_orders: bool = False,
                                              tp_orders: bool = False,
-                                             excluded_indexes: Optional[List[int]] = None) -> QuerySet:
+                                             excluded_indexes: Optional[List[int]] = None) -> QSSellO:
         """
         Function to get not handled worked Sell orders
         For FUTURES provide:
@@ -976,7 +996,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     def __get_opened_buy_orders(self, statuses: Optional[List] = None,
-                                excluded_indexes: Optional[List[int]] = None) -> QuerySet:
+                                excluded_indexes: Optional[List[int]] = None) -> QSBuyO:
         """
         Function to get sent Buy orders
         """
@@ -999,7 +1019,7 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def __get_opened_sell_orders(self,
                                  statuses: Optional[List] = None,
-                                 excluded_indexes: Optional[List[int]] = None) -> QuerySet:
+                                 excluded_indexes: Optional[List[int]] = None) -> QSSellO:
         """
         Function to get sent Sell orders
         """
@@ -1021,7 +1041,7 @@ class Signal(BaseSignal):
             qs = qs.exclude(index=index)
         return qs
 
-    def __get_gl_sl_sell_orders(self, statuses: Optional[List] = None):
+    def __get_gl_sl_sell_orders(self, statuses: Optional[List] = None) -> QSSellO:
         from apps.order.models import SellOrder
         params = {
             'signal': self,
@@ -1064,7 +1084,7 @@ class Signal(BaseSignal):
         return qs
 
     @debug_input_and_returned
-    def __get_completed_sell_orders(self) -> QuerySet:
+    def __get_completed_sell_orders(self) -> QSSellO:
         """
         Function to get Completed Sell orders
         """
@@ -1078,7 +1098,7 @@ class Signal(BaseSignal):
         return SellOrder.objects.filter(**params)
 
     @debug_input_and_returned
-    def __get_completed_buy_orders(self) -> QuerySet:
+    def __get_completed_buy_orders(self) -> QSBuyO:
         """
         Function to get Completed Buy orders
         """
@@ -1095,7 +1115,7 @@ class Signal(BaseSignal):
         return BuyOrder.objects.filter(**params)
 
     @staticmethod
-    def __update_flag_handled_worked_buy_orders(worked_orders: QuerySet):
+    def __update_flag_handled_worked_buy_orders(worked_orders: QSBuyO):
         """
         Set flag handled_worked
         """
@@ -1109,7 +1129,7 @@ class Signal(BaseSignal):
             order.save()
 
     @staticmethod
-    def __update_flag_handled_worked_sell_orders(worked_orders: QuerySet):
+    def __update_flag_handled_worked_sell_orders(worked_orders: QSSellO):
         """
         Set flag handled_worked
         """
@@ -1124,7 +1144,7 @@ class Signal(BaseSignal):
 
     @staticmethod
     @debug_input_and_returned
-    def __cancel_sent_buy_orders(sent_orders: QuerySet):
+    def __cancel_sent_buy_orders(sent_orders: QSBuyO):
         """
         Set flag local_cancelled for orders.
         The orders are ready to cancel
@@ -1143,7 +1163,7 @@ class Signal(BaseSignal):
 
     @staticmethod
     @debug_input_and_returned
-    def __cancel_sent_sell_orders(sent_orders: QuerySet):
+    def __cancel_sent_sell_orders(sent_orders: QSSellO):
         """
         Set flag local_cancelled for orders.
         The orders are ready to cancel
@@ -1162,7 +1182,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @rounded_result
-    def __get_bought_quantity(self, worked_orders: QuerySet, ignore_fee: bool = False) -> float:
+    def __get_bought_quantity(self, worked_orders: QSBuyO, ignore_fee: bool = False) -> float:
         """
         Get Sum of bought_quantity of worked Buy orders
         """
@@ -1175,7 +1195,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @rounded_result
-    def __get_bought_amount(self, worked_orders: QuerySet) -> float:
+    def __get_bought_amount(self, worked_orders: QSBuyO) -> float:
         """
         """
         # TODO: move it
@@ -1184,7 +1204,7 @@ class Signal(BaseSignal):
 
     @staticmethod
     @rounded_result
-    def __get_sold_amount(worked_orders: QuerySet) -> float:
+    def __get_sold_amount(worked_orders: QSSellO) -> float:
         """
         """
         # TODO: move it
@@ -1193,7 +1213,7 @@ class Signal(BaseSignal):
 
     @staticmethod
     @rounded_result
-    def __get_sold_quantity(worked_orders: QuerySet) -> float:
+    def __get_sold_quantity(worked_orders: QSSellO) -> float:
         """
         Get Sum of quantity of orders
         """
@@ -1204,7 +1224,7 @@ class Signal(BaseSignal):
     @staticmethod
     @debug_input_and_returned
     @rounded_result
-    def __get_planned_executed_quantity(worked_orders: QuerySet) -> float:
+    def __get_planned_executed_quantity(worked_orders: QSBaseO) -> float:
         """
         Get Sum of quantity of orders
         """
@@ -1215,7 +1235,7 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     @rounded_result
     def __calculate_new_executed_quantity(self,
-                                          sent_orders: QuerySet,
+                                          sent_orders: QSBaseO,
                                           addition_quantity: float) -> float:
         """Calculate new bought_quantity by sent_sell_orders and addition_quantity
          (bought quantity of worked buy orders).
@@ -1227,7 +1247,7 @@ class Signal(BaseSignal):
         return self.__find_not_fractional_by_step(res, pair.step_quantity)
 
     @staticmethod
-    def __exclude_sl_or_tp_orders(main_orders: QuerySet, worked_orders: QuerySet) -> QuerySet:
+    def __exclude_sl_or_tp_orders(main_orders: QSSellO, worked_orders: QSSellO) -> QSSellO:
         """Exclude paired orders
         e.g.:
         main_orders = [order_1_tp, order_1_sl, order_2_tp]
@@ -1308,13 +1328,15 @@ class Signal(BaseSignal):
 
     # POINT FIRST FORMATION
 
-    def _first_formation_futures_long_orders(self) -> bool:
+    def _first_formation_futures_long_orders(self, fake_balance: Optional[float] = None) -> bool:
         """
         FUTURES Market
         LONG Position
         """
         for index, entry_point in enumerate(self.entry_points.all()):
-            coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
+            coin_quantity = self._get_distributed_toc_quantity(
+                entry_point_price=entry_point.value,
+                fake_balance=fake_balance)
             if not coin_quantity:
                 logger.debug(f"Not enough amount for Signal: '{self}'")
                 return False
@@ -1326,9 +1348,11 @@ class Signal(BaseSignal):
         self.__form_sell_gl_sl_order(quantity=planned_executed_quantity, price=self.stop_loss)
         return True
 
-    def _first_formation_futures_short_orders(self) -> bool:
+    def _first_formation_futures_short_orders(self, fake_balance: Optional[float] = None) -> bool:
         for index, entry_point in enumerate(self.entry_points.all()):
-            coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
+            coin_quantity = self._get_distributed_toc_quantity(
+                entry_point_price=entry_point.value,
+                fake_balance=fake_balance)
             if not coin_quantity:
                 logger.debug(f"Not enough amount for Signal: '{self}'")
                 return False
@@ -1338,7 +1362,7 @@ class Signal(BaseSignal):
         self.__form_buy_gl_sl_order(quantity=planned_executed_quantity, price=self.stop_loss)
         return True
 
-    def _first_formation_futures_orders(self):
+    def _first_formation_futures_orders(self, fake_balance: Optional[float] = None):
         """
         FUTURES Market
         """
@@ -1347,26 +1371,28 @@ class Signal(BaseSignal):
             return
         if self.is_position_short():
             logger.debug(f"Form Futures SHORT: '{self}'")
-            is_success = self._first_formation_futures_short_orders()
+            is_success = self._first_formation_futures_short_orders(fake_balance=fake_balance)
         else:
             logger.debug(f"Form Futures LONG: '{self}'")
-            is_success = self._first_formation_futures_long_orders()
+            is_success = self._first_formation_futures_long_orders(fake_balance=fake_balance)
         if is_success:
             self.status = SignalStatus.FORMED.value
             self.save()
         return is_success
 
-    def _first_formation_spot_orders(self) -> bool:
+    def _first_formation_spot_orders(self, fake_balance: Optional[float] = None) -> bool:
         """
         SPOT Market
         """
-        if not self._check_if_balance_enough_for_signal():
+        if not self._check_if_balance_enough_for_signal(fake_balance=fake_balance):
             # TODO: Add sent message to yourself telegram
             logger.debug(f"Not enough amount for Signal '{self}'")
             return False
         self.status = SignalStatus.FORMED.value
         for index, entry_point in enumerate(self.entry_points.all()):
-            coin_quantity = self._get_distributed_toc_quantity(entry_point.value)
+            coin_quantity = self._get_distributed_toc_quantity(
+                entry_point_price=entry_point.value,
+                fake_balance=fake_balance)
             if not coin_quantity:
                 logger.debug(f"Not enough amount for Signal '{self}'")
                 return False
@@ -1761,7 +1787,7 @@ class Signal(BaseSignal):
     # POINT MAIN FOR ONE SIGNAL
 
     # @transaction.atomic
-    def first_formation_orders(self) -> bool:
+    def first_formation_orders(self, fake_balance: Optional[float] = None) -> bool:
         """
         Function for first formation orders for NEW signal
         """
@@ -1770,9 +1796,9 @@ class Signal(BaseSignal):
                            f"{self._status} : {SignalStatus.NEW.value}")
             return False
         if self._is_market_type_futures():
-            return self._first_formation_futures_orders()
+            return self._first_formation_futures_orders(fake_balance=fake_balance)
         else:
-            return self._first_formation_spot_orders()
+            return self._first_formation_spot_orders(fake_balance=fake_balance)
 
     @debug_input_and_returned
     def push_orders(self):
@@ -1901,7 +1927,8 @@ class Signal(BaseSignal):
     @classmethod
     def handle_new_signals(cls,
                            outer_signal_id: Optional[int] = None,
-                           techannel_abbr: Optional[str] = None):
+                           techannel_abbr: Optional[str] = None,
+                           fake_balance: Optional[float] = None):
         """Handle all NEW signals: Step 2"""
         params = {'_status': SignalStatus.NEW.value}
         if outer_signal_id:
@@ -1909,7 +1936,7 @@ class Signal(BaseSignal):
                            'techannel__abbr': techannel_abbr})
         new_signals = Signal.objects.filter(**params)
         for signal in new_signals:
-            signal.first_formation_orders()
+            signal.first_formation_orders(fake_balance=fake_balance)
 
     @classmethod
     def push_signals(cls,
