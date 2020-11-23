@@ -15,7 +15,7 @@ from PIL import Image
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from pytesseract import image_to_string
-from telethon.tl.types import User
+from telethon.tl.types import User, PeerUser
 
 from apps.signal.models import SignalOrig, EntryPoint, TakeProfit
 from apps.techannel.models import Techannel
@@ -694,9 +694,8 @@ class Telegram(BaseTelegram):
     async def parse_crypto_zone_channel(self):
         channel_id = int(conf_obj.crypto_zone)
         channel_abbr = 'crop_zone'
-        short_channel_abbr = 'crzo'
         async for message in self.client.iter_messages(channel_id, limit=10):
-            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_crypto_zone_message(message.text, message.id)
@@ -749,6 +748,96 @@ class Telegram(BaseTelegram):
         profits = profits[:4]
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
+        return signals
+
+    async def parse_wcse_channel(self):
+        channel_id = int(conf_obj.wcse)
+        channel_abbr = 'wc_se'
+        # entity = await self.client.get_entity('@WCSEBot')
+        access_hash = 4349140352664297866
+        channel_entity = User(id=channel_id, access_hash=access_hash)
+        async for message in self.client.iter_messages(entity=channel_entity, limit=10):
+            exists = await self.is_signal_handled(message.id, channel_abbr)
+            should_handle_msg = not exists
+            if message.text and should_handle_msg:
+                signal = self.parse_wcse_message(message.text, message.id)
+                if signal:
+                    if signal[0].entry_points and signal[0].pair:
+                        inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                        if inserted_to_db != 'success':
+                            await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                                f"please check logs for '{signal[0].pair}' "
+                                                                f"related to the '{channel_abbr}' algorithm: "
+                                                                f"{inserted_to_db}")
+                    else:
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                            message.date, channel_abbr, message.id)
+                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                            message.date, channel_abbr, message.id)
+
+
+    def parse_wcse_message(self, message_text, message_id):
+        signals = []
+        splitted_info = message_text.splitlines()
+        is_new_signal = 'New Signal Created'
+        is_futures_label = 'BinanceFutures'
+        buy_label = '🔀 Entry Zone 🔀'
+        long_label = 'Long'
+        sell_label = 'Short'
+        goals_label = '🔆 Exit Targets:🔆'
+        stop_label = '⛔ StopLoss ⛔'
+        pair = ''
+        current_price = ''
+        is_margin = False
+        position = None
+        leverage = ''
+        entries = []
+        profits = []
+        stop_loss = ''
+        if is_new_signal in splitted_info[0]:
+            pair_info = splitted_info[1].split('#')
+            pair = ''.join(filter(str.isalpha, pair_info[1]))
+            if is_futures_label in splitted_info[2]:
+                if long_label in splitted_info[2]:
+                    position = 'Long'
+                elif sell_label in splitted_info[2]:
+                    position = 'Short'
+                possible_leverage = splitted_info[2].split('(')
+                leverage = left_numbers([possible_leverage[1].split(' ')[1]])
+                leverage = leverage[0]
+                try:
+                    entry_index = splitted_info.index(buy_label)
+                except ValueError as e:
+                    return signals.append(SignalModel(pair, current_price, is_margin, position,
+                                                      leverage, entries, profits, stop_loss, message_id))
+                possible_entries = splitted_info[entry_index + 1:entry_index + 3]
+                for possible_entry in possible_entries:
+                    entry = possible_entry.split(' ')
+                    entries.append(entry[1])
+
+                try:
+                    goals_index = splitted_info.index(goals_label)
+                except ValueError as e:
+                    return signals.append(SignalModel(pair, current_price, is_margin, position,
+                                                      leverage, entries, profits, stop_loss, message_id))
+                possible_targets = splitted_info[goals_index + 1:goals_index + 5]
+                for possible_target in possible_targets:
+                    target = possible_target.split(' ')
+                    profits.append(target[1])
+
+                try:
+                    stop_index = splitted_info.index(stop_label)
+                except ValueError as e:
+                    return signals.append(SignalModel(pair, current_price, is_margin, position,
+                                           leverage, entries, profits, stop_loss, message_id))
+                possible_stop = splitted_info[stop_index + 1:stop_index + 2]
+                stop_loss = possible_stop[0].split(' ')
+                stop_loss = stop_loss[1]
+
+                """ Take only first 4 take profits: """
+                profits = profits[:4]
+                signals.append(SignalModel(pair, current_price, is_margin, position,
+                                           leverage, entries, profits, stop_loss, message_id))
         return signals
 
     def handle_ca_recommend_to_array(self, message_line):
