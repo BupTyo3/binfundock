@@ -65,12 +65,12 @@ class Telegram(BaseTelegram):
         if should_close:
             if 'BTC' in message.text:
                 obj = SignalOrig.objects.filter(
-                    symbol='BTCUSDT', techannel__abbr=channel_abbr).order_by('id').last()
+                    symbol='BTCUSDT', techannel__name=channel_abbr).order_by('id').last()
                 if obj:
                     logger.debug(f'please close the position: {obj}')
             if 'ETH' in message.text:
                 obj = SignalOrig.objects.filter(
-                    symbol='ETHUSDT', techannel__abbr=channel_abbr).order_by('id').last()
+                    symbol='ETHUSDT', techannel__name=channel_abbr).order_by('id').last()
                 if obj:
                     logger.debug(f'please close the position: {obj}')
             return True
@@ -83,12 +83,12 @@ class Telegram(BaseTelegram):
         if should_move:
             if 'BTC' in message.text:
                 obj = SignalOrig.objects.filter(
-                    symbol='BTCUSDT', techannel__abbr=channel_abbr).order_by('id').last()
+                    symbol='BTCUSDT', techannel__name=channel_abbr).order_by('id').last()
                 if obj:
                     logger.debug(f'please close the position: {obj}')
             if 'ETH' in message.text:
                 obj = SignalOrig.objects.filter(
-                    symbol='ETHUSDT', techannel__abbr=channel_abbr).order_by('id').last()
+                    symbol='ETHUSDT', techannel__name=channel_abbr).order_by('id').last()
                 if obj:
                     logger.debug(f'please close the position: {obj}')
             return True
@@ -96,7 +96,6 @@ class Telegram(BaseTelegram):
 
     async def parse_tca_origin_channel(self):
         channel_abbr = 'assist_origin'
-        short_channel_abbr = 'asor'
         from telethon import errors
         try:
             channel_id = 1200686541
@@ -104,7 +103,7 @@ class Telegram(BaseTelegram):
             channel_entity = User(id=channel_id, access_hash=access_hash)
 
             async for message in self.client.iter_messages(entity=channel_entity, limit=25):
-                exists = await self.is_signal_handled(message.id, short_channel_abbr)
+                exists = await self.is_signal_handled(message.id, channel_abbr)
                 should_handle_msg = not exists
                 if message.text and should_handle_msg:
                     signal = self.parse_tca_origin_message(message.text, message.id)
@@ -194,9 +193,8 @@ class Telegram(BaseTelegram):
     async def parse_margin_whale_channel(self):
         chat_id = int(conf_obj.margin_whales)
         channel_abbr = 'margin_whale'
-        short_channel_abbr = 'mawh'
         async for message in self.client.iter_messages(chat_id, limit=5):
-            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg:
                 signal = self.parse_margin_whale_message(message.text, message.id)
@@ -256,9 +254,8 @@ class Telegram(BaseTelegram):
     async def parse_simple_future_channel(self):
         chat_id = int(conf_obj.simple_future)
         channel_abbr = 'simple_future'
-        short_channel_abbr = 'sifu'
         async for message in self.client.iter_messages(chat_id, limit=15):
-            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg:
                 signal = self.parse_simple_future_message(message.text, message.id)
@@ -320,9 +317,8 @@ class Telegram(BaseTelegram):
     async def parse_raticoin_channel(self):
         chat_id = int(conf_obj.raticoin)
         channel_abbr = 'recoin'
-        short_channel_abbr = 're'
-        async for message in self.client.iter_messages(chat_id, limit=10):
-            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+        async for message in self.client.iter_messages(chat_id, limit=15):
+            exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg:
                 signal = self.parse_raticoin_message(message.text, message.id)
@@ -410,9 +406,8 @@ class Telegram(BaseTelegram):
     async def parse_lucrative_trend_channel(self):
         chat_id = int(conf_obj.lucrative_channel)
         channel_abbr = 'lucrative_trend'
-        short_channel_abbr = 'lutr'
         async for message in self.client.iter_messages(chat_id, limit=15):
-            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg:
                 signal = self.parse_lucrative_trend_message(message.text, message.id)
@@ -495,9 +490,8 @@ class Telegram(BaseTelegram):
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
         channel_abbr = 'crypto_passive'
-        short_channel_abbr = 'crpa'
         async for message in self.client.iter_messages(chat_id, limit=10):
-            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_angel_message(message.text, message.id)
@@ -558,9 +552,8 @@ class Telegram(BaseTelegram):
         # entity = await self.client.get_entity('@WhiteBullsVip_bot')
         channel_entity = User(id=channel_id, access_hash=access_hash)
         channel_abbr = 'white_bull'
-        short_channel_abbr = 'whbu'
         async for message in self.client.iter_messages(entity=channel_entity, limit=7):
-            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_white_bull_message(message.text, message.id)
@@ -630,9 +623,8 @@ class Telegram(BaseTelegram):
     async def parse_bull_exclusive_channel(self):
         channel_id = int(conf_obj.bull_exclusive)
         channel_abbr = 'bull_excl'
-        short_channel_abbr = 'buex'
         async for message in self.client.iter_messages(channel_id, limit=10):
-            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_bull_exclusive_message(message.text, message.id)
@@ -774,17 +766,14 @@ class Telegram(BaseTelegram):
     async def parse_tca_channel(self, sub_type: str):
         chat_id = int
         channel_abbr = ''
-        short_channel_abbr = ''
         if sub_type == 'altcoin':
             channel_abbr = 'assist_altcoin'
-            short_channel_abbr = 'asal'
             chat_id = int(conf_obj.tca_altcoin)
         if sub_type == 'leverage':
             channel_abbr = 'assist_leverage'
-            short_channel_abbr = 'asle'
             chat_id = int(conf_obj.tca_leverage)
         async for message in self.client.iter_messages(chat_id, limit=10):
-            exists = await self.is_signal_handled(message.id, short_channel_abbr)
+            exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_tca_message(message.text, message.id)
@@ -844,7 +833,7 @@ class Telegram(BaseTelegram):
 
     @sync_to_async
     def is_signal_handled(self, message_id, channel_abbr):
-        is_exist = SignalOrig.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).exists()
+        is_exist = SignalOrig.objects.filter(outer_signal_id=message_id, techannel__name=channel_abbr).exists()
         if is_exist:
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists in DB")
         return is_exist
@@ -854,7 +843,7 @@ class Telegram(BaseTelegram):
         if not signal[0].pair:
             return
         signal[0].pair = check_pair(signal[0].pair)
-        sm_obj = SignalOrig.objects.filter(outer_signal_id=message_id, techannel__abbr=channel_abbr).first()
+        sm_obj = SignalOrig.objects.filter(outer_signal_id=message_id, techannel__name=channel_abbr).first()
         if sm_obj:
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists")
             quit()
