@@ -769,11 +769,11 @@ class Telegram(BaseTelegram):
                                                                 f"please check logs for '{signal[0].pair}' "
                                                                 f"related to the '{channel_abbr}' algorithm: "
                                                                 f"{inserted_to_db}")
-                    else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                            message.date, channel_abbr, message.id)
+                        else:
+                            await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                               message.date, channel_abbr, message.id)
+                            await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                               message.date, channel_abbr, message.id)
 
 
     def parse_wcse_message(self, message_text, message_id):
