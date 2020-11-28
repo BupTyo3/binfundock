@@ -37,7 +37,7 @@ regexp_stop = '\d+\.?\d+$'
 
 class SignalModel:
     def __init__(self, pair, current_price, is_margin, position, leverage, entry_points, take_profits, stop_loss,
-                 msg_id):
+                 msg_id, algorithm=None):
         self.pair = pair
         self.current_price = current_price
         self.is_margin = is_margin
@@ -47,6 +47,7 @@ class SignalModel:
         self.take_profits = take_profits
         self.stop_loss = stop_loss
         self.msg_id = msg_id
+        self.algorithm = algorithm
 
 
 class Telegram(BaseTelegram):
@@ -412,7 +413,8 @@ class Telegram(BaseTelegram):
             if should_handle_msg:
                 signal = self.parse_lucrative_trend_message(message.text, message.id)
                 if signal[0].entry_points != '':
-                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, signal[0].current_price)
+                    inserted_to_db = await self.write_signal_to_db(
+                        f"{channel_abbr}__{signal[0].algorithm}", signal, message.id, signal[0].current_price)
                     if inserted_to_db != 'success':
                         await self.send_message_to_yourself(f"Error during processing the signal to DB, "
                                                             f"please check logs for '{signal[0].pair}' "
@@ -436,6 +438,7 @@ class Telegram(BaseTelegram):
         profits = []
         stop_loss = ''
         datetime_label = 'Time:'
+        algorithm = 'Algorithm: '
         for line in splitted_info:
             if line.startswith(pair_label):
                 possible_pair = line.split(' ')
@@ -457,8 +460,10 @@ class Telegram(BaseTelegram):
             if line.startswith(datetime_label):
                 current_price = line[7:].replace('\'', '')
                 current_price = current_price+'+02:00'
+            if line.startswith(algorithm):
+                algorithm = line[len(algorithm):].replace('\'', '')
         signals.append(SignalModel(pair, current_price, is_margin, position,
-                                   leverage, entries, profits, stop_loss, message_id))
+                                   leverage, entries, profits, stop_loss, message_id, algorithm=algorithm))
         return signals
 
     async def parse_china_channel(self):
