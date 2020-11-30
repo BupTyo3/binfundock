@@ -131,12 +131,12 @@ class SellOrderAdmin(admin.ModelAdmin):
                     'status',
                     'handled_worked',
                     'push_count',
-                    'no_need_push',
                     'local_canceled',
                     'type',
                     'local_canceled_time',
                     'created',
                     'last_updated_by_api',
+                    'no_need_push',
                     ]
     select_related_fields = ['signal', ]
     search_fields = ['id', 'custom_order_id', 'signal__outer_signal_id', 'symbol', ]

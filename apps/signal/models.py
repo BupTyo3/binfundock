@@ -1801,6 +1801,9 @@ class Signal(BaseSignal):
             logger.warning(f"Not valid Signal status for formation BUY order: "
                            f"{self._status} : {SignalStatus.NEW.value}")
             return False
+        logger.debug(f"FIRST FORMATION for Signal '{self}': INITIAL DATA: balance_to_signal_perc="
+                     f"'{get_or_create_crontask().balance_to_signal_perc}',"
+                     f" slip_delta_sl_perc='{get_or_create_crontask().slip_delta_sl_perc}'")
         if self._is_market_type_futures():
             return self._first_formation_futures_orders(fake_balance=fake_balance)
         else:
