@@ -1735,10 +1735,13 @@ class Signal(BaseSignal):
             self._close()
             self._update_income()
             self._update_amount()
-        else:
+        elif get_or_create_crontask().sell_residual_quantity_enabled:
             logger.debug(f"We have residual quantity. We will sell it by Market. Signal: '{self}'")
             price = self._get_current_price()
             self.__form_sell_market_order(quantity=residual_quantity, price=price)
+        else:
+            logger.debug(f"[LONG] We have residual quantity. But sell_residual_quantity_enabled is False."
+                         f" Signal: '{self}'")
 
     @debug_input_and_returned
     def __close_futures_short(self):
@@ -1747,10 +1750,13 @@ class Signal(BaseSignal):
             self._close()
             self._update_income()
             self._update_amount()
-        else:
+        elif get_or_create_crontask().sell_residual_quantity_enabled:
             logger.debug(f"[SHORT] We have residual quantity. We will buy it by Market. Signal: '{self}'")
             price = self._get_current_price()
             self.__form_buy_market_order(quantity=residual_quantity, price=price)
+        else:
+            logger.debug(f"[SHORT] We have residual quantity. But sell_residual_quantity_enabled is False."
+                         f" Signal: '{self}'")
 
     @debug_input_and_returned
     # @transaction.atomic
@@ -1795,6 +1801,9 @@ class Signal(BaseSignal):
             logger.warning(f"Not valid Signal status for formation BUY order: "
                            f"{self._status} : {SignalStatus.NEW.value}")
             return False
+        logger.debug(f"FIRST FORMATION for Signal '{self}': INITIAL DATA: balance_to_signal_perc="
+                     f"'{get_or_create_crontask().balance_to_signal_perc}',"
+                     f" slip_delta_sl_perc='{get_or_create_crontask().slip_delta_sl_perc}'")
         if self._is_market_type_futures():
             return self._first_formation_futures_orders(fake_balance=fake_balance)
         else:
