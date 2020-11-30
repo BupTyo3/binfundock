@@ -269,6 +269,7 @@ class EntryPointAdmin(admin.ModelAdmin):
                     'signal',
                     'signal_status',
                     'value',
+                    'created',
                     ]
     select_related_fields = ['signal', 'signal__techannel', ]
     search_fields = ['id', 'signal__outer_signal_id', 'signal__symbol', 'signal__techannel__abbr', ]
@@ -290,6 +291,7 @@ class TakeProfitAdmin(admin.ModelAdmin):
                     'signal',
                     'signal_status',
                     'value',
+                    'created',
                     ]
     select_related_fields = ['signal', 'signal__techannel', ]
     search_fields = ['id', 'signal__outer_signal_id', 'signal__symbol', 'signal__techannel__abbr', ]
@@ -321,6 +323,7 @@ class EntryPointOrigAdmin(admin.ModelAdmin):
     list_display = ['id',
                     'signal',
                     'value',
+                    'created',
                     ]
     select_related_fields = ['signal', 'signal__techannel', ]
     search_fields = ['id', 'signal__outer_signal_id', 'signal__symbol', 'signal__techannel__abbr', ]
@@ -336,6 +339,7 @@ class TakeProfitOrigAdmin(admin.ModelAdmin):
     list_display = ['id',
                     'signal',
                     'value',
+                    'created',
                     ]
     select_related_fields = ['signal', 'signal__techannel', ]
     search_fields = ['id', 'signal__outer_signal_id', 'signal__symbol', 'signal__techannel__abbr', ]

@@ -158,29 +158,66 @@ class SellOrderAdmin(admin.ModelAdmin):
         return order.signal.id
 
 
+class SignalIDOrderFilter(InputFilter):
+    parameter_name = 'signal_id'
+    title = _('Signal_id')
+
+    def queryset(self, request, queryset):
+        if self.value() is not None:
+            try:
+                signal_id = self.value()
+            except ValueError:
+                return queryset
+            return queryset.filter(main_order__signal__id=signal_id)
+
+
 @admin.register(HistoryApiBuyOrder)
 class HistoryApiBuyOrderAdmin(admin.ModelAdmin):
-    list_display = ['id', 'main_order', 'status', 'bought_quantity',
+    list_display = ['id',
+                    's_id',
+                    's_status',
+                    'main_order', 'status', 'bought_quantity',
                     'created',
                     ]
-    select_related_fields = ['main_order', ]
+    select_related_fields = ['main_order', 'main_order__signal', ]
     search_fields = ['id', 'main_order__custom_order_id', 'main_order__symbol', ]
     list_filter = [
         'status',
+        SignalIDOrderFilter,
         OrderIDFilter,
         CustomOrderIDFilter,
         ]
 
+    @staticmethod
+    def s_id(history_order):
+        return history_order.main_order.signal.id
+
+    @staticmethod
+    def s_status(history_order):
+        return history_order.main_order.signal.status
+
 
 @admin.register(HistoryApiSellOrder)
 class HistoryApiSellOrderAdmin(admin.ModelAdmin):
-    list_display = ['id', 'main_order', 'status', 'sold_quantity',
+    list_display = ['id',
+                    's_id',
+                    's_status',
+                    'main_order', 'status', 'sold_quantity',
                     'created',
                     ]
-    select_related_fields = ['main_order', ]
+    select_related_fields = ['main_order', 'main_order__signal', ]
     search_fields = ['id', 'main_order__custom_order_id', 'main_order__symbol', ]
     list_filter = [
         'status',
+        SignalIDOrderFilter,
         OrderIDFilter,
         CustomOrderIDFilter,
     ]
+
+    @staticmethod
+    def s_id(history_order):
+        return history_order.main_order.signal.id
+
+    @staticmethod
+    def s_status(history_order):
+        return history_order.main_order.signal.status
