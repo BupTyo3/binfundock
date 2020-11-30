@@ -382,6 +382,10 @@ class SignalOrigAdmin(admin.ModelAdmin):
     actions = [
         'bim_spot_create',
         'bim_futures_create',
+        'remove_far_tp',
+        'remove_far_ep',
+        'remove_near_tp',
+        'remove_near_ep',
     ]
 
     def notifications_handling(value):
@@ -439,10 +443,10 @@ class SignalOrigAdmin(admin.ModelAdmin):
         return obj.sig_count
 
     def max_profit(self, obj):
-        return round(obj.max_profit, 2)
+        return round(obj.max_profit or 0, 2)
 
     def max_loss(self, obj):
-        return round(obj.max_loss, 2)
+        return round(obj.max_loss or 0, 2)
 
     # def t_profits(self, obj):
     #     return obj.t_profits
@@ -475,3 +479,40 @@ class SignalOrigAdmin(admin.ModelAdmin):
     def _bim_futures_create_one(self, request, signal):
         market = get_or_create_futures_market()
         signal.create_market_signal(market=market)
+
+
+
+    def remove_far_tp(self, request, queryset):
+        for signal in queryset:
+            self._remove_far_tp(request, signal)
+
+    @notifications_handling('')
+    def _remove_far_tp(self, request, signal):
+        signal.remove_far_tp()
+
+
+    def remove_near_tp(self, request, queryset):
+        for signal in queryset:
+            self._remove_near_tp(request, signal)
+
+    @notifications_handling('')
+    def _remove_near_tp(self, request, signal):
+        signal.remove_near_tp()
+
+
+    def remove_far_ep(self, request, queryset):
+        for signal in queryset:
+            self._remove_far_ep(request, signal)
+
+    @notifications_handling('')
+    def _remove_far_ep(self, request, signal):
+        signal.remove_far_ep()
+
+
+    def remove_near_ep(self, request, queryset):
+        for signal in queryset:
+            self._remove_near_ep(request, signal)
+
+    @notifications_handling('')
+    def _remove_near_ep(self, request, signal):
+        signal.remove_near_ep()

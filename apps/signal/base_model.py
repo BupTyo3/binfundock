@@ -21,9 +21,51 @@ class BaseBaseSignal(SystemBaseModel):
     outer_signal_id: int
     leverage: int
     position: SignalPosition
+    entry_points: 'BaseEntryPoint.objects'
+    take_profits: 'BaseTakeProfit.objects'
 
     def is_position_short(self) -> bool:
         return True if self.position == SignalPosition.SHORT.value else False
+
+    def remove_near_tp(self):
+        if self.is_position_short():
+            near_tp = self.take_profits.order_by('value').last()
+        else:
+            near_tp = self.take_profits.order_by('value').first()
+        if near_tp:
+            near_tp.delete()
+            return True
+        return False
+
+    def remove_far_tp(self):
+        if self.is_position_short():
+            far_tp = self.take_profits.order_by('value').first()
+        else:
+            far_tp = self.take_profits.order_by('value').last()
+        if far_tp:
+            far_tp.delete()
+            return True
+        return False
+
+    def remove_far_ep(self):
+        if self.is_position_short():
+            far_ep = self.entry_points.order_by('value').last()
+        else:
+            far_ep = self.entry_points.order_by('value').first()
+        if far_ep:
+            far_ep.delete()
+            return True
+        return False
+
+    def remove_near_ep(self):
+        if self.is_position_short():
+            near_ep = self.entry_points.order_by('value').first()
+        else:
+            near_ep = self.entry_points.order_by('value').last()
+        if near_ep:
+            near_ep.delete()
+            return True
+        return False
 
     class Meta:
         abstract = True
