@@ -114,10 +114,10 @@ class BaseOrder(SystemBaseModel):
                       index: Optional[int]) -> str:
         start_number_of_copies = 0
         if not (message_id or index or techannel_abbr):
-            return f'{start_number_of_copies}{self.market_logic.order_id_separator}_{self.get_signal_position()}_' \
-                   f'{self.order_type_separator}_{gen_short_uuid()}'
-        return f'{start_number_of_copies}{self.market_logic.order_id_separator}_{self.get_signal_position()}_' \
-               f'{self.order_type_separator}_{techannel_abbr}_{message_id}_{index}'
+            return f'{start_number_of_copies}{self.market_logic.order_id_separator[-2:]}{self.get_signal_position()}' \
+                   f'{self.order_type_separator}{gen_short_uuid()}'
+        return f'{start_number_of_copies}{self.market_logic.order_id_separator[-2:]}{self.get_signal_position()}' \
+               f'{self.order_type_separator}{techannel_abbr}_{str(message_id)[-4:]}_{str(index)[:2]}'
 
     @classmethod
     def form_sl_order_id(cls, main_order: 'BaseOrder') -> str:

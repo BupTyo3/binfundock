@@ -293,4 +293,4 @@ conf_obj = Config()
 try:
     from local_settings import *
 except ImportError:
-    print('local_settings load failed!')
+    pass

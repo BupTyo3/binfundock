@@ -19,6 +19,10 @@ class CronTask(CronTaskBase):
     sold_worker_enabled = models.BooleanField(default=False)
     spoil_worker_enabled = models.BooleanField(default=False)
     close_worker_enabled = models.BooleanField(default=False)
+    sell_residual_quantity_enabled = models.BooleanField(
+        default=False,
+        help_text="If enabled in Futures (close_worker) residual quantity will be"
+                  " sold (LONG) or bought (SHORT)")
 
     ai_algorithm = models.BooleanField(default=False)
     crypto_passive = models.BooleanField(default=False)
