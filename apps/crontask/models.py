@@ -23,6 +23,9 @@ class CronTask(CronTaskBase):
         default=False,
         help_text="If enabled in Futures (close_worker) residual quantity will be"
                   " sold (LONG) or bought (SHORT)")
+    trailing_stop_enabled = models.BooleanField(
+        default=False,
+        help_text="Trail SL if price has become above near EP (LONG) or lower (SHORT)")
 
     ai_algorithm = models.BooleanField(default=False)
     crypto_passive = models.BooleanField(default=False)

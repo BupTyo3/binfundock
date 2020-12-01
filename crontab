@@ -4,8 +4,9 @@ PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 * * * * * root cd ../binfun; sleep 16; python manage.py pull_job --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
 * * * * * root cd ../binfun; sleep 26; python manage.py bought_worker --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
 * * * * * root cd ../binfun; sleep 29; python manage.py sold_worker --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
-* * * * * root cd ../binfun; sleep 35; python manage.py spoil_worker --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
-* * * * * root cd ../binfun; sleep 46; python manage.py close_worker --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
+* * * * * root cd ../binfun; sleep 32; python manage.py trail_stop_worker --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
+* * * * * root cd ../binfun; sleep 39; python manage.py spoil_worker --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
+* * * * * root cd ../binfun; sleep 50; python manage.py close_worker --without_checking > /proc/1/fd/1 2>/proc/1/fd/2
 
 * * * * * root cd ../binfun; sleep 10; python manage.py parse_channel --channel tca_origin > /proc/1/fd/1 2>/proc/1/fd/2
 */2 * * * * root cd ../binfun; python manage.py parse_channel --channel china > /proc/1/fd/1 2>/proc/1/fd/2

@@ -7,6 +7,7 @@ from django.db.models import QuerySet, Sum, F
 from django.utils import timezone
 
 from utils.framework.models import (
+    SystemBaseModel,
     get_increased_leading_number,
 )
 from .base_model import (
@@ -235,6 +236,9 @@ class Signal(BaseSignal):
     all_targets = models.BooleanField(
         help_text="Flag is unset if the Signal was spoiled by admin",
         default=True)
+    trailing_stop_enabled = models.BooleanField(
+        default=False,
+        help_text="Trail SL if price has become above near EP (LONG) or lower (SHORT)")
 
     objects = models.Manager()
 
@@ -1759,6 +1763,82 @@ class Signal(BaseSignal):
                          f" Signal: '{self}'")
 
     @debug_input_and_returned
+    def __trail_stop_futures_short(self):
+        pass
+
+    @debug_input_and_returned
+    def __check_if_needs_to_move_sl_as_trailing_stop(self,
+                                                     zero_value: float,
+                                                     sl_value: float,
+                                                     current_price: float) -> bool:
+        """
+        Check:
+        if the current price has crossed a specific value (threshold)
+        Threshold is a discreteness value by delta from Config (CronTask for now)
+        since a zero value
+        A zero value is a value of the nearest Entry point value
+        """
+        delta_from_zero_value = (zero_value * get_or_create_crontask().slip_delta_sl_perc
+                                 ) / self.conf.one_hundred_percent
+        # For the next crossing
+        old_value_of_price = 2 * sl_value - zero_value
+        # For the first crossing of the threshold
+        old_value_of_price = zero_value + delta_from_zero_value if\
+            old_value_of_price < zero_value else old_value_of_price
+        threshold = old_value_of_price + delta_from_zero_value
+        msg = f"Check trailing_stop '{self}':" \
+              f" if: current_price > threshold: {current_price} > {threshold}?"
+        if current_price > threshold:
+            logger.debug(msg + ': Yes')
+            return True
+        else:
+            logger.debug(msg + ': No')
+            return False
+
+    @debug_input_and_returned
+    @rounded_result
+    def __get_new_sl_value_for_trailing_stop(self, zero_value: float, current_price: float):
+        res = (zero_value + current_price) / 2
+        pair = self._get_pair()
+        return self.__find_not_fractional_by_step(res, pair.step_quantity)
+
+    @debug_input_and_returned
+    def __trail_stop_futures_long(self, fake_price: Optional[float] = None) -> bool:
+        """
+        If the current price has crossed the threshold,
+         the Stop loss order is moved to the specific value:
+          it's a half value subtracted the current price and zero value.
+          The zero value is a value of the nearest Entry Point
+        """
+        from apps.order.utils import OPENED_ORDER_STATUSES
+
+        opened_gl_sl_orders = self.__get_gl_sl_sell_orders(statuses=OPENED_ORDER_STATUSES)
+        gl_sl_order = opened_gl_sl_orders.last()
+        sl_value = gl_sl_order.price
+        zero_value = EntryPoint.get_max_value(self)
+        if fake_price:
+            current_price = fake_price
+            logger.debug(f"Fake price for Trailing stop: '{fake_price}'")
+        else:
+            current_price = self._get_current_price()
+
+        # Change True by checking for moving GL_SL_ORDER
+        if not self.__check_if_needs_to_move_sl_as_trailing_stop(
+                zero_value=zero_value, sl_value=sl_value, current_price=current_price):
+            return False
+        # Cancel opened Buy orders if exist
+        self._cancel_opened_orders(buy=True)
+        # Recreate GL_SL_ORDER
+        opened_gl_sl_orders_id = opened_gl_sl_orders.first().id
+        self.__cancel_sent_sell_orders(opened_gl_sl_orders)
+        new_stop_loss = self.__get_new_sl_value_for_trailing_stop(
+            zero_value=zero_value, current_price=current_price)
+        residual_quantity = self._get_residual_quantity(ignore_fee=True)
+        self.__form_sell_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
+                                     original_order_id=opened_gl_sl_orders_id)
+        return True
+
+    @debug_input_and_returned
     # @transaction.atomic
     def _try_to_close_futures(self):
         """
@@ -1769,6 +1849,23 @@ class Signal(BaseSignal):
                 self.__close_futures_short()
             else:
                 self.__close_futures_long()
+
+    @debug_input_and_returned
+    # @transaction.atomic
+    def _trail_stop_futures(self, fake_price: Optional[float] = None) -> bool:
+        """
+        """
+        if self.is_position_short():
+            return self.__trail_stop_futures_short()
+        else:
+            return self.__trail_stop_futures_long(fake_price=fake_price)
+
+    @debug_input_and_returned
+    # @transaction.atomic
+    def _trail_stop_spot(self):
+        """
+        """
+        pass
 
     # POINT OTHERS
 
@@ -1931,6 +2028,19 @@ class Signal(BaseSignal):
         else:
             return self._try_to_close_spot()
 
+    @debug_input_and_returned
+    # @transaction.atomic
+    def trail_stop(self, fake_price: Optional[float] = None):
+        """
+        """
+        if self._status not in BOUGHT_SOLD__SIG_STATS:
+            return False
+        if self._is_market_type_futures():
+            return self._trail_stop_futures(fake_price=fake_price)
+        else:
+            return self._trail_stop_spot()
+
+
     # POINT MAIN FOR ALL SIGNALS
 
     @classmethod
@@ -2026,6 +2136,23 @@ class Signal(BaseSignal):
         signals = Signal.objects.filter(**params)
         for signal in signals:
             signal.try_to_close()
+
+    @classmethod
+    def trailing_stop_worker(cls,
+                             outer_signal_id: Optional[int] = None,
+                             techannel_abbr: Optional[str] = None,
+                             fake_price: Optional[float] = None):
+        """Handle all signals. Trailing stop feature"""
+        params = {
+            '_status__in': BOUGHT_SOLD__SIG_STATS,
+            'trailing_stop_enabled': True,
+        }
+        if outer_signal_id:
+            params.update({'outer_signal_id': outer_signal_id,
+                           'techannel__abbr': techannel_abbr})
+        signals = Signal.objects.filter(**params)
+        for signal in signals:
+            signal.trail_stop(fake_price=fake_price)
 
 
 class EntryPointOrig(BasePointOrig):
