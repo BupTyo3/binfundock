@@ -14,6 +14,7 @@ class CronTaskAdmin(admin.ModelAdmin):
                     'sold_worker_enabled',
                     'spoil_worker_enabled',
                     'close_worker_enabled',
+                    'trailing_stop_enabled',
                     'sell_residual_quantity_enabled',
 
                     'ai_algorithm',

@@ -83,6 +83,7 @@ class SignalAdmin(admin.ModelAdmin):
                     'perc_inc',
                     'message_date',
                     'created',
+                    'trailing_stop_enabled',
                     'all_targets',
                     'signal_orig',
                     ]
@@ -101,6 +102,8 @@ class SignalAdmin(admin.ModelAdmin):
         'sell_by_market',
         'try_to_close',
         'update_info_by_api',
+        'once_trail_stop',
+        'set_trail_stop',
     ]
 
     def notifications_handling(value):
@@ -180,6 +183,14 @@ class SignalAdmin(admin.ModelAdmin):
         for signal in queryset:
             self._try_to_close(request, signal)
 
+    def once_trail_stop(self, request, queryset):
+        for signal in queryset:
+            self._trail_stop(request, signal)
+
+    def set_trail_stop(self, request, queryset):
+        for signal in queryset:
+            self._set_trail_stop(request, signal)
+
     @notifications_handling('')
     def _form_one(self, request, signal):
         is_success = signal.first_formation_orders()
@@ -209,6 +220,15 @@ class SignalAdmin(admin.ModelAdmin):
     @notifications_handling('')
     def _try_to_close(self, request, signal):
         signal.try_to_close()
+
+    @notifications_handling('')
+    def _trail_stop(self, request, signal):
+        signal.trail_stop()
+
+    @notifications_handling('')
+    def _set_trail_stop(self, request, signal):
+        signal.trailing_stop_enabled = True
+        signal.save()
 
 
 class PointOuterIDFilter(InputFilter):
