@@ -1830,20 +1830,27 @@ class Signal(BaseSignal):
         else:
             current_price = self._get_current_price()
 
-        # Change True by checking for moving GL_SL_ORDER
+        # Check
         if not self.__check_if_needs_to_move_sl_as_trailing_stop(
                 zero_value=zero_value, sl_value=sl_value, current_price=current_price):
             return False
-        # Cancel opened Buy orders if exist
-        self._cancel_opened_orders(buy=True)
-        # Recreate GL_SL_ORDER
-        opened_gl_sl_orders_id = opened_gl_sl_orders.first().id
-        self.__cancel_sent_sell_orders(opened_gl_sl_orders)
+
+        # Check if new_stop_loss price > current_stop_loss
+        opened_gl_sl_order = opened_gl_sl_orders.first()
         new_stop_loss = self.__get_new_sl_value_for_trailing_stop(
             zero_value=zero_value, current_price=current_price)
+        if new_stop_loss <= opened_gl_sl_order.price:
+            logger.debug(f"Calculated new_stop_loss of trailing_stop less then or equal to current GL_SL price!!!: "
+                         f"{new_stop_loss} <= {opened_gl_sl_order.price}: {self}")
+            return False
+
+        # Recreate GL_SL_ORDER
+        # Cancel opened Buy orders if exist
+        self._cancel_opened_orders(buy=True)
+        self.__cancel_sent_sell_orders(opened_gl_sl_orders)
         residual_quantity = self._get_residual_quantity(ignore_fee=True)
         self.__form_sell_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
-                                     original_order_id=opened_gl_sl_orders_id)
+                                     original_order_id=opened_gl_sl_order.id)
         return True
 
     @debug_input_and_returned
