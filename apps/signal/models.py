@@ -187,9 +187,11 @@ class SignalOrig(BaseSignalOrig):
             signal_orig=self,
         )
         for entry_point in self.entry_points.all():
-            EntryPoint.objects.create(signal=signal, value=entry_point.value)
+            value = signal.get_not_fractional_price(entry_point.value)
+            EntryPoint.objects.create(signal=signal, value=value)
         for take_profit in self.take_profits.all():
-            TakeProfit.objects.create(signal=signal, value=take_profit.value)
+            value = signal.get_not_fractional_price(take_profit.value)
+            TakeProfit.objects.create(signal=signal, value=value)
         return signal
 
     def _get_main_coin(self, symbol) -> str:
@@ -390,6 +392,12 @@ class Signal(BaseSignal):
         one_satoshi = 0.00000001
         value += one_satoshi
         return (value // step) * step
+
+    @debug_input_and_returned
+    @rounded_result
+    def get_not_fractional_price(self, price: float):
+        pair = self._get_pair()
+        return self.__find_not_fractional_by_step(price, pair.step_price)
 
     @debug_input_and_returned
     @rounded_result
