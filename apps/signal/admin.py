@@ -50,19 +50,6 @@ class TechannelFilter(InputFilter):
             return queryset.filter(techannel__abbr=techannel_abbr)
 
 
-def float_to_decimal(f):
-    "Convert a floating point number to a Decimal with no loss of information"
-    n, d = f.as_integer_ratio()
-    numerator, denominator = Decimal(n), Decimal(d)
-    ctx = Context(prec=60)
-    result = ctx.divide(numerator, denominator)
-    while ctx.flags[Inexact]:
-        ctx.flags[Inexact] = False
-        ctx.prec *= 2
-        result = ctx.divide(numerator, denominator)
-    return result
-
-
 @admin.register(Signal)
 class SignalAdmin(admin.ModelAdmin):
     list_display = ['id',
@@ -113,9 +100,9 @@ class SignalAdmin(admin.ModelAdmin):
                 try:
                     f(self, request, signal)
                 except ValueError as ex:
-                    messages.error(request, f"{ex} T_ID={signal.id}: {signal.outer_signal_id}")
+                    messages.error(request, f"{ex} T_ID={signal.id}: {signal.symbol}")
                 else:
-                    msg = f"Successful action for T_ID={signal.id}: {signal.outer_signal_id}"
+                    msg = f"Successful action for T_ID={signal.id}: {signal.symbol}"
                     messages.success(request, msg)
             return applicator
         return decorate
@@ -224,7 +211,13 @@ class SignalAdmin(admin.ModelAdmin):
 
     @notifications_handling('')
     def _trail_stop(self, request, signal):
-        signal.trail_stop()
+        res = signal.trail_stop()
+        if res:
+            msg = f"Stop loss was MOVED for T_ID={signal.id}: {signal.symbol}"
+            messages.success(request, msg)
+        else:
+            msg = f"Stop loss was NOT moved for T_ID={signal.id}: {signal.symbol}"
+            messages.error(request, msg)
 
     @notifications_handling('')
     def _set_trail_stop(self, request, signal):
@@ -415,9 +408,9 @@ class SignalOrigAdmin(admin.ModelAdmin):
                 try:
                     f(self, request, signal)
                 except ValueError as ex:
-                    messages.error(request, f"{ex} T_ID={signal.id}: {signal.outer_signal_id}")
+                    messages.error(request, f"{ex} T_ID={signal.id}: {signal.symbol}")
                 else:
-                    msg = f"Successful action for T_ID={signal.id}: {signal.outer_signal_id}"
+                    msg = f"Successful action for T_ID={signal.id}: {signal.symbol}"
                     messages.success(request, msg)
             return applicator
         return decorate

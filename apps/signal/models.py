@@ -1324,7 +1324,7 @@ class Signal(BaseSignal):
         self._cancel_opened_orders(buy=True, sell=True)
         residual_quantity = self._get_residual_quantity(ignore_fee=ignore_fee)
         price = self._get_current_price()
-        if residual_quantity and\
+        if residual_quantity > 0 and\
                 self._check_if_quantity_enough_for_sell(quantity=residual_quantity, price=price):
             if self.is_position_short():
                 self.__form_buy_market_order(quantity=residual_quantity, price=price)
@@ -1808,7 +1808,7 @@ class Signal(BaseSignal):
     def __get_new_sl_value_for_trailing_stop(self, zero_value: float, current_price: float):
         res = (zero_value + current_price) / 2
         pair = self._get_pair()
-        return self.__find_not_fractional_by_step(res, pair.step_quantity)
+        return self.__find_not_fractional_by_step(res, pair.step_price)
 
     @debug_input_and_returned
     def __trail_stop_futures_long(self, fake_price: Optional[float] = None) -> bool:
@@ -1841,14 +1841,18 @@ class Signal(BaseSignal):
             zero_value=zero_value, current_price=current_price)
         if new_stop_loss <= opened_gl_sl_order.price:
             logger.debug(f"Calculated new_stop_loss of trailing_stop less then or equal to current GL_SL price!!!: "
-                         f"{new_stop_loss} <= {opened_gl_sl_order.price}: {self}")
+                         f"{new_stop_loss} <= {opened_gl_sl_order.price}: '{self}'")
             return False
 
+        # Check if quantity exists
+        residual_quantity = self._get_residual_quantity(ignore_fee=True)
+        if residual_quantity <= 0:
+            logger.warning(f"Wrong Residual Quantity '{residual_quantity}' for trailing_stop: '{self}'")
+            return False
         # Recreate GL_SL_ORDER
         # Cancel opened Buy orders if exist
         self._cancel_opened_orders(buy=True)
         self.__cancel_sent_sell_orders(opened_gl_sl_orders)
-        residual_quantity = self._get_residual_quantity(ignore_fee=True)
         self.__form_sell_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
                                      original_order_id=opened_gl_sl_order.id)
         return True
