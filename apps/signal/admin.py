@@ -86,6 +86,7 @@ class SignalAdmin(admin.ModelAdmin):
                     'trailing_stop_enabled',
                     'all_targets',
                     'signal_orig',
+                    'modified',
                     ]
     select_related_fields = ['techannel', 'entry_points', 'take_profits', 'market', ]
     search_fields = ['id', 'outer_signal_id', 'symbol', 'techannel__abbr', 'market__name', ]
