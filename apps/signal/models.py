@@ -109,9 +109,10 @@ class SignalOrig(BaseSignalOrig):
             market = market_method()
             if market:
                 try:
-                    res.append(self.create_market_signal(market=market))
+                    res.append(self.create_market_signal(
+                        market=market, trail_stop=self.techannel.auto_trailing_stop))
                 except PairNotExistsError as err:
-                    logger.warning(f"Signal '{self}' doesn't created: '{err}'")
+                    logger.warning(f"Signal '{self}' was not created: '{err}'")
         return res
 
     @classmethod
@@ -169,7 +170,7 @@ class SignalOrig(BaseSignalOrig):
         return sm_obj
 
     @transaction.atomic
-    def create_market_signal(self, market: BaseMarket) -> 'Signal':
+    def create_market_signal(self, market: BaseMarket, trail_stop: bool = False) -> 'Signal':
         self._check_if_pair_does_not_exist_in_market(market)
         # ValueError if SPOT & SHORT
         self._check_inappropriate_position_to_market_type(market)
@@ -183,6 +184,7 @@ class SignalOrig(BaseSignalOrig):
             position=self.position,
             leverage=leverage,
             message_date=self.message_date,
+            trailing_stop_enabled=trail_stop,
             market=market,
             signal_orig=self,
         )

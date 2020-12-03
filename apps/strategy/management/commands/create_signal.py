@@ -20,7 +20,6 @@ class Command(SystemCommand):
         parser.add_argument('--techannel', type=str, required=True,
                             help='Unique abbreviation of Telegram channel in lowercase')
         parser.add_argument('--outer_signal_id', type=int, required=True)
-        parser.add_argument('--market_name', type=str, help='Market name')
         parser.add_argument('--without_checking', action='store_true')
 
     def check_signal_input(self, entry_points: List[float],
