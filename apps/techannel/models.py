@@ -39,6 +39,12 @@ class Techannel(TechannelBase):
         help_text='Auto creating into Signal for BiSpot Market',
     )
 
+    auto_trailing_stop = models.BooleanField(
+        default=False,
+        help_text="Auto add trailing_stop_enabled for new Signals. It works if one "
+                  "of the next flags is set: auto_bi_futures, auto_bi_spot",
+    )
+
     objects = models.Manager()
 
     def __str__(self):
