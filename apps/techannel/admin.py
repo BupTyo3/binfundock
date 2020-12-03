@@ -10,5 +10,6 @@ class TechannelAdmin(admin.ModelAdmin):
                     'name',
                     'auto_bi_futures',
                     'auto_bi_spot',
+                    'auto_trailing_stop',
                     ]
 
