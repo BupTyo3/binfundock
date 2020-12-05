@@ -1011,14 +1011,18 @@ class ChinaImageToSignal:
 
     def find_pair(self, array):
         pair = ''
-        matches = ["USDT", "BTC", "U20", "Z20"]
+        matches = ["USDT", "USD", "BTC", "U20", "Z20"]
 
         for item in array:
             if any(x in item for x in matches):
                 usdt_position = item.rfind('USDT')
+                usd_position = item.rfind('USD')
                 btc_position = item.rfind('BTC')
                 utwenty_position = item.rfind('U20')
                 ztwenty_position = item.rfind('Z20')
+                if usd_position > 0:
+                    pair = item[0:usd_position + 3]
+                    pair = pair.replace('USD', 'USDT')
                 if usdt_position > 0:
                     pair = item[0:usdt_position + 4]
                 if btc_position > 0:
