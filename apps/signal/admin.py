@@ -175,8 +175,9 @@ class SignalAdmin(admin.ModelAdmin):
         realized_amount = subtract_fee(realized_amount, obj.get_market_fee()) if realized_amount else 0
         planned_amount = subtract_fee(obj.planned_amount, obj.get_market_fee()) if obj.planned_amount else 0
         planned_amount = subtract_fee(planned_amount, obj.get_market_fee()) if planned_amount else 0
-        _res = realized_amount + planned_amount - obj.spent_amount
-        res = (_res / obj.spent_amount) * 100 if obj.spent_amount else 0
+        spent_amount = obj.spent_amount or 0
+        _res = realized_amount + planned_amount - spent_amount
+        res = (_res / spent_amount) * 100 if spent_amount else 0
         return round(res, 2)
 
     @staticmethod
