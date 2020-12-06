@@ -3,7 +3,7 @@ import logging
 from django.db import models
 from django.contrib.auth import get_user_model
 
-from typing import Tuple, TypedDict, TYPE_CHECKING, Union, Callable, Type, Any
+from typing import Tuple, TypedDict, TYPE_CHECKING, Union, Callable, Type, Any, Optional
 
 from binance import client
 from apps.order.utils import OrderStatus
@@ -173,6 +173,15 @@ class BiMarketLogic(BaseMarketLogic,
     def market(self) -> 'BaseMarket':
         market, created = Market.objects.get_or_create(name=self.name)
         return market
+
+    def _get_ticker_current_prices(self, symbol: Optional[str] = None):
+        kwargs = dict()
+        if symbol:
+            kwargs.update({'symbol': symbol})
+        return self.my_client.get_symbol_ticker(**kwargs)
+
+    def get_ticker_current_prices(self, symbol: Optional[str] = None):
+        return self._get_ticker_current_prices(symbol=symbol)
 
     @api_logging
     def _get_balance_api(self, coin):
@@ -379,6 +388,9 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         """Send request to get current average price by pair (symbol)"""
         response = self.my_client.get_avg_price(symbol=symbol)
         return response[self.price_]
+
+    def get_ticker_current_prices(self, symbol: Optional[str] = None):
+        pass
 
     @api_logging
     def _get_balance_api(self):
