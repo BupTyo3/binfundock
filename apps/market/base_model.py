@@ -1,7 +1,7 @@
 import logging
 
 from abc import ABC, abstractmethod
-from typing import Tuple, Union, Optional, Callable, Type
+from typing import Tuple, Union, Optional, Callable, Type, List, TypedDict
 
 from django.db import models
 
@@ -11,6 +11,11 @@ from apps.order.utils import OrderStatus
 from .base_client import BaseClient
 
 logger = logging.getLogger(__name__)
+
+
+class SymbolPriceDict(TypedDict):
+    symbol: str
+    price: str
 
 
 class BaseMarketLogic(ABC):
@@ -75,6 +80,9 @@ class BaseMarketLogic(ABC):
 
     @abstractmethod
     def get_current_balance(self, coin: str) -> float:
+        pass
+
+    def get_ticker_current_prices(self, symbol: Optional[str] = None) -> List[SymbolPriceDict]:
         pass
 
     @abstractmethod

@@ -26,6 +26,9 @@ class CronTask(CronTaskBase):
     trailing_stop_enabled = models.BooleanField(
         default=False,
         help_text="Trail SL if price has become above near EP (LONG) or lower (SHORT)")
+    prices_update_worker_enabled = models.BooleanField(
+        default=True,
+        help_text="Allow price updates into the Pair table (prices_update_worker)")
 
     ai_algorithm = models.BooleanField(default=False)
     crypto_passive = models.BooleanField(default=False)

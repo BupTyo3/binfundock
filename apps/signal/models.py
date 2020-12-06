@@ -288,7 +288,7 @@ class Signal(BaseSignal):
         bought_amount = self.__get_bought_amount(completed_buy_orders)
         completed_sell_orders = self.__get_completed_sell_orders()
         sold_amount = self.__get_sold_amount(completed_sell_orders)
-        sold_amount_subtracted_fee = subtract_fee(sold_amount, self._get_market_fee())
+        sold_amount_subtracted_fee = subtract_fee(sold_amount, self.get_market_fee())
         res = sold_amount_subtracted_fee - bought_amount
         logger.debug(f"Income calculating for Signal '{self}': COMPLETED_BUY_ORDERS: {completed_buy_orders}; "
                      f"COMPLETED_SELL_ORDERS: {completed_sell_orders}; "
@@ -303,7 +303,7 @@ class Signal(BaseSignal):
         completed_buy_orders = self.__get_completed_buy_orders()
         bought_amount = self.__get_bought_amount(completed_buy_orders)
         sold_amount = self.__get_sold_amount(completed_sell_orders)
-        bought_amount_subtracted_fee = subtract_fee(bought_amount, self._get_market_fee())
+        bought_amount_subtracted_fee = subtract_fee(bought_amount, self.get_market_fee())
         res = sold_amount - bought_amount_subtracted_fee
         logger.debug(f"[SHORT] Income calculating for Signal '{self}': COMPLETED_SELL_ORDERS: {completed_sell_orders}; "
                      f"COMPLETED_BUY_ORDERS: {completed_buy_orders}; "
@@ -359,7 +359,7 @@ class Signal(BaseSignal):
     def _get_current_price(self):
         return self.market_logic.get_current_price(self.symbol)
 
-    def _get_market_fee(self):
+    def get_market_fee(self):
         return self.market_logic.market_fee
 
     def _get_pair(self):
@@ -716,7 +716,7 @@ class Signal(BaseSignal):
         pair = self._get_pair()
         # get amount and subtract fee for buy orders
         amount_quantity = subtract_fee(self.__get_amount_quantity(fake_balance=fake_balance),
-                                       self._get_market_fee() * self.__get_distribution_by_entry_points())
+                                       self.get_market_fee() * self.__get_distribution_by_entry_points())
         logger.debug(f"'{self}':amount_quantity_subtracted_fee={amount_quantity}")
         if amount_quantity < pair.min_amount:
             logger.debug(f"Bad Check: amount_quantity < min_amount: {amount_quantity} < {pair.min_amount}!")
@@ -1203,7 +1203,7 @@ class Signal(BaseSignal):
         # TODO: move it
         res = worked_orders.aggregate(Sum('bought_quantity'))
         bought_quantity = res['bought_quantity__sum'] or 0
-        res = subtract_fee(bought_quantity, self._get_market_fee()) if not ignore_fee else bought_quantity
+        res = subtract_fee(bought_quantity, self.get_market_fee()) if not ignore_fee else bought_quantity
         pair = self._get_pair()
         return self.__find_not_fractional_by_step(res, pair.step_quantity)
 
