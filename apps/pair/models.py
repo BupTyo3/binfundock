@@ -1,6 +1,6 @@
 import logging
 
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth import get_user_model
 from .base_model import BasePair
 
@@ -23,12 +23,32 @@ class Pair(BasePair):
     min_quantity = models.FloatField()
     min_amount = models.FloatField()
 
+    last_ticker_price = models.FloatField(
+        default=0,
+        help_text="This price may be a little outdated")
+
     objects = models.Manager()
 
     def __str__(self):
-        return f"{self.symbol}"
+        return f"{self.symbol}:{self.market}"
 
     @classmethod
     def get_pair(cls, symbol: str, market: Market):
         pair = cls.objects.filter(symbol=symbol, market=market).first()
         return pair
+
+    @classmethod
+    def last_prices_update(cls):
+        from apps.market.models import get_or_create_market
+        ticker_prices = get_or_create_market().logic.get_ticker_current_prices()
+        ticker_prices_transformed = {
+            ticker_price['symbol']: float(ticker_price['price']) for ticker_price in ticker_prices
+        }
+        objs = []
+        for pair in cls.objects.all():
+            try:
+                pair.last_ticker_price = ticker_prices_transformed[pair.symbol]
+                objs.append(pair)
+            except KeyError as ex:
+                logger.warning(f"Price for Pair '{pair}' not received. Ex: '{ex}'")
+        cls.objects.bulk_update(objs, ['last_ticker_price'])

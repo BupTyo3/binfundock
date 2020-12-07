@@ -12,6 +12,7 @@ from django.contrib.postgres.aggregates.general import StringAgg
 
 from apps.market.models import get_or_create_market, get_or_create_futures_market
 from utils.admin import InputFilter
+from tools.tools import subtract_fee
 
 from .models import (
     Signal,
@@ -65,6 +66,7 @@ class SignalAdmin(admin.ModelAdmin):
                     'techannel',
                     'outer_signal_id',
                     'status',
+                    'calc_inc',
                     'amount',
                     'income',
                     'perc_inc',
@@ -108,6 +110,7 @@ class SignalAdmin(admin.ModelAdmin):
         return decorate
 
     def get_queryset(self, request):
+        from apps.pair.models import Pair
         qs = super(SignalAdmin, self).get_queryset(request)
 
         # UNCOMMENT for only PostgreSQL
@@ -121,6 +124,34 @@ class SignalAdmin(admin.ModelAdmin):
         #     Cast('entry_points__value', output_field=CharField()),
         #     output_field=CharField(), delimiter='-', distinct=True))
 
+        current_price_qs = Pair.objects.filter(symbol=OuterRef('symbol'), market=OuterRef('market')) \
+            .annotate(current_price=F('last_ticker_price')).values('current_price')
+
+        qs = qs.annotate(quantity_in_stock=Sum(Case(
+            When(position='long', then=F('buy_orders__bought_quantity') - F('sell_orders__sold_quantity')),
+            When(position='short', then=F('sell_orders__sold_quantity') - F('buy_orders__bought_quantity'))))
+        )
+
+        qs = qs.annotate(realized_amount=Sum(Case(
+            When(position='long', then=(F('sell_orders__sold_quantity') * F('sell_orders__price'))),
+            When(position='short', then=(F('buy_orders__bought_quantity') * F('buy_orders__price'))))))
+
+        qs = qs.annotate(spent_amount=Sum(Case(
+            When(position='long', then=(F('buy_orders__bought_quantity') * F('buy_orders__price'))),
+            When(position='short', then=(F('sell_orders__sold_quantity') * F('sell_orders__price'))))))
+
+        qs = qs.annotate(planned_amount=F('quantity_in_stock') * Subquery(current_price_qs))
+
+        qs = qs.annotate(calc_inc_perc=Case(
+            When(position='long',
+                 then=Case(When(spent_amount=0, then=0),
+                           default=(F('realized_amount') + F('planned_amount') - F('spent_amount')
+                                    ) / F('spent_amount') * 100)),
+            When(position='short',
+                 then=Case(When(spent_amount=0, then=0),
+                           default=(F('realized_amount') + F('planned_amount') - F('spent_amount')
+                                    ) / F('spent_amount') * 100))))
+
         res = qs.annotate(perc_inc=Case(
             When(amount=0, then=0),
             default=F('income') / F('amount') * 100))
@@ -133,7 +164,21 @@ class SignalAdmin(admin.ModelAdmin):
     #     return obj.e_points
 
     def perc_inc(self, obj):
-          return round(obj.perc_inc, 2)
+        return round(obj.perc_inc, 2)
+
+    def calc_inc(self, obj):
+        """
+        Calculated income in percent if we are sell by market
+        Prices come from the Pair table
+        """
+        realized_amount = subtract_fee(obj.realized_amount, obj.get_market_fee()) if obj.realized_amount else 0
+        realized_amount = subtract_fee(realized_amount, obj.get_market_fee()) if realized_amount else 0
+        planned_amount = subtract_fee(obj.planned_amount, obj.get_market_fee()) if obj.planned_amount else 0
+        planned_amount = subtract_fee(planned_amount, obj.get_market_fee()) if planned_amount else 0
+        spent_amount = obj.spent_amount or 0
+        _res = realized_amount + planned_amount - spent_amount
+        res = (_res / spent_amount) * 100 if spent_amount else 0
+        return round(res, 2)
 
     @staticmethod
     def take_profits(signal):
