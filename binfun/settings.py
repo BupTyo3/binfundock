@@ -287,6 +287,7 @@ class Config:
         self.crypto_zone = telegram.get('CryptoZone', None)
         self.wcse = telegram.get('wcse', None)
         self.xlucrative = telegram.get('xLucrative', None)
+        self.server = telegram.get('Server', None)
 
 
 conf_obj = Config()

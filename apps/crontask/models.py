@@ -43,6 +43,7 @@ class CronTask(CronTaskBase):
     bull_exclusive = models.BooleanField(default=False)
     crypto_zone = models.BooleanField(default=False)
     wcse = models.BooleanField(default=False)
+    server = models.BooleanField(default=False)
 
     balance_to_signal_perc = models.FloatField(
         default=_default_balance_percentage_by_signal,
