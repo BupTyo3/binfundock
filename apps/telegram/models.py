@@ -212,6 +212,8 @@ class Telegram(BaseTelegram):
                                                         message.date, channel_abbr, message.id)
                     await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                         message.date, channel_abbr, message.id)
+                    await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                                                        message.date, channel_abbr, message.id)
 
     def parse_margin_whale_message(self, message_text, message_id):
         signals = []
@@ -271,6 +273,8 @@ class Telegram(BaseTelegram):
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                             message.date, channel_abbr, message.id)
                         await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                            message.date, channel_abbr, message.id)
+                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_simple_future_message(self, message_text, message_id):
@@ -336,6 +340,8 @@ class Telegram(BaseTelegram):
                                                                 message.date, channel_abbr, message.id)
                             await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                             message.date, channel_abbr, message.id)
+                            await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                                                                message.date, channel_abbr, message.id)
 
     def parse_raticoin_message(self, message_text, message_id):
         signals = []
@@ -491,6 +497,8 @@ class Telegram(BaseTelegram):
                                                         message.date, channel_abbr, message.id)
                     await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                         message.date, channel_abbr, message.id)
+                    await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                                                        message.date, channel_abbr, message.id)
 
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
@@ -511,6 +519,8 @@ class Telegram(BaseTelegram):
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                             message.date, channel_abbr, message.id)
                         await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                            message.date, channel_abbr, message.id)
+                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_angel_message(self, message_text, message_id):
@@ -573,6 +583,8 @@ class Telegram(BaseTelegram):
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                             message.date, channel_abbr, message.id)
                         await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                            message.date, channel_abbr, message.id)
+                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_white_bull_message(self, message_text, message_id):
@@ -647,6 +659,8 @@ class Telegram(BaseTelegram):
                                                                 message.date, channel_abbr, message.id)
                             await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                                 message.date, channel_abbr, message.id)
+                            await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                                                                message.date, channel_abbr, message.id)
                 #TODO: CONSIDER TO BUILD LEVELS ON USDT PAIR ACCORDING TO THE BTC PAIR:
                 # elif signal[0].entry_points and signal[0].pair and is_btc_pair:
                 #     signal[0].position = 'Buy'
@@ -716,6 +730,8 @@ class Telegram(BaseTelegram):
                                                             message.date, channel_abbr, message.id)
                         await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                             message.date, channel_abbr, message.id)
+                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                                                            message.date, channel_abbr, message.id)
 
 
     def parse_crypto_zone_message(self, message_text, message_id):
@@ -779,6 +795,8 @@ class Telegram(BaseTelegram):
                                                                message.date, channel_abbr, message.id)
                             await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                                message.date, channel_abbr, message.id)
+                            await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                                                                message.date, channel_abbr, message.id)
 
 
     def parse_wcse_message(self, message_text, message_id):
@@ -882,6 +900,8 @@ class Telegram(BaseTelegram):
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                             message.date, channel_abbr, message.id)
                         await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                            message.date, channel_abbr, message.id)
+                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_tca_message(self, message_text, message_id):
