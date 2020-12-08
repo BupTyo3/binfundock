@@ -402,7 +402,7 @@ class Telegram(BaseTelegram):
                                    leverage, entries, profits, stop_loss, message_id))
         possible_stop = splitted_info[stop_index + 1:stop_index + 2]
         stop_loss = possible_stop[0].split(' ')
-        stop_loss = stop_loss[1]
+        stop_loss = stop_loss[1].replace('-', '')
 
         """ Take only first 4 take profits: """
         if profits: profits = profits[:4]
