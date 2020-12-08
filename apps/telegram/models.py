@@ -878,20 +878,12 @@ class Telegram(BaseTelegram):
                                                             f"please check logs for '{signal[0].pair}' "
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
-                    else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
-                                                            message.date, channel_abbr, message.id)
 
 
     def parse_server_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
-        is_futures_label = '💠#Binance Futures Signals'
-        buy_label = ['Long/Buy', 'Buy', 'Sell']
+        buy_label = ['Long', 'Buy', 'Sell']
         goals_label = 'Targets'
         stop_label = 'Stop Loss'
         pair = ''
@@ -902,14 +894,10 @@ class Telegram(BaseTelegram):
         entries = ''
         profits = ''
         stop_loss = ''
-        if is_futures_label in splitted_info[0]:
-            pair_info = splitted_info[1].split(' ')
-            pair = ''.join(filter(str.isalpha, pair_info[1]))
-            entries = [pair_info[2]]
-            if buy_label[0] in splitted_info[1] or buy_label[1] in splitted_info[1]:
-                position = 'LONG'
-            elif buy_label[2] in splitted_info[1]:
-                position = 'SHORT'
+        if buy_label[0] in splitted_info or buy_label[1] in splitted_info:
+            position = 'LONG'
+        elif buy_label[2] in splitted_info[1]:
+            position = 'SHORT'
         for line in splitted_info:
             if line.startswith(goals_label):
                 fake_profits = line[7:]
