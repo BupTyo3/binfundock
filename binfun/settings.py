@@ -272,6 +272,8 @@ class Config:
         telegram = config['Telegram']
         self.api_id = telegram.get('api_id', None)
         self.api_hash = telegram.get('api_hash', None)
+        self.api_id_xy = telegram.get('api_id_xy', None)
+        self.api_hash_xy = telegram.get('api_hash_xy', None)
         self.chat_china_id = telegram.get('chat_china_id', None)
         self.crypto_angel_id = telegram.get('crypto_angel_id', None)
         self.tca_altcoin = telegram.get('TCA_Altcoin', None)

@@ -16,12 +16,19 @@ class Command(SystemCommand):
     def __init__(self):
         self._client = None
         self._telegram = None
+        self._client_xy = None
+        self._telegram_xy = None
         super().__init__()
 
     def init_telegram(self, session_name):
         self._client = TelegramClient(session_name, conf_obj.api_id, conf_obj.api_hash)
         self._client.start()
         self._telegram = Telegram(self._client)
+
+    def init_telegram_xy(self, session_name):
+        self._client_xy = TelegramClient(session_name, conf_obj.api_id_xy, conf_obj.api_hash_xy)
+        self._client_xy.start()
+        self._telegram_xy = Telegram(self._client_xy)
 
     def add_arguments(self, parser):
         pass
@@ -95,7 +102,7 @@ class Command(SystemCommand):
 
     def collect_info_from_white_bull_channel(self):
         session_name = 'White-Bulls'
-        self.init_telegram(session_name)
+        self.init_telegram_xy(session_name)
         try:
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_white_bull_channel())
