@@ -477,7 +477,7 @@ class Telegram(BaseTelegram):
         verify_signal = SignalVerification()
         chat_id = int(conf_obj.chat_china_id)
         channel_abbr = 'ai'
-        async for message in self.client.iter_messages(chat_id, limit=27):
+        async for message in self.client.iter_messages(chat_id, limit=12):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg and message.photo:
