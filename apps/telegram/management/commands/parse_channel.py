@@ -104,12 +104,12 @@ class Command(SystemCommand):
         session_name = 'White-Bulls'
         self.init_telegram_xy(session_name)
         try:
-            with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_white_bull_channel())
+            with self._client_xy:
+                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_white_bull_channel())
         except Exception as e:
             logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
         finally:
-            self._client.disconnect()
+            self._client_xy.disconnect()
 
     def collect_info_from_simple_future_channel(self):
         session_name = 'Simple-Future'
