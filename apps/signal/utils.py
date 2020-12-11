@@ -15,6 +15,7 @@ class SignalStatus(Enum):
     SOLD = 'sold'
     CANCELING = 'canceling'
     CLOSED = 'closed'
+    ERROR = 'error'
 
     @classmethod
     def choices(cls):
@@ -66,6 +67,9 @@ SOLD__SIG_STATS = [
 ]
 BOUGHT__SIG_STATS = [
     SignalStatus.BOUGHT.value,
+]
+ERROR__SIG_STATS = [
+    SignalStatus.ERROR.value,
 ]
 
 
