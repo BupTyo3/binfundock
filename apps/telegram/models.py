@@ -96,7 +96,7 @@ class Telegram(BaseTelegram):
         return False
 
     async def parse_tca_origin_channel(self):
-        channel_abbr = 'assist_origin'
+        channel_abbr = 'cf_tr'
         from telethon import errors
         try:
             tca = int(conf_obj.CFTrader)
@@ -130,7 +130,7 @@ class Telegram(BaseTelegram):
         splitted_info = message_text.splitlines()
         possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in  ', 'Get in : ', 'Gеt in :',
                                 'Get  in : ']
-        possible_take_profits_label = ['Sell at: ', 'Targets: ', 'Тargets: ', 'Targеts: ', 'Tаrgets: ']
+        possible_take_profits_label = ['Sell at', 'Targets', 'Тargets', 'Targеts', 'Tаrgets']
         possible_take_profits_label2 = ['Take profit', 'Takе profit', 'Tаkе profit', 'Tаke profit']
         possible_stop_label = ['SL: ', 'SL : ']
         pair_label = ['Pair: ', 'Рair: ']
@@ -443,11 +443,11 @@ class Telegram(BaseTelegram):
                                                             f"{inserted_to_db}")
                     else:
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                            message.date, channel_abbr, message.id)
+                                                            message.date, signal[0].algorithm, message.id)
                         await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                            message.date, channel_abbr, message.id)
+                                                            message.date, signal[0].algorithm, message.id)
                         await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
-                                                            message.date, channel_abbr, message.id)
+                                                            message.date, signal[0].algorithm, message.id)
 
     def parse_lucrative_trend_message(self, message_text, message_id):
         signals = []
