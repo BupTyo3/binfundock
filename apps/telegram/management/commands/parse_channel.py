@@ -36,25 +36,25 @@ class Command(SystemCommand):
 
     def collect_info_from_china_channel(self):
         session_name = 'Lucrative-AI'
-        self.init_telegram(session_name)
+        self.init_telegram_xy(session_name)
         try:
-            with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_china_channel())
+            with self._client_xy:
+                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_china_channel())
         except Exception as e:
             logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
         finally:
-            self._client.disconnect()
+            self._client_xy.disconnect()
 
     def collect_info_from_angel_channel(self):
-        session_name = 'Lucrative-Passive'
-        self.init_telegram(session_name)
+        session_name = 'CryptoAngel'
+        self.init_telegram_xy(session_name)
         try:
-            with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_crypto_angel_channel())
+            with self._client_xy:
+                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_crypto_angel_channel())
         except Exception as e:
             logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
         finally:
-            self._client.disconnect()
+            self._client_xy.disconnect()
 
     def collect_info_from_tca_altcoin_channel(self):
         session_name = 'Lucrative-altcoin'
@@ -79,15 +79,15 @@ class Command(SystemCommand):
             self._client.disconnect()
 
     def collect_info_from_tca_origin_channel(self):
-        session_name = 'Lucrative-origin'
-        self.init_telegram(session_name)
+        session_name = 'CFTrader'
+        self.init_telegram_xy(session_name)
         try:
-            with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_tca_origin_channel())
+            with self._client_xy:
+                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_tca_origin_channel())
         except Exception as e:
             logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
         finally:
-            self._client.disconnect()
+            self._client_xy.disconnect()
 
     def collect_info_from_margin_whales_channel(self):
         session_name = 'Lucrative-Whales'
@@ -101,7 +101,7 @@ class Command(SystemCommand):
             self._client.disconnect()
 
     def collect_info_from_white_bull_channel(self):
-        session_name = 'White-Bulls'
+        session_name = 'WhiteBull'
         self.init_telegram_xy(session_name)
         try:
             with self._client_xy:
@@ -133,12 +133,23 @@ class Command(SystemCommand):
         finally:
             self._client.disconnect()
 
-    def collect_info_from_raticoin_channel(self):
-        session_name = 'Raticoin'
+    def collect_info_from_lucrative_channel(self):
+        session_name = 'Lucrative'
         self.init_telegram(session_name)
         try:
             with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_raticoin_channel())
+                self._client.loop.run_until_complete(self._telegram.parse_lucrative_channel())
+        except Exception as e:
+            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+        finally:
+            self._client.disconnect()
+
+    def collect_info_from_raticoin_channel(self):
+        session_name = 'RatiCoin'
+        self.init_telegram_xy(session_name)
+        try:
+            with self._client_xy:
+                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_raticoin_channel())
         except Exception as e:
             logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
         finally:
@@ -188,6 +199,7 @@ class Command(SystemCommand):
         white_bull_matches = ["white_bulls", "whitebull", "white", "margin_whale"]
         simple_future_matches = ["simple_future"]
         lucrative_trend_matches = ["lucrative_trend", "LucrativeTrend"]
+        lucrative_matches = ["lucrative"]
         raticoin_matches = ["raticoin"]
         bull_exclusive_matches = ["bull_exclusive"]
         crypto_zone_matches = ["crypto_zone"]
@@ -237,6 +249,11 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in lucrative_trend_matches):
             self.collect_info_from_lucrative_trend_channel()
+
+        if not get_or_create_crontask().lucrative:
+            pass
+        elif any(x in channel for x in lucrative_matches):
+            self.collect_info_from_lucrative_channel()
 
         if not get_or_create_crontask().raticoin:
             pass

@@ -282,6 +282,7 @@ class Config:
         self.margin_whales = telegram.get('Margin_Whales', None)
         self.white_bull = telegram.get('white_bull', None)
         self.lucrative_channel = telegram.get('Lucrative_Recommendations', None)
+        self.lucrative = telegram.get('Lucrative', None)
         self.simple_future = telegram.get('simple_future', None)
         self.lucrative_trend = telegram.get('Lucrative_Trend', None)
         self.raticoin = telegram.get('Raticoin', None)
@@ -289,6 +290,7 @@ class Config:
         self.crypto_zone = telegram.get('CryptoZone', None)
         self.wcse = telegram.get('wcse', None)
         self.xlucrative = telegram.get('xLucrative', None)
+        self.CFTrader = telegram.get('CFTrader', None)
 
 
 conf_obj = Config()
