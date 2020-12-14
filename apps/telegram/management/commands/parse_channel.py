@@ -153,7 +153,7 @@ class Command(SystemCommand):
         except Exception as e:
             logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
         finally:
-            self._client.disconnect()
+            self._client_xy.disconnect()
 
     def collect_info_from_crypto_zone_channel(self):
         session_name = 'CryptoZone'
