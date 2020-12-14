@@ -35,7 +35,7 @@ class Command(SystemCommand):
         parser.add_argument('--channel', type=str, help='Type a channel name')
 
     def collect_info_from_china_channel(self):
-        session_name = 'Lucrative-AI'
+        session_name = 'AI'
         self.init_telegram_xy(session_name)
         try:
             with self._client_xy:
@@ -168,14 +168,14 @@ class Command(SystemCommand):
 
     def collect_info_from_bull_exclusive_channel(self):
         session_name = 'BullExclusive'
-        self.init_telegram(session_name)
+        self.init_telegram_xy(session_name)
         try:
-            with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_bull_exclusive_channel())
+            with self._client_xy:
+                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_bull_exclusive_channel())
         except Exception as e:
             logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
         finally:
-            self._client.disconnect()
+            self._client_xy.disconnect()
 
     def collect_info_from_wcse_channel(self):
         session_name = 'WCSE'
