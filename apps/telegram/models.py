@@ -379,7 +379,7 @@ class Telegram(BaseTelegram):
                                    leverage, entries, profits, stop_loss, message_id))
         possible_entries = splitted_info[entry_index + 1:entry_index + 2]
         for possible_entry in possible_entries:
-            entry = possible_entry.split(' - ')
+            entry = possible_entry.split('-')
             for entr in entry:
                 entries.append(entr)
 
@@ -687,7 +687,7 @@ class Telegram(BaseTelegram):
         pair = ''
         current_price = ''
         is_margin = False
-        position = None
+        position = 'Long'
         leverage = 5
         entries = ''
         profits = ''
