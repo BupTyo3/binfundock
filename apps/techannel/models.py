@@ -24,6 +24,8 @@ class Techannel(TechannelBase):
     """
     Model of Telegram channel entity
     """
+    _default_balance_percentage_by_signal = 0.5
+
     name = models.CharField(max_length=50,
                             unique=True,
                             help_text='unique name. Lowercase alphanumeric and underscores')

@@ -15,7 +15,7 @@ from PIL import Image
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from pytesseract import image_to_string
-from telethon.tl.types import User, PeerUser
+from telethon.tl.types import User, PeerUser, PeerChannel
 
 from apps.signal.models import SignalOrig, EntryPoint, TakeProfit
 from apps.techannel.models import Techannel
@@ -96,14 +96,12 @@ class Telegram(BaseTelegram):
         return False
 
     async def parse_tca_origin_channel(self):
-        channel_abbr = 'assist_origin'
+        channel_abbr = 'cf_tr'
         from telethon import errors
         try:
-            channel_id = 1200686541
-            access_hash = -3660432826774178781
-            channel_entity = User(id=channel_id, access_hash=access_hash)
+            tca = int(conf_obj.CFTrader)
 
-            async for message in self.client.iter_messages(entity=channel_entity, limit=25):
+            async for message in self.client.iter_messages(tca, limit=25):
                 exists = await self.is_signal_handled(message.id, channel_abbr)
                 should_handle_msg = not exists
                 if message.text and should_handle_msg:
@@ -116,9 +114,7 @@ class Telegram(BaseTelegram):
                                                                 f"related to the '{channel_abbr}' algorithm: "
                                                                 f"{inserted_to_db}")
                         else:
-                            await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                                message.date, channel_abbr, message.id)
-                            await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                            await self.send_message_by_template('Eugene_Povetkin', signal[0],
                                                                 message.date, channel_abbr, message.id)
                     else:
                         attention_to_close = self.is_urgent_close_position(message.text, channel_abbr)
@@ -134,7 +130,8 @@ class Telegram(BaseTelegram):
         splitted_info = message_text.splitlines()
         possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in  ', 'Get in : ', 'Gеt in :',
                                 'Get  in : ']
-        possible_take_profits_label = ['Sell at: ', 'Targets: ', 'Тargets: ', 'Targеts: ', 'Tаrgets: ']
+        possible_take_profits_label = ['Sell at', 'Targets', 'Тargets', 'Targеts', 'Tаrgets']
+        possible_take_profits_label2 = ['Take profit', 'Takе profit', 'Tаkе profit', 'Tаke profit']
         possible_stop_label = ['SL: ', 'SL : ']
         pair_label = ['Pair: ', 'Рair: ']
         pair = ''
@@ -169,6 +166,11 @@ class Telegram(BaseTelegram):
                 possible_take_profits_label[3]) \
                     or line.startswith(possible_take_profits_label[4]):
                 fake_profits = line[9:]
+                possible_profits = fake_profits.split('-')
+                profits = left_numbers(possible_profits)
+            if line.startswith(possible_take_profits_label2[0]) or line.startswith(possible_take_profits_label2[1])\
+                    or line.startswith(possible_take_profits_label2[2]) or line.startswith(possible_take_profits_label2[3]):
+                fake_profits = line[11:]
                 possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
             if line.startswith(possible_stop_label[0]) or line.startswith(possible_stop_label[1]):
@@ -336,11 +338,7 @@ class Telegram(BaseTelegram):
                                                                 f"related to the '{channel_abbr}' algorithm: "
                                                                 f"{inserted_to_db}")
                         else:
-                            await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                                message.date, channel_abbr, message.id)
-                            await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                            await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                            await self.send_message_by_template('Eugene_Povetkin', signal[0],
                                                                 message.date, channel_abbr, message.id)
 
     def parse_raticoin_message(self, message_text, message_id):
@@ -427,6 +425,30 @@ class Telegram(BaseTelegram):
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
 
+    async def parse_lucrative_channel(self):
+        chat_id = int(conf_obj.lucrative)
+        channel_abbr = 'lucrative'
+        async for message in self.client.iter_messages(chat_id, limit=15):
+            exists = await self.is_signal_handled(message.id, channel_abbr)
+            should_handle_msg = not exists
+            if should_handle_msg:
+                signal = self.parse_lucrative_trend_message(message.text, message.id)
+                if signal[0].entry_points != '':
+                    inserted_to_db = await self.write_signal_to_db(
+                        f"{signal[0].algorithm}", signal, message.id, signal[0].current_price)
+                    if inserted_to_db != 'success':
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                            f"please check logs for '{signal[0].pair}' "
+                                                            f"related to the '{channel_abbr}' algorithm: "
+                                                            f"{inserted_to_db}")
+                    else:
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                            message.date, signal[0].algorithm, message.id)
+                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                            message.date, signal[0].algorithm, message.id)
+                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                                                            message.date, signal[0].algorithm, message.id)
+
     def parse_lucrative_trend_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
@@ -493,11 +515,7 @@ class Telegram(BaseTelegram):
                                                         f"related to the '{channel_abbr}' algorithm: "
                                                         f"{inserted_to_db}")
                 else:
-                    await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                        message.date, channel_abbr, message.id)
-                    await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                        message.date, channel_abbr, message.id)
-                    await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                    await self.send_message_by_template('Eugene_Povetkin', signal[0],
                                                         message.date, channel_abbr, message.id)
 
     async def parse_crypto_angel_channel(self):
@@ -516,11 +534,7 @@ class Telegram(BaseTelegram):
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
                     else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_angel_message(self, message_text, message_id):
@@ -580,11 +594,7 @@ class Telegram(BaseTelegram):
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
                     else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_white_bull_message(self, message_text, message_id):
@@ -655,11 +665,7 @@ class Telegram(BaseTelegram):
                                                                 f"related to the '{channel_abbr}' algorithm: "
                                                                 f"{inserted_to_db}")
                         else:
-                            await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                                message.date, channel_abbr, message.id)
-                            await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                                message.date, channel_abbr, message.id)
-                            await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                            await self.send_message_by_template('Eugene_Povetkin', signal[0],
                                                                 message.date, channel_abbr, message.id)
                 #TODO: CONSIDER TO BUILD LEVELS ON USDT PAIR ACCORDING TO THE BTC PAIR:
                 # elif signal[0].entry_points and signal[0].pair and is_btc_pair:
@@ -726,13 +732,8 @@ class Telegram(BaseTelegram):
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
                     else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
                                                             message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
-                                                            message.date, channel_abbr, message.id)
-
 
     def parse_crypto_zone_message(self, message_text, message_id):
         signals = []
