@@ -9,6 +9,7 @@ from typing import (
 
 from django.db import models
 from .base_model import TechannelBase
+from apps.crontask.models import CronTask
 from utils.framework.models import (
     left_only_numbers_letters_underscores,
 )
@@ -43,6 +44,11 @@ class Techannel(TechannelBase):
         default=False,
         help_text="Auto add trailing_stop_enabled for new Signals. It works if one "
                   "of the next flags is set: auto_bi_futures, auto_bi_spot",
+    )
+
+    balance_to_signal_perc = models.FloatField(
+        default=CronTask.default_balance_percentage_by_signal,
+        help_text='percent for one signal from the balance'
     )
 
     objects = models.Manager()

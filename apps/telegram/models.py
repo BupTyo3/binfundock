@@ -103,7 +103,7 @@ class Telegram(BaseTelegram):
             access_hash = -3660432826774178781
             channel_entity = User(id=channel_id, access_hash=access_hash)
 
-            async for message in self.client.iter_messages(entity=channel_entity, limit=25):
+            async for message in self.client.iter_messages(entity=channel_entity, limit=15):
                 exists = await self.is_signal_handled(message.id, channel_abbr)
                 should_handle_msg = not exists
                 if message.text and should_handle_msg:

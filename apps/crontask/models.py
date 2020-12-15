@@ -10,7 +10,7 @@ class CronTask(CronTaskBase):
     Model of CronTask entity
     """
     _default_slip_delta_stop_loss_percentage = 0.2
-    _default_balance_percentage_by_signal = 0
+    default_balance_percentage_by_signal = 3
 
     first_forming_enabled = models.BooleanField(default=False)
     push_job_enabled = models.BooleanField(default=False)
@@ -46,7 +46,7 @@ class CronTask(CronTaskBase):
     server = models.BooleanField(default=False)
 
     balance_to_signal_perc = models.FloatField(
-        default=_default_balance_percentage_by_signal,
+        default=default_balance_percentage_by_signal,
         help_text='how percent for one signal from the balance'
     )
     slip_delta_sl_perc = models.FloatField(
