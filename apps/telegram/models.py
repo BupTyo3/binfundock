@@ -101,7 +101,7 @@ class Telegram(BaseTelegram):
         try:
             tca = int(conf_obj.CFTrader)
 
-            async for message in self.client.iter_messages(tca, limit=25):
+            async for message in self.client.iter_messages(tca, limit=15):
                 exists = await self.is_signal_handled(message.id, channel_abbr)
                 should_handle_msg = not exists
                 if message.text and should_handle_msg:
@@ -379,7 +379,7 @@ class Telegram(BaseTelegram):
                                    leverage, entries, profits, stop_loss, message_id))
         possible_entries = splitted_info[entry_index + 1:entry_index + 2]
         for possible_entry in possible_entries:
-            entry = possible_entry.split(' - ')
+            entry = possible_entry.split('-')
             for entr in entry:
                 entries.append(entr)
 
@@ -577,7 +577,7 @@ class Telegram(BaseTelegram):
 
     async def parse_white_bull_channel(self):
         channel_id = int(conf_obj.white_bull)
-        access_hash = -169664420124732255
+        access_hash = -4326493311717887790
         # entity = await self.client.get_entity('@WhiteBullsVip_bot')
         channel_entity = User(id=channel_id, access_hash=access_hash)
         channel_abbr = 'white_bull'
@@ -687,7 +687,7 @@ class Telegram(BaseTelegram):
         pair = ''
         current_price = ''
         is_margin = False
-        position = None
+        position = 'Long'
         leverage = 5
         entries = ''
         profits = ''
@@ -862,6 +862,55 @@ class Telegram(BaseTelegram):
                 profits = profits[:4]
                 signals.append(SignalModel(pair, current_price, is_margin, position,
                                            leverage, entries, profits, stop_loss, message_id))
+        return signals
+
+    async def parse_server_channel(self):
+        channel_id = int(conf_obj.server)
+        channel_abbr = 'server'
+        async for message in self.client.iter_messages(channel_id, limit=10):
+            exists = await self.is_signal_handled(message.id, channel_abbr)
+            should_handle_msg = not exists
+            if message.text and should_handle_msg:
+                signal = self.parse_server_message(message.text, message.id)
+                if signal[0].entry_points and signal[0].pair:
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                    if inserted_to_db != 'success':
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                            f"please check logs for '{signal[0].pair}' "
+                                                            f"related to the '{channel_abbr}' algorithm: "
+                                                            f"{inserted_to_db}")
+
+
+    def parse_server_message(self, message_text, message_id):
+        signals = []
+        splitted_info = message_text.splitlines()
+        buy_label = ['Long', 'Buy', 'Sell']
+        goals_label = 'Targets'
+        stop_label = 'Stop Loss'
+        pair = ''
+        current_price = ''
+        is_margin = False
+        position = None
+        leverage = random.randint(5, 10)
+        entries = ''
+        profits = ''
+        stop_loss = ''
+        if buy_label[0] in splitted_info or buy_label[1] in splitted_info:
+            position = 'LONG'
+        elif buy_label[2] in splitted_info[1]:
+            position = 'SHORT'
+        for line in splitted_info:
+            if line.startswith(goals_label):
+                fake_profits = line[7:]
+                possible_take_profits = fake_profits.split('-')
+                profits = left_numbers(possible_take_profits)
+            if line.startswith(stop_label):
+                stop_loss = line[9:]
+
+        """ Take only first 4 take profits: """
+        profits = profits[:4]
+        signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
         return signals
 
     def handle_ca_recommend_to_array(self, message_line):

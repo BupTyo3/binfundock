@@ -22,6 +22,7 @@ from .utils import (
     FORMED_PUSHED__SIG_STATS, SOLD__SIG_STATS,
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
     PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, BOUGHT_SOLD__SIG_STATS, BOUGHT__SIG_STATS,
+    ERROR__SIG_STATS,
 )
 from .exceptions import (
     MainCoinNotServicedError,
@@ -373,7 +374,7 @@ class Signal(BaseSignal):
         If free_balance 1000 usd, 10% - config parameter, so
          result will be 100 usd"""
         res = (self._get_current_balance_of_main_coin(fake_balance=fake_balance) *
-               get_or_create_crontask().balance_to_signal_perc /
+               self.techannel.balance_to_signal_perc /
                self.conf.one_hundred_percent)
         return res
         # return res / n_distribution  # эквивалент 33 долларов
@@ -1466,15 +1467,29 @@ class Signal(BaseSignal):
             'no_need_push': False,
         }
         # push NOT_SENT SELL orders
+        # TODO: Maybe move both try except into market.models
+        from binance.exceptions import BinanceAPIException
+        error_status_flag = False
         for sell_order in self.sell_orders.filter(**orders_params_for_pushing):
-            sell_order.push_to_market()
+            try:
+                sell_order.push_to_market()
+            except BinanceAPIException as ex:
+                error_status_flag = True
+                logger.warning(f"Push order Error: Signal:'{self}' Order: '{sell_order}': Ex: '{ex}'")
         # push NOT_SENT BUY orders
         for buy_order in self.buy_orders.filter(**orders_params_for_pushing):
-            buy_order.push_to_market()
+            try:
+                buy_order.push_to_market()
+            except BinanceAPIException as ex:
+                error_status_flag = True
+                logger.warning(f"Push order Error: Signal:'{self}' Order: '{buy_order}': Ex: '{ex}'")
             # set status if at least one order has created
-            if self.status not in PUSHED_BOUGHT_SOLD__SIG_STATS:
+            if not error_status_flag and self.status not in PUSHED_BOUGHT_SOLD__SIG_STATS:
                 self.status = SignalStatus.PUSHED.value
                 self.save()
+        if error_status_flag and self.status not in ERROR__SIG_STATS:
+            self.status = SignalStatus.ERROR.value
+            self.save()
 
     @debug_input_and_returned
     def _push_futures_orders(self):
