@@ -188,6 +188,17 @@ class Command(SystemCommand):
         finally:
             self._client.disconnect()
 
+    def collect_info_from_server_channel(self):
+        session_name = 'Server'
+        self.init_telegram(session_name)
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_server_channel())
+        except Exception as e:
+            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+        finally:
+            self._client.disconnect()
+
     def handle(self, *args, **options):
         channel = options['channel']
         china_matches = ["China", "china"]
@@ -204,6 +215,12 @@ class Command(SystemCommand):
         bull_exclusive_matches = ["bull_exclusive"]
         crypto_zone_matches = ["crypto_zone"]
         wcse_matches = ["wcse"]
+        server_matches = ["server"]
+
+        if not get_or_create_crontask().server:
+            pass
+        elif any(x in channel for x in server_matches):
+            self.collect_info_from_server_channel()
 
         if not get_or_create_crontask().ai_algorithm:
             pass

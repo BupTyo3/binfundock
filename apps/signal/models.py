@@ -374,7 +374,7 @@ class Signal(BaseSignal):
         If free_balance 1000 usd, 10% - config parameter, so
          result will be 100 usd"""
         res = (self._get_current_balance_of_main_coin(fake_balance=fake_balance) *
-               get_or_create_crontask().balance_to_signal_perc /
+               self.techannel.balance_to_signal_perc /
                self.conf.one_hundred_percent)
         return res
         # return res / n_distribution  # эквивалент 33 долларов
