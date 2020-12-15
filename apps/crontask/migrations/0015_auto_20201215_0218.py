@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('crontask', '0013_crontask_server'),
+        ('crontask', '0014_crontask_server'),
     ]
 
     operations = [
