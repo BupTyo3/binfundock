@@ -11,5 +11,6 @@ class TechannelAdmin(admin.ModelAdmin):
                     'auto_bi_futures',
                     'auto_bi_spot',
                     'auto_trailing_stop',
+                    'balance_to_signal_perc',
                     ]
 
