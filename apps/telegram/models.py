@@ -429,25 +429,15 @@ class Telegram(BaseTelegram):
         chat_id = int(conf_obj.lucrative)
         channel_abbr = 'lucrative'
         async for message in self.client.iter_messages(chat_id, limit=15):
-            exists = await self.is_signal_handled(message.id, channel_abbr)
-            should_handle_msg = not exists
-            if should_handle_msg:
-                signal = self.parse_lucrative_trend_message(message.text, message.id)
-                if signal[0].entry_points != '':
-                    inserted_to_db = await self.write_signal_to_db(
-                        f"{signal[0].algorithm}", signal, message.id, signal[0].current_price)
-                    if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{channel_abbr}' algorithm: "
-                                                            f"{inserted_to_db}")
-                    else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                            message.date, signal[0].algorithm, message.id)
-                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                            message.date, signal[0].algorithm, message.id)
-                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
-                                                            message.date, signal[0].algorithm, message.id)
+            signal = self.parse_lucrative_trend_message(message.text, message.id)
+            exists = await self.is_lucrative_signal_handled(signal[0].pair, signal[0].algorithm, signal[0].current_price)
+            if not exists:
+                await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                                                    message.date, signal[0].algorithm, message.id)
+                await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                    message.date, signal[0].algorithm, message.id)
+                await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
+                                                    message.date, signal[0].algorithm, message.id)
 
     def parse_lucrative_trend_message(self, message_text, message_id):
         signals = []
@@ -1000,6 +990,21 @@ class Telegram(BaseTelegram):
         is_exist = SignalOrig.objects.filter(outer_signal_id=message_id, techannel__name=channel_abbr).exists()
         if is_exist:
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists in DB")
+        return is_exist
+
+    @sync_to_async
+    def is_lucrative_signal_handled(self, pair, channel_abbr, date_time):
+        date_time = date_time.split('+')
+        date_time = date_time[0]
+        is_exist = False
+        signals_by_channel = SignalOrig.objects.filter(techannel__name=channel_abbr, symbol=pair)
+        for signal in signals_by_channel:
+            utc_time = signal.message_date.replace(microsecond=0, tzinfo=None)
+            signal_time = utc_time + timedelta(hours=2)
+            if date_time == signal_time.strftime('%Y-%m-%d %H:%M:%S'):
+                is_exist = True
+        if is_exist:
+            logger.debug(f"Signal '{channel_abbr}' already exists in DB")
         return is_exist
 
     @sync_to_async
