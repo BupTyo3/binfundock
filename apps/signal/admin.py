@@ -73,7 +73,7 @@ class SignalAdmin(admin.ModelAdmin):
                     'message_date',
                     'created',
                     'trailing_stop_enabled',
-                    'all_targets',
+                    'spoiled',
                     'signal_orig',
                     'modified',
                     ]

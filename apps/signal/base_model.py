@@ -20,6 +20,7 @@ class BaseBaseSignal(SystemBaseModel):
     techannel: 'TechannelBase'
     outer_signal_id: int
     leverage: int
+    margin_type: str
     position: SignalPosition
     entry_points: 'BaseEntryPoint.objects'
     take_profits: 'BaseTakeProfit.objects'

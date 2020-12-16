@@ -36,11 +36,11 @@ regexp_stop = '\d+\.?\d+$'
 
 
 class SignalModel:
-    def __init__(self, pair, current_price, is_margin, position, leverage, entry_points, take_profits, stop_loss,
+    def __init__(self, pair, current_price, margin_type, position, leverage, entry_points, take_profits, stop_loss,
                  msg_id, algorithm=None):
         self.pair = pair
         self.current_price = current_price
-        self.is_margin = is_margin
+        self.margin_type = margin_type
         self.position = position
         self.leverage = leverage
         self.entry_points = entry_points
@@ -136,7 +136,7 @@ class Telegram(BaseTelegram):
         pair_label = ['Pair: ', 'Рair: ']
         pair = ''
         current_price = ''
-        is_margin = False
+        margin_type = 'CROSSED'
         position = None
         leverage_label = ['Leverage:', 'Levеrage:', 'Leveragе:', 'Leverаge:', 'Lеverage:']
         leverage = ''
@@ -189,7 +189,7 @@ class Telegram(BaseTelegram):
                 leverage = ''.join(filter(str.isdigit, possible_leverage[2]))
         """ Take only first 4 take profits: """
         profits = profits[:4]
-        signals.append(SignalModel(pair, current_price, is_margin, position,
+        signals.append(SignalModel(pair, current_price, margin_type, position,
                                    leverage, entries, profits, stop_loss[0], message_id))
         return signals
 
@@ -1034,7 +1034,8 @@ class Telegram(BaseTelegram):
                                      entry_points=signal[0].entry_points,
                                      take_profits=signal[0].take_profits,
                                      outer_signal_id=message_id,
-                                     message_date=message_date)
+                                     message_date=message_date,
+                                     margin_type=signal[0].margin_type)
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
             return 'success'
         except Exception as e:
