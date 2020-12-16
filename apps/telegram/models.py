@@ -433,11 +433,11 @@ class Telegram(BaseTelegram):
             exists = await self.is_lucrative_signal_handled(signal[0].pair, signal[0].algorithm, signal[0].current_price)
             if not exists:
                 await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
-                                                    message.date, signal[0].algorithm, message.id)
+                                                    signal[0].current_price, signal[0].algorithm, message.id)
                 await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                    message.date, signal[0].algorithm, message.id)
+                                                    signal[0].current_price, signal[0].algorithm, message.id)
                 await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                    message.date, signal[0].algorithm, message.id)
+                                                    signal[0].current_price, signal[0].algorithm, message.id)
 
     def parse_lucrative_trend_message(self, message_text, message_id):
         signals = []
