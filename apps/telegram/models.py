@@ -24,6 +24,7 @@ from tools.tools import countdown
 from utils.parse_channels.str_parser import left_numbers, check_pair, find_number_in_list
 from .base_model import BaseTelegram
 from .init_client import ShtClient
+from ..signal.utils import MarginType
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,7 @@ class Telegram(BaseTelegram):
         pair_label = ['Pair: ', 'Рair: ']
         pair = ''
         current_price = ''
-        margin_type = 'CROSSED'
+        margin_type = MarginType.CROSSED.value
         position = None
         leverage_label = ['Leverage:', 'Levеrage:', 'Leveragе:', 'Leverаge:', 'Lеverage:']
         leverage = ''
