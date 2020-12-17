@@ -22,6 +22,14 @@ class SignalStatus(Enum):
         return [(key.value, key.name) for key in cls]
 
 
+class MarginType(Enum):
+    ISOLATED = 'ISOLATED'
+    CROSSED = 'CROSSED'
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+
 FORMED__SIG_STATS = [
     SignalStatus.FORMED.value,
 ]

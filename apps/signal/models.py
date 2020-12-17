@@ -18,6 +18,7 @@ from .base_model import (
 from .utils import (
     SignalStatus,
     SignalPosition,
+    MarginType,
     calculate_position,
     FORMED_PUSHED__SIG_STATS, SOLD__SIG_STATS,
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
@@ -58,7 +59,7 @@ QSBaseO = Union[QuerySet, List['BaseOrder']]
 
 class SignalOrig(BaseSignalOrig):
     _default_leverage = 1
-    _default_margin_type = 'ISOLATED'
+    _default_margin_type = MarginType.ISOLATED.value
     conf = conf_obj
 
     techannel = models.ForeignKey(to=Techannel,
@@ -72,7 +73,9 @@ class SignalOrig(BaseSignalOrig):
                                 choices=SignalPosition.choices(),
                                 default=SignalPosition.LONG.value, )
     leverage = models.PositiveIntegerField(default=_default_leverage)
-    margin_type = models.CharField(max_length=9, default=_default_margin_type)
+    margin_type = models.CharField(max_length=9,
+                                   choices=MarginType.choices(),
+                                   default=_default_margin_type)
     message_date = models.DateTimeField(default=timezone.now, blank=True)
 
     techannel: Techannel
@@ -218,7 +221,7 @@ class SignalOrig(BaseSignalOrig):
 
 class Signal(BaseSignal):
     _default_leverage = 1
-    _default_margin_type = 'ISOLATED'
+    _default_margin_type = MarginType.ISOLATED.value
     conf = conf_obj
 
     signal_orig = models.ForeignKey(to=SignalOrig,
@@ -244,7 +247,9 @@ class Signal(BaseSignal):
                                 choices=SignalPosition.choices(),
                                 default=SignalPosition.LONG.value, )
     leverage = models.PositiveIntegerField(default=_default_leverage)
-    margin_type = models.CharField(max_length=9, default=_default_margin_type)
+    margin_type = models.CharField(max_length=9,
+                                   choices=MarginType.choices(),
+                                   default=_default_margin_type)
     message_date = models.DateTimeField(default=timezone.now, blank=True)
     spoiled = models.BooleanField(
         help_text="Flag is unset if the Signal was spoiled by admin",
@@ -264,7 +269,7 @@ class Signal(BaseSignal):
     symbol: str
     stop_loss: float
     leverage: int
-    margin_type: str
+    margin_type: MarginType
 
     def __str__(self):
         return f"Signal:{self.pk}:{self.symbol}:{self.techannel.abbr}" \

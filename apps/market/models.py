@@ -140,8 +140,6 @@ class BinanceDataMixin:
 class BinanceFuturesDataMixin:
     available_balance_ = 'withdrawAvailable'
     order_type_stop_market = 'STOP_MARKET'
-    margin_type_isolated = "ISOLATED"
-    margin_type_crossed = "CROSSED"
 
 
 class BiMarketLogic(BaseMarketLogic,
