@@ -251,7 +251,7 @@ class Signal(BaseSignal):
                                    choices=MarginType.choices(),
                                    default=_default_margin_type)
     message_date = models.DateTimeField(default=timezone.now, blank=True)
-    spoiled = models.BooleanField(
+    uninterrupted = models.BooleanField(
         help_text="Flag is unset if the Signal was spoiled by admin",
         default=True)
     trailing_stop_enabled = models.BooleanField(
@@ -1351,7 +1351,7 @@ class Signal(BaseSignal):
             logger.debug(f"No RESIDUAL QUANTITY for Signal '{self}'")
         if force:
             # Set flag because admin decided to spoil the signal
-            self.spoiled = False
+            self.uninterrupted = False
         self.status = SignalStatus.CANCELING.value
         self.save()
 
