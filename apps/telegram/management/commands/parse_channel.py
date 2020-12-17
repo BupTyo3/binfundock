@@ -209,7 +209,7 @@ class Command(SystemCommand):
         margin_whale_matches = ["margin", "whale", "marginwhale", "margin_whale"]
         white_bull_matches = ["white_bulls", "whitebull", "white", "margin_whale"]
         simple_future_matches = ["simple_future"]
-        lucrative_trend_matches = ["lucrative_trend", "LucrativeTrend"]
+        lucrative_trend_matches = ["trend"]
         lucrative_matches = ["lucrative"]
         raticoin_matches = ["raticoin"]
         bull_exclusive_matches = ["bull_exclusive"]
