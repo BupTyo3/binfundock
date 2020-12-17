@@ -18,6 +18,7 @@ from .base_model import (
 from .utils import (
     SignalStatus,
     SignalPosition,
+    MarginType,
     calculate_position,
     FORMED_PUSHED__SIG_STATS, SOLD__SIG_STATS,
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
@@ -58,6 +59,7 @@ QSBaseO = Union[QuerySet, List['BaseOrder']]
 
 class SignalOrig(BaseSignalOrig):
     _default_leverage = 1
+    _default_margin_type = MarginType.ISOLATED.value
     conf = conf_obj
 
     techannel = models.ForeignKey(to=Techannel,
@@ -71,6 +73,9 @@ class SignalOrig(BaseSignalOrig):
                                 choices=SignalPosition.choices(),
                                 default=SignalPosition.LONG.value, )
     leverage = models.PositiveIntegerField(default=_default_leverage)
+    margin_type = models.CharField(max_length=9,
+                                   choices=MarginType.choices(),
+                                   default=_default_margin_type)
     message_date = models.DateTimeField(default=timezone.now, blank=True)
 
     techannel: Techannel
@@ -120,6 +125,7 @@ class SignalOrig(BaseSignalOrig):
     def create_signal(cls, symbol: str, techannel_name: str,
                       stop_loss: float, outer_signal_id: int,
                       entry_points: List[float], take_profits: List[float],
+                      margin_type: Optional[str] = None,
                       leverage: Optional[int] = None,
                       message_date=timezone.now()):
         """
@@ -129,7 +135,7 @@ class SignalOrig(BaseSignalOrig):
             symbol=symbol, techannel_name=techannel_name,
             stop_loss=stop_loss, outer_signal_id=outer_signal_id,
             entry_points=entry_points, take_profits=take_profits,
-            leverage=leverage, message_date=message_date)
+            leverage=leverage, message_date=message_date, margin_type=margin_type)
         if not sig_orig:
             return
         sig_market_list = sig_orig._create_into_markets_if_auto()
@@ -142,6 +148,7 @@ class SignalOrig(BaseSignalOrig):
     def _create_signal(cls, symbol: str, techannel_name: str,
                        stop_loss: float, outer_signal_id: int,
                        entry_points: List[float], take_profits: List[float],
+                       margin_type: Optional[str] = None,
                        leverage: Optional[int] = None,
                        message_date=timezone.now()) -> Optional['SignalOrig']:
         """
@@ -162,7 +169,8 @@ class SignalOrig(BaseSignalOrig):
             outer_signal_id=outer_signal_id,
             position=position,
             leverage=leverage if leverage else cls._default_leverage,
-            message_date=message_date)
+            message_date=message_date,
+            margin_type=margin_type if margin_type else cls._default_margin_type)
         for entry_point in entry_points:
             EntryPointOrig.objects.create(signal=sm_obj, value=entry_point)
         for take_profit in take_profits:
@@ -184,6 +192,7 @@ class SignalOrig(BaseSignalOrig):
             outer_signal_id=self.outer_signal_id,
             position=self.position,
             leverage=leverage,
+            margin_type=self.margin_type,
             message_date=self.message_date,
             trailing_stop_enabled=trail_stop,
             market=market,
@@ -212,6 +221,7 @@ class SignalOrig(BaseSignalOrig):
 
 class Signal(BaseSignal):
     _default_leverage = 1
+    _default_margin_type = MarginType.ISOLATED.value
     conf = conf_obj
 
     signal_orig = models.ForeignKey(to=SignalOrig,
@@ -237,8 +247,11 @@ class Signal(BaseSignal):
                                 choices=SignalPosition.choices(),
                                 default=SignalPosition.LONG.value, )
     leverage = models.PositiveIntegerField(default=_default_leverage)
+    margin_type = models.CharField(max_length=9,
+                                   choices=MarginType.choices(),
+                                   default=_default_margin_type)
     message_date = models.DateTimeField(default=timezone.now, blank=True)
-    all_targets = models.BooleanField(
+    spoiled = models.BooleanField(
         help_text="Flag is unset if the Signal was spoiled by admin",
         default=True)
     trailing_stop_enabled = models.BooleanField(
@@ -256,6 +269,7 @@ class Signal(BaseSignal):
     symbol: str
     stop_loss: float
     leverage: int
+    margin_type: MarginType
 
     def __str__(self):
         return f"Signal:{self.pk}:{self.symbol}:{self.techannel.abbr}" \
@@ -1337,7 +1351,7 @@ class Signal(BaseSignal):
             logger.debug(f"No RESIDUAL QUANTITY for Signal '{self}'")
         if force:
             # Set flag because admin decided to spoil the signal
-            self.all_targets = False
+            self.spoiled = False
         self.status = SignalStatus.CANCELING.value
         self.save()
 

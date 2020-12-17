@@ -137,3 +137,4 @@ pgdata/
 apps/telegram/media/
 parsed-images/
 *.session-journal
+postgres
