@@ -38,7 +38,7 @@ regexp_stop = '\d+\.?\d+$'
 
 class SignalModel:
     def __init__(self, pair, current_price, margin_type, position, leverage, entry_points, take_profits, stop_loss,
-                 msg_id, algorithm=None):
+                 msg_id, algorithm=None, is_shared=False):
         self.pair = pair
         self.current_price = current_price
         self.margin_type = margin_type
@@ -49,6 +49,7 @@ class SignalModel:
         self.stop_loss = stop_loss
         self.msg_id = msg_id
         self.algorithm = algorithm
+        self.is_shared = is_shared
 
 
 class Telegram(BaseTelegram):
@@ -431,7 +432,8 @@ class Telegram(BaseTelegram):
         channel_abbr = 'lucrative'
         async for message in self.client.iter_messages(chat_id, limit=15):
             signal = self.parse_lucrative_trend_message(message.text, message.id)
-            exists = await self.is_lucrative_signal_handled(signal[0].pair, signal[0].algorithm, signal[0].current_price)
+            exists = await self.is_lucrative_signal_handled(signal[0].pair, signal[0].algorithm,
+                                                            signal[0].current_price)
             if not exists:
                 await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
                                                     signal[0].current_price, signal[0].algorithm, message.id)
