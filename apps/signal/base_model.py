@@ -7,7 +7,7 @@ from django.db import models
 
 from utils.framework.models import SystemBaseModel, SystemBaseModelWithoutModified
 from tools.tools import debug_input_and_returned
-from .utils import SignalStatus, SignalPosition
+from .utils import SignalStatus, SignalPosition, MarginType
 
 if TYPE_CHECKING:
     from apps.techannel.base_model import TechannelBase
@@ -20,6 +20,7 @@ class BaseBaseSignal(SystemBaseModel):
     techannel: 'TechannelBase'
     outer_signal_id: int
     leverage: int
+    margin_type: MarginType
     position: SignalPosition
     entry_points: 'BaseEntryPoint.objects'
     take_profits: 'BaseTakeProfit.objects'

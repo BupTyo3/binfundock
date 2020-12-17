@@ -140,8 +140,6 @@ class BinanceDataMixin:
 class BinanceFuturesDataMixin:
     available_balance_ = 'withdrawAvailable'
     order_type_stop_market = 'STOP_MARKET'
-    margin_type_isolated = "ISOLATED"
-    margin_type_crossed = "CROSSED"
 
 
 class BiMarketLogic(BaseMarketLogic,
@@ -596,7 +594,7 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         # Set leverage
         self._set_leverage(order.symbol, order.signal.leverage)
         # Set margin type
-        self._change_margin_type(order.symbol, self.margin_type_isolated)
+        self._change_margin_type(order.symbol, order.signal.margin_type)
 
     def push_buy_limit_order(self, order: 'BuyOrder'):
         """Push BUY LIMIT order to Futures"""
