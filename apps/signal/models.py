@@ -152,27 +152,13 @@ class SignalOrig(BaseSignalOrig):
         """
         Update signal
         """
-        sig_orig = cls._update_shared_signal(is_shared=is_shared,
-                                             techannel_name=techannel_name,
-                                             outer_signal_id=outer_signal_id)
-        if not sig_orig:
-            return
-        logger.debug(f"SignalOrig updated: '{sig_orig}'")
-        return True
-
-    @classmethod
-    @transaction.atomic
-    def _update_shared_signal(cls, is_shared: Optional[bool] = False,
-                              techannel_name: Optional[str] = None,
-                              outer_signal_id: Optional[int] = None) -> Optional['SignalOrig']:
-        """
-        Update signal
-        """
         techannel, created = Techannel.objects.get_or_create(name=techannel_name)
         sm_obj = SignalOrig.objects.filter(outer_signal_id=outer_signal_id,
                                            techannel=techannel).update(is_shared=is_shared)
-        logger.debug(f"SignalOrig '{sm_obj}' has been updated successfully")
-        return sm_obj
+        if not sm_obj:
+            return
+        logger.debug(f"SignalOrig updated: '{sm_obj}'")
+        return True
 
     @classmethod
     @transaction.atomic
