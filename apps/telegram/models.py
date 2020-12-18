@@ -418,7 +418,7 @@ class Telegram(BaseTelegram):
             exists = await self.is_signal_handled(signal[0].msg_id, signal[0].algorithm)
             if not exists and signal[0].entry_points != '':
                 inserted_to_db = await self.write_signal_to_db(
-                    signal[0].algorithm, signal, message.id, signal[0].current_price)
+                    signal[0].algorithm, signal, signal[0].msg_id, signal[0].current_price)
                 if inserted_to_db != 'success':
                     await self.send_message_to_yourself(f"Error during processing the signal to DB, "
                                                         f"please check logs for '{signal[0].pair}' "
