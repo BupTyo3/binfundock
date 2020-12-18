@@ -69,6 +69,7 @@ class SignalOrig(BaseSignalOrig):
     outer_signal_id = models.PositiveIntegerField()
     main_coin = models.CharField(max_length=16)
     stop_loss = models.FloatField()
+    is_shared = models.BooleanField(default=False)
     position = models.CharField(max_length=32,
                                 choices=SignalPosition.choices(),
                                 default=SignalPosition.LONG.value, )
@@ -82,6 +83,7 @@ class SignalOrig(BaseSignalOrig):
     entry_points: 'EntryPoint.objects'
     take_profits: 'TakeProfit.objects'
     symbol: str
+    is_shared: bool
 
     objects = models.Manager()
 
@@ -142,6 +144,38 @@ class SignalOrig(BaseSignalOrig):
         logger.debug(f"SignalOrig created: '{sig_orig}' and next '{len(sig_market_list)}' "
                      f"Signals: '{sig_market_list}'")
         return sig_orig
+
+    @classmethod
+    def update_shared_signal(cls, is_shared: Optional[bool] = False,
+                      techannel_name: Optional[str] = None,
+                      outer_signal_id: Optional[int] = None):
+        """
+        Update signal
+        """
+        sig_orig = cls._update_shared_signal(is_shared=is_shared,
+                                             techannel_name=techannel_name,
+                                             outer_signal_id=outer_signal_id)
+        if not sig_orig:
+            return
+        logger.debug(f"SignalOrig updated: '{sig_orig}'")
+        return True
+
+    @classmethod
+    @transaction.atomic
+    def _update_shared_signal(cls, is_shared: Optional[bool] = False,
+                              techannel_name: Optional[str] = None,
+                              outer_signal_id: Optional[int] = None) -> Optional['SignalOrig']:
+        """
+        Update signal
+        """
+        techannel, created = Techannel.objects.get_or_create(name=techannel_name)
+        sm_obj = SignalOrig.objects.filter(outer_signal_id=outer_signal_id, techannel=techannel).first()
+        if not sm_obj:
+            logger.warning(f"SignalOrig '{outer_signal_id}':'{techannel_name}' does not exist")
+            return
+        sm_obj = cls.objects.update(is_shared=is_shared)
+        logger.debug(f"SignalOrig '{sm_obj}' has been updated successfully")
+        return sm_obj
 
     @classmethod
     @transaction.atomic
