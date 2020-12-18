@@ -38,7 +38,7 @@ regexp_stop = '\d+\.?\d+$'
 
 class SignalModel:
     def __init__(self, pair, current_price, margin_type, position, leverage, entry_points, take_profits, stop_loss,
-                 msg_id, algorithm=None):
+                 msg_id, algorithm=None, is_shared=False):
         self.pair = pair
         self.current_price = current_price
         self.margin_type = margin_type
@@ -49,6 +49,7 @@ class SignalModel:
         self.stop_loss = stop_loss
         self.msg_id = msg_id
         self.algorithm = algorithm
+        self.is_shared = is_shared
 
 
 class Telegram(BaseTelegram):
@@ -416,7 +417,7 @@ class Telegram(BaseTelegram):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg:
-                signal = self.parse_lucrative_trend_message(message.text, message.id)
+                signal = self.parse_lucrative_trend_message(message.text)
                 if signal[0].entry_points != '':
                     inserted_to_db = await self.write_signal_to_db(
                         f"{channel_abbr}__{signal[0].algorithm}", signal, message.id, signal[0].current_price)
@@ -428,19 +429,24 @@ class Telegram(BaseTelegram):
 
     async def parse_lucrative_channel(self):
         chat_id = int(conf_obj.lucrative)
-        channel_abbr = 'lucrative'
         async for message in self.client.iter_messages(chat_id, limit=15):
-            signal = self.parse_lucrative_trend_message(message.text, message.id)
-            exists = await self.is_lucrative_signal_handled(signal[0].pair, signal[0].algorithm, signal[0].current_price)
-            if not exists:
-                await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
-                                                    signal[0].current_price, signal[0].algorithm, message.id)
-                await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                    signal[0].current_price, signal[0].algorithm, message.id)
-                await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                    signal[0].current_price, signal[0].algorithm, message.id)
+            signal = self.parse_lucrative_trend_message(message.text)
+            is_shared = await self.is_signal_shared(signal[0].msg_id, signal[0].algorithm)
+            if not is_shared:
+                await self.send_shared_message(int(conf_obj.xlucrative), signal[0],
+                                               signal[0].current_price, signal[0].algorithm, signal[0].msg_id)
+                await self.send_shared_message(int(conf_obj.lucrative_channel), signal[0],
+                                               signal[0].current_price, signal[0].algorithm, signal[0].msg_id)
+                await self.send_shared_message(int(conf_obj.lucrative_trend), signal[0],
+                                               signal[0].current_price, signal[0].algorithm, signal[0].msg_id)
+                await self.update_shared_signal(signal[0])
 
-    def parse_lucrative_trend_message(self, message_text, message_id):
+    @sync_to_async
+    def update_shared_signal(self, signal):
+        is_updated = SignalOrig.update_shared_signal(is_shared=True, techannel_name=signal.algorithm,
+                                                     outer_signal_id=signal.msg_id)
+
+    def parse_lucrative_trend_message(self, message_text):
         signals = []
         splitted_info = message_text.splitlines()
         buy_label = 'Entry Points: '
@@ -454,10 +460,12 @@ class Telegram(BaseTelegram):
         position = None
         leverage = 'Leverage: '
         entries = ''
+        message_id = ''
         profits = []
         stop_loss = ''
         datetime_label = 'Time:'
         algorithm = 'Algorithm: '
+        outer_id_label = 'ID: '
         for line in splitted_info:
             if line.startswith(pair_label):
                 possible_pair = line.split(' ')
@@ -481,6 +489,8 @@ class Telegram(BaseTelegram):
                 current_price = current_price+'+02:00'
             if line.startswith(algorithm):
                 algorithm = line[len(algorithm):].replace('\'', '')
+            if line.startswith(outer_id_label):
+                message_id = line[4:].replace('\'', '')
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id, algorithm=algorithm))
         return signals
@@ -991,7 +1001,13 @@ class Telegram(BaseTelegram):
         is_exist = SignalOrig.objects.filter(outer_signal_id=message_id, techannel__name=channel_abbr).exists()
         if is_exist:
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists in DB")
-        return is_exist
+        return is_exist\
+
+    @sync_to_async
+    def is_signal_shared(self, message_id, channel_abbr):
+        is_shared = SignalOrig.objects.filter(is_shared=True, outer_signal_id=message_id,
+                                              techannel__name=channel_abbr).exists()
+        return is_shared
 
     @sync_to_async
     def is_lucrative_signal_handled(self, pair, channel_abbr, date_time):
@@ -1060,6 +1076,22 @@ class Telegram(BaseTelegram):
                   f"Take Profits: '{signal.take_profits}'\n" \
                   f"Stop Loss: '{signal.stop_loss}'\n" \
                   f"Time: '{message_date.replace(tzinfo=None) + timedelta(hours=2)}'\n" \
+                  f"Algorithm: '{channel_abbr}'\n" \
+                  f"ID: '{message_id}'"
+        await self.client.send_message(channel_name, message)
+
+    async def send_shared_message(self, channel_name, signal, message_date, channel_abbr, message_id):
+        message_date = message_date.split('+')
+        message_date = message_date[0]
+        if not signal.leverage:
+            signal.leverage = 1
+        message = f"Pair: '{signal.pair}'\n" \
+                  f"Position: '{signal.position}'\n" \
+                  f"Leverage: '{signal.leverage}'\n" \
+                  f"Entry Points: '{signal.entry_points}'\n" \
+                  f"Take Profits: '{signal.take_profits}'\n" \
+                  f"Stop Loss: '{signal.stop_loss}'\n" \
+                  f"Time: '{message_date}'\n" \
                   f"Algorithm: '{channel_abbr}'\n" \
                   f"ID: '{message_id}'"
         await self.client.send_message(channel_name, message)
