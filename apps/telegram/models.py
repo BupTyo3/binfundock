@@ -412,20 +412,18 @@ class Telegram(BaseTelegram):
 
     async def parse_lucrative_trend_channel(self):
         chat_id = int(conf_obj.lucrative_channel)
-        channel_abbr = 'lucrative_trend'
+        # channel_abbr = 'lucrative_trend'
         async for message in self.client.iter_messages(chat_id, limit=15):
-            exists = await self.is_signal_handled(message.id, channel_abbr)
-            should_handle_msg = not exists
-            if should_handle_msg:
-                signal = self.parse_lucrative_trend_message(message.text)
-                if signal[0].entry_points != '':
-                    inserted_to_db = await self.write_signal_to_db(
-                        f"{channel_abbr}__{signal[0].algorithm}", signal, message.id, signal[0].current_price)
-                    if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{channel_abbr}' algorithm: "
-                                                            f"{inserted_to_db}")
+            signal = self.parse_lucrative_trend_message(message.text)
+            exists = await self.is_signal_handled(signal[0].msg_id, signal[0].algorithm)
+            if not exists and signal[0].entry_points != '':
+                inserted_to_db = await self.write_signal_to_db(
+                    signal[0].algorithm, signal, message.id, signal[0].current_price)
+                if inserted_to_db != 'success':
+                    await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                        f"please check logs for '{signal[0].pair}' "
+                                                        f"related to the '{signal[0].algorithm}' algorithm: "
+                                                        f"{inserted_to_db}")
 
     async def parse_lucrative_channel(self):
         chat_id = int(conf_obj.lucrative)
