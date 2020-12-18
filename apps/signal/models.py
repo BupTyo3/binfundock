@@ -1819,15 +1819,95 @@ class Signal(BaseSignal):
                          f" Signal: '{self}'")
 
     @debug_input_and_returned
-    def __trail_stop_futures_short(self):
-        pass
+    def __trail_stop_futures_short(self, fake_price: Optional[float] = None) -> bool:
+        """
+
+        FUTURES Market
+        SHORT Position
+        If the current price has crossed the threshold,
+         the Stop loss order is moved to the specific value:
+          it's a half value subtracted the current price and zero value.
+          The zero value is a value of the nearest Entry Point
+        """
+        from apps.order.utils import OPENED_ORDER_STATUSES
+
+        opened_gl_sl_orders = self.__get_gl_sl_buy_orders(statuses=OPENED_ORDER_STATUSES)
+        gl_sl_order = opened_gl_sl_orders.first()
+        sl_value = gl_sl_order.price
+        zero_value = EntryPoint.get_min_value(self)
+        if fake_price:
+            current_price = fake_price
+            logger.debug(f"Fake price for Trailing stop: '{fake_price}'")
+        else:
+            current_price = self._get_current_price()
+
+        # Check
+        if not self.__check_if_needs_to_move_sl_as_trailing_stop_short(
+                zero_value=zero_value, sl_value=sl_value, current_price=current_price):
+            return False
+
+        # Check if new_stop_loss price < current_stop_loss
+        opened_gl_sl_order = opened_gl_sl_orders.last()
+        new_stop_loss = self.__get_new_sl_value_for_trailing_stop(
+            zero_value=zero_value, current_price=current_price)
+        if new_stop_loss >= opened_gl_sl_order.price:
+            logger.debug(f"[SHORT] Calculated new_stop_loss of trailing_stop"
+                         f" more then or equal to current GL_SL price!!!: "
+                         f"{new_stop_loss} >= {opened_gl_sl_order.price}: '{self}'")
+            return False
+
+        # Check if quantity exists
+        residual_quantity = self._get_residual_quantity(ignore_fee=True)
+        if residual_quantity <= 0:
+            logger.warning(f"Wrong Residual Quantity '{residual_quantity}' for trailing_stop: '{self}'")
+            return False
+        # Recreate GL_SL_ORDER
+        # Cancel opened Buy orders if exist
+        self._cancel_opened_orders(sell=True)
+        self.__cancel_sent_buy_orders(opened_gl_sl_orders)
+        self.__form_buy_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
+                                    original_order_id=opened_gl_sl_order.id)
+        return True
 
     @debug_input_and_returned
-    def __check_if_needs_to_move_sl_as_trailing_stop(self,
-                                                     zero_value: float,
-                                                     sl_value: float,
-                                                     current_price: float) -> bool:
+    def __check_if_needs_to_move_sl_as_trailing_stop_short(self,
+                                                           zero_value: float,
+                                                           sl_value: float,
+                                                           current_price: float) -> bool:
         """
+        FUTURES Market
+        SHORT Position
+        Check:
+        if the current price has crossed a specific value (threshold)
+        Threshold is a discreteness value by delta from Config (CronTask for now)
+        since a zero value
+        A zero value is a value of the nearest Entry point value
+        """
+        delta_from_zero_value = (zero_value * get_or_create_crontask().slip_delta_sl_perc
+                                 ) / self.conf.one_hundred_percent
+        # For the next crossing
+        old_value_of_price = 2 * sl_value - zero_value
+        # For the first crossing of the threshold
+        old_value_of_price = zero_value - delta_from_zero_value if \
+            old_value_of_price > zero_value else old_value_of_price
+        threshold = old_value_of_price - delta_from_zero_value
+        msg = f"[SHORT] Check trailing_stop '{self}':" \
+              f" if: current_price < threshold: {current_price} < {threshold}?"
+        if current_price < threshold:
+            logger.debug(msg + ': Yes')
+            return True
+        else:
+            logger.debug(msg + ': No')
+            return False
+
+    @debug_input_and_returned
+    def __check_if_needs_to_move_sl_as_trailing_stop_long(self,
+                                                          zero_value: float,
+                                                          sl_value: float,
+                                                          current_price: float) -> bool:
+        """
+        FUTURES Market
+        LONG Position
         Check:
         if the current price has crossed a specific value (threshold)
         Threshold is a discreteness value by delta from Config (CronTask for now)
@@ -1861,6 +1941,8 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def __trail_stop_futures_long(self, fake_price: Optional[float] = None) -> bool:
         """
+        FUTURES Market
+        LONG Position
         If the current price has crossed the threshold,
          the Stop loss order is moved to the specific value:
           it's a half value subtracted the current price and zero value.
@@ -1879,7 +1961,7 @@ class Signal(BaseSignal):
             current_price = self._get_current_price()
 
         # Check
-        if not self.__check_if_needs_to_move_sl_as_trailing_stop(
+        if not self.__check_if_needs_to_move_sl_as_trailing_stop_long(
                 zero_value=zero_value, sl_value=sl_value, current_price=current_price):
             return False
 
@@ -1923,7 +2005,7 @@ class Signal(BaseSignal):
         """
         """
         if self.is_position_short():
-            return self.__trail_stop_futures_short()
+            return self.__trail_stop_futures_short(fake_price=fake_price)
         else:
             return self.__trail_stop_futures_long(fake_price=fake_price)
 
