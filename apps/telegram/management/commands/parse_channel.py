@@ -2,6 +2,7 @@ import logging
 from random import random
 import asyncio
 from telethon import TelegramClient
+import traceback
 
 from apps.signal.models import Signal
 from apps.telegram.models import Telegram
@@ -41,7 +42,8 @@ class Command(SystemCommand):
             with self._client_xy:
                 self._client_xy.loop.run_until_complete(self._telegram_xy.parse_china_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client_xy.disconnect()
 
@@ -52,7 +54,8 @@ class Command(SystemCommand):
             with self._client_xy:
                 self._client_xy.loop.run_until_complete(self._telegram_xy.parse_crypto_angel_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client_xy.disconnect()
 
@@ -63,7 +66,8 @@ class Command(SystemCommand):
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_tca_channel('altcoin'))
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client.disconnect()
 
@@ -74,7 +78,8 @@ class Command(SystemCommand):
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_tca_channel('leverage'))
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client.disconnect()
 
@@ -85,7 +90,8 @@ class Command(SystemCommand):
             with self._client_xy:
                 self._client_xy.loop.run_until_complete(self._telegram_xy.parse_tca_origin_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client_xy.disconnect()
 
@@ -96,7 +102,8 @@ class Command(SystemCommand):
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_margin_whale_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client.disconnect()
 
@@ -107,7 +114,8 @@ class Command(SystemCommand):
             with self._client_xy:
                 self._client_xy.loop.run_until_complete(self._telegram_xy.parse_white_bull_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client_xy.disconnect()
 
@@ -118,7 +126,8 @@ class Command(SystemCommand):
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_simple_future_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client.disconnect()
 
@@ -129,7 +138,8 @@ class Command(SystemCommand):
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_lucrative_trend_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client.disconnect()
 
@@ -140,7 +150,8 @@ class Command(SystemCommand):
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_lucrative_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client.disconnect()
 
@@ -151,7 +162,8 @@ class Command(SystemCommand):
             with self._client_xy:
                 self._client_xy.loop.run_until_complete(self._telegram_xy.parse_raticoin_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client_xy.disconnect()
 
@@ -162,7 +174,8 @@ class Command(SystemCommand):
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_crypto_zone_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client.disconnect()
 
@@ -173,7 +186,8 @@ class Command(SystemCommand):
             with self._client_xy:
                 self._client_xy.loop.run_until_complete(self._telegram_xy.parse_bull_exclusive_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client_xy.disconnect()
 
@@ -184,7 +198,8 @@ class Command(SystemCommand):
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_wcse_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client.disconnect()
 
@@ -195,7 +210,8 @@ class Command(SystemCommand):
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_server_channel())
         except Exception as e:
-            logger.error(f'The following Error appeared during the attempt to start Telegram for {session_name}: {e}')
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
         finally:
             self._client.disconnect()
 
