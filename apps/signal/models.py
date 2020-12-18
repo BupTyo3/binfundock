@@ -169,11 +169,8 @@ class SignalOrig(BaseSignalOrig):
         Update signal
         """
         techannel, created = Techannel.objects.get_or_create(name=techannel_name)
-        sm_obj = SignalOrig.objects.filter(outer_signal_id=outer_signal_id, techannel=techannel).first()
-        if not sm_obj:
-            logger.warning(f"SignalOrig '{outer_signal_id}':'{techannel_name}' does not exist")
-            return
-        sm_obj = cls.objects.update(is_shared=is_shared)
+        sm_obj = SignalOrig.objects.filter(outer_signal_id=outer_signal_id,
+                                           techannel=techannel).update(is_shared=is_shared)
         logger.debug(f"SignalOrig '{sm_obj}' has been updated successfully")
         return sm_obj
 
