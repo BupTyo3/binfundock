@@ -38,7 +38,7 @@ class CronTask(CronTaskBase):
     margin_whale = models.BooleanField(default=False)
     white_bull = models.BooleanField(default=False)
     simple_future = models.BooleanField(default=False)
-    lucrative_trend = models.BooleanField(default=False)
+    lucrative_recommendations = models.BooleanField(default=False)
     lucrative = models.BooleanField(default=False)
     raticoin = models.BooleanField(default=False)
     bull_exclusive = models.BooleanField(default=False)
