@@ -22,7 +22,7 @@ PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 * * * * * root cd ../binfun; sleep 35; python manage.py parse_channel --channel bull_exclusive > /proc/1/fd/1 2>/proc/1/fd/2
 * * * * * root cd ../binfun; sleep 55; python manage.py parse_channel --channel wcse > /proc/1/fd/1 2>/proc/1/fd/2
 */1 * * * * root cd ../binfun; python manage.py parse_channel --channel lucrative > /proc/1/fd/1 2>/proc/1/fd/2
-* * * * * root cd ../binfun; python manage.py parse_channel --channel trend > /proc/1/fd/1 2>/proc/1/fd/2
+* * * * * root cd ../binfun; python manage.py parse_channel --channel recommend > /proc/1/fd/1 2>/proc/1/fd/2
 * * * * * root cd ../binfun; sleep 5; python manage.py parse_channel --channel server > /proc/1/fd/1 2>/proc/1/fd/2
 
 #15 * * * * root python ../binfun/manage.py  > /proc/1/fd/1 2>/proc/1/fd/2

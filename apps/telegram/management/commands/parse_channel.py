@@ -132,7 +132,7 @@ class Command(SystemCommand):
             self._client.disconnect()
 
     def collect_info_from_lucrative_trend_channel(self):
-        session_name = 'LucrativeTrend'
+        session_name = 'LucrativeRecommendations'
         self.init_telegram(session_name)
         try:
             with self._client:
@@ -225,7 +225,7 @@ class Command(SystemCommand):
         margin_whale_matches = ["margin", "whale", "marginwhale", "margin_whale"]
         white_bull_matches = ["white_bulls", "whitebull", "white", "margin_whale"]
         simple_future_matches = ["simple_future"]
-        lucrative_trend_matches = ["trend"]
+        lucrative_recommendation_matches = ["recommend"]
         lucrative_matches = ["lucrative"]
         raticoin_matches = ["raticoin"]
         bull_exclusive_matches = ["bull_exclusive"]
@@ -278,9 +278,9 @@ class Command(SystemCommand):
         elif any(x in channel for x in simple_future_matches):
             self.collect_info_from_simple_future_channel()
 
-        if not get_or_create_crontask().lucrative_trend:
+        if not get_or_create_crontask().lucrative_recommendations:
             pass
-        elif any(x in channel for x in lucrative_trend_matches):
+        elif any(x in channel for x in lucrative_recommendation_matches):
             self.collect_info_from_lucrative_trend_channel()
 
         if not get_or_create_crontask().lucrative:
