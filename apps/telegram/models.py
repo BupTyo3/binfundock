@@ -1328,6 +1328,7 @@ class SignalVerification:
 
     def verify_profits(self, pair_object, current_pair_info):
         verified_profits = []
+        pair_object.take_profits = [price for price in pair_object.take_profits if price != '00']
         dot_position = current_pair_info['price'].index('.')
         if dot_position:
             for price in pair_object.take_profits:
