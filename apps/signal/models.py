@@ -70,6 +70,7 @@ class SignalOrig(BaseSignalOrig):
     main_coin = models.CharField(max_length=16)
     stop_loss = models.FloatField()
     is_shared = models.BooleanField(default=False)
+    is_served = models.BooleanField(default=False)
     position = models.CharField(max_length=32,
                                 choices=SignalPosition.choices(),
                                 default=SignalPosition.LONG.value, )
@@ -84,6 +85,7 @@ class SignalOrig(BaseSignalOrig):
     take_profits: 'TakeProfit.objects'
     symbol: str
     is_shared: bool
+    is_served: bool
 
     objects = models.Manager()
 
@@ -222,6 +224,18 @@ class SignalOrig(BaseSignalOrig):
             value = signal.get_not_fractional_price(take_profit.value)
             TakeProfit.objects.create(signal=signal, value=value)
         return signal
+
+    def make_signal_served(self, techannel_name: str, outer_signal_id: int):
+        """
+        Update signal
+        """
+        techannel, created = Techannel.objects.get_or_create(name=techannel_name)
+        sm_obj = SignalOrig.objects.filter(outer_signal_id=outer_signal_id,
+                                           techannel=techannel).update(is_served=True)
+        if not sm_obj:
+            return
+        logger.debug(f"SignalOrig updated: '{sm_obj}'")
+        return True
 
     def _get_main_coin(self, symbol) -> str:
         """

@@ -17,8 +17,8 @@ class Command(SystemCommand):
     def __init__(self):
         self._client = None
         self._telegram = None
-        self._client_xy = None
-        self._telegram_xy = None
+        self._client_luck = None
+        self._telegram_luck = None
         super().__init__()
 
     def init_telegram(self, session_name):
@@ -27,9 +27,9 @@ class Command(SystemCommand):
         self._telegram = Telegram(self._client)
 
     def init_telegram_xy(self, session_name):
-        self._client_xy = TelegramClient(session_name, conf_obj.api_id_xy, conf_obj.api_hash_xy)
-        self._client_xy.start()
-        self._telegram_xy = Telegram(self._client_xy)
+        self._client_luck = TelegramClient(session_name, conf_obj.api_id_luck, conf_obj.api_hash_luck)
+        self._client_luck.start()
+        self._telegram_luck = Telegram(self._client_luck)
 
     def add_arguments(self, parser):
         pass
@@ -39,25 +39,25 @@ class Command(SystemCommand):
         session_name = 'AI'
         self.init_telegram_xy(session_name)
         try:
-            with self._client_xy:
-                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_china_channel())
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_china_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client_xy.disconnect()
+            self._client_luck.disconnect()
 
     def collect_info_from_angel_channel(self):
         session_name = 'CryptoAngel'
         self.init_telegram_xy(session_name)
         try:
-            with self._client_xy:
-                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_crypto_angel_channel())
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_crypto_angel_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client_xy.disconnect()
+            self._client_luck.disconnect()
 
     def collect_info_from_tca_altcoin_channel(self):
         session_name = 'Lucrative-altcoin'
@@ -87,13 +87,13 @@ class Command(SystemCommand):
         session_name = 'CFTrader'
         self.init_telegram_xy(session_name)
         try:
-            with self._client_xy:
-                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_tca_origin_channel())
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_tca_origin_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client_xy.disconnect()
+            self._client_luck.disconnect()
 
     def collect_info_from_margin_whales_channel(self):
         session_name = 'Lucrative-Whales'
@@ -111,13 +111,13 @@ class Command(SystemCommand):
         session_name = 'WhiteBull'
         self.init_telegram_xy(session_name)
         try:
-            with self._client_xy:
-                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_white_bull_channel())
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_white_bull_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client_xy.disconnect()
+            self._client_luck.disconnect()
 
     def collect_info_from_simple_future_channel(self):
         session_name = 'Simple-Future'
@@ -159,13 +159,13 @@ class Command(SystemCommand):
         session_name = 'RatiCoin'
         self.init_telegram_xy(session_name)
         try:
-            with self._client_xy:
-                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_raticoin_channel())
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_raticoin_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client_xy.disconnect()
+            self._client_luck.disconnect()
 
     def collect_info_from_crypto_zone_channel(self):
         session_name = 'CryptoZone'
@@ -183,13 +183,13 @@ class Command(SystemCommand):
         session_name = 'BullExclusive'
         self.init_telegram_xy(session_name)
         try:
-            with self._client_xy:
-                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_bull_exclusive_channel())
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_bull_exclusive_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client_xy.disconnect()
+            self._client_luck.disconnect()
 
     def collect_info_from_wcse_channel(self):
         session_name = 'WCSE'
@@ -202,6 +202,18 @@ class Command(SystemCommand):
             traceback.print_exc()
         finally:
             self._client.disconnect()
+
+    def collect_info_from_klondike_channel(self):
+        session_name = 'klondike'
+        self.init_telegram_xy(session_name)
+        try:
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_klondike_channel())
+        except Exception as e:
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
+        finally:
+            self._client_luck.disconnect()
 
     def collect_info_from_server_channel(self):
         session_name = 'Server'
@@ -231,6 +243,7 @@ class Command(SystemCommand):
         bull_exclusive_matches = ["bull_exclusive"]
         crypto_zone_matches = ["crypto_zone"]
         wcse_matches = ["wcse"]
+        klondike_matches = ["klondike"]
         server_matches = ["server"]
 
         if not get_or_create_crontask().server:
@@ -307,3 +320,8 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in wcse_matches):
             self.collect_info_from_wcse_channel()
+
+        if not get_or_create_crontask().klondike:
+            pass
+        elif any(x in channel for x in klondike_matches):
+            self.collect_info_from_klondike_channel()

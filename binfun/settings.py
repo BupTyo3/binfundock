@@ -272,8 +272,8 @@ class Config:
         telegram = config['Telegram']
         self.api_id = telegram.get('api_id', None)
         self.api_hash = telegram.get('api_hash', None)
-        self.api_id_xy = telegram.get('api_id_xy', None)
-        self.api_hash_xy = telegram.get('api_hash_xy', None)
+        self.api_id_luck = telegram.get('api_id_luck', None)
+        self.api_hash_luck = telegram.get('api_hash_luck', None)
         self.chat_china_id = telegram.get('chat_china_id', None)
         self.crypto_angel_id = telegram.get('crypto_angel_id', None)
         self.tca_altcoin = telegram.get('TCA_Altcoin', None)
@@ -282,7 +282,7 @@ class Config:
         self.margin_whales = telegram.get('Margin_Whales', None)
         self.white_bull = telegram.get('white_bull', None)
         self.lucrative_channel = telegram.get('Lucrative_Recommendations', None)
-        self.lucrative = telegram.get('Lucrative', None)
+        self.Luck8414 = telegram.get('Luck8414', None)
         self.simple_future = telegram.get('simple_future', None)
         self.lucrative_trend = telegram.get('Lucrative_Trend', None)
         self.raticoin = telegram.get('Raticoin', None)
@@ -290,6 +290,7 @@ class Config:
         self.crypto_zone = telegram.get('CryptoZone', None)
         self.wcse = telegram.get('wcse', None)
         self.xlucrative = telegram.get('xLucrative', None)
+        self.klondike = telegram.get('klondike', None)
         self.server = telegram.get('Server', None)
 
 
