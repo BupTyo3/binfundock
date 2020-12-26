@@ -2,6 +2,7 @@ import logging
 
 from typing import Optional, List, Set, Union, TYPE_CHECKING
 
+from asgiref.sync import sync_to_async
 from django.db import models, transaction
 from django.db.models import QuerySet, Sum, F
 from django.utils import timezone
@@ -225,6 +226,36 @@ class SignalOrig(BaseSignalOrig):
             TakeProfit.objects.create(signal=signal, value=value)
         return signal
 
+    @sync_to_async
+    @transaction.atomic
+    def create_async_market_signal(self, market: BaseMarket, trail_stop: bool = False) -> 'Signal':
+        self._check_if_pair_does_not_exist_in_market(market)
+        # ValueError if SPOT & SHORT
+        self._check_inappropriate_position_to_market_type(market)
+        # Set leverage = 1 for Spot Market
+        leverage = self._default_leverage if market.is_spot_market() else self.leverage
+        signal = Signal.objects.create(
+            techannel=self.techannel,
+            symbol=self.symbol,
+            stop_loss=self.stop_loss,
+            outer_signal_id=self.outer_signal_id,
+            position=self.position,
+            leverage=leverage,
+            margin_type=self.margin_type,
+            message_date=self.message_date,
+            trailing_stop_enabled=trail_stop,
+            market=market,
+            signal_orig=self,
+        )
+        for entry_point in self.entry_points.all():
+            value = signal.get_not_fractional_price(entry_point.value)
+            EntryPoint.objects.create(signal=signal, value=value)
+        for take_profit in self.take_profits.all():
+            value = signal.get_not_fractional_price(take_profit.value)
+            TakeProfit.objects.create(signal=signal, value=value)
+        return signal
+
+    @sync_to_async
     def make_signal_served(self, techannel_name: str, outer_signal_id: int):
         """
         Update signal
