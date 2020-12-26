@@ -143,12 +143,12 @@ class Command(SystemCommand):
         finally:
             self._client.disconnect()
 
-    def collect_info_from_lucrative_channel(self):
+    def collect_info_from_luck_channel(self):
         session_name = 'Lucrative'
         self.init_telegram(session_name)
         try:
             with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_lucrative_channel())
+                self._client.loop.run_until_complete(self._telegram.parse_luck_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
@@ -238,7 +238,7 @@ class Command(SystemCommand):
         white_bull_matches = ["white_bulls", "whitebull", "white", "margin_whale"]
         simple_future_matches = ["simple_future"]
         lucrative_recommendation_matches = ["recommend"]
-        lucrative_matches = ["lucrative"]
+        luck_matches = ["luck"]
         raticoin_matches = ["raticoin"]
         bull_exclusive_matches = ["bull_exclusive"]
         crypto_zone_matches = ["crypto_zone"]
@@ -296,10 +296,10 @@ class Command(SystemCommand):
         elif any(x in channel for x in lucrative_recommendation_matches):
             self.collect_info_from_lucrative_trend_channel()
 
-        if not get_or_create_crontask().lucrative:
+        if not get_or_create_crontask().luck:
             pass
-        elif any(x in channel for x in lucrative_matches):
-            self.collect_info_from_lucrative_channel()
+        elif any(x in channel for x in luck_matches):
+            self.collect_info_from_luck_channel()
 
         if not get_or_create_crontask().raticoin:
             pass

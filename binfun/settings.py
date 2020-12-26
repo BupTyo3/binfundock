@@ -289,7 +289,7 @@ class Config:
         self.bull_exclusive = telegram.get('TheBullExclusive', None)
         self.crypto_zone = telegram.get('CryptoZone', None)
         self.wcse = telegram.get('wcse', None)
-        self.xlucrative = telegram.get('xLucrative', None)
+        self.lucrative = telegram.get('Lucrative', None)
         self.klondike = telegram.get('klondike', None)
         self.server = telegram.get('Server', None)
 

@@ -24,7 +24,7 @@ from tools.tools import countdown
 from utils.parse_channels.str_parser import left_numbers, check_pair, find_number_in_list
 from .base_model import BaseTelegram
 from .init_client import ShtClient
-from ..market.models import get_or_create_futures_market
+from ..market.models import BiFuturesMarketLogic, get_async_market
 from ..signal.utils import MarginType
 
 logger = logging.getLogger(__name__)
@@ -201,7 +201,7 @@ class Telegram(BaseTelegram):
                                                         message.date, channel_abbr, message.id)
                     await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                         message.date, channel_abbr, message.id)
-                    await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                    await self.send_message_by_template(int(conf_obj.lucrative), signal[0],
                                                         message.date, channel_abbr, message.id)
 
     def parse_margin_whale_message(self, message_text, message_id):
@@ -263,7 +263,7 @@ class Telegram(BaseTelegram):
                                                             message.date, channel_abbr, message.id)
                         await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                             message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative), signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_simple_future_message(self, message_text, message_id):
@@ -410,19 +410,20 @@ class Telegram(BaseTelegram):
                                                         f"related to the '{signal[0].algorithm}' algorithm: "
                                                         f"{inserted_to_db}")
 
-    async def parse_lucrative_channel(self):
-        chat_id = int(conf_obj.lucrative)
+    async def parse_luck_channel(self):
+        chat_id = int(conf_obj.luck)
         async for message in self.client.iter_messages(chat_id, limit=15):
-            signal = self.parse_lucrative_trend_message(message.text)
-            is_shared = await self.is_signal_shared(signal[0].msg_id, signal[0].algorithm)
-            if not is_shared:
-                await self.send_shared_message(int(conf_obj.xlucrative), signal[0],
-                                               signal[0].current_price, signal[0].algorithm, signal[0].msg_id)
-                await self.send_shared_message(int(conf_obj.lucrative_channel), signal[0],
-                                               signal[0].current_price, signal[0].algorithm, signal[0].msg_id)
-                await self.send_shared_message(int(conf_obj.lucrative_trend), signal[0],
-                                               signal[0].current_price, signal[0].algorithm, signal[0].msg_id)
-                await self.update_shared_signal(signal[0])
+            if message.text:
+                signal = self.parse_lucrative_trend_message(message.text)
+                is_shared = await self.is_signal_shared(signal[0].msg_id, signal[0].algorithm)
+                if not is_shared:
+                    await self.send_shared_message(int(conf_obj.lucrative), signal[0],
+                                                   signal[0].current_price, signal[0].algorithm, signal[0].msg_id)
+                    await self.send_shared_message(int(conf_obj.lucrative_channel), signal[0],
+                                                   signal[0].current_price, signal[0].algorithm, signal[0].msg_id)
+                    await self.send_shared_message(int(conf_obj.lucrative_trend), signal[0],
+                                                   signal[0].current_price, signal[0].algorithm, signal[0].msg_id)
+                    await self.update_shared_signal(signal[0])
 
     @sync_to_async
     def update_shared_signal(self, signal):
@@ -866,7 +867,7 @@ class Telegram(BaseTelegram):
                                                                 message.date, channel_abbr, message.id)
                             await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                                 message.date, channel_abbr, message.id)
-                            await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                            await self.send_message_by_template(int(conf_obj.lucrative), signal[0],
                                                                 message.date, channel_abbr, message.id)
 
     def parse_wcse_message(self, message_text, message_id):
@@ -940,15 +941,17 @@ class Telegram(BaseTelegram):
         channel_id = int(conf_obj.server)
         channel_abbr = 'server'
         async for message in self.client.iter_messages(channel_id, limit=5):
-            signal = self.parse_server_message(message.text)
-            served_signal = SignalOrig.objects.filter(is_served=True, techannel_name=signal[0].algorithm,
-                                                      outer_signal_id=message.id).first()
-            if not served_signal:
-                market = get_or_create_futures_market()
-                served_signal.create_market_signal(market=market)
-                served_signal.make_signal_served(techannel_name=signal[0].algorithm, outer_signal_id=message.id)
-            if served_signal and signal[0].current_price == 'close':
-                served_signal.try_to_spoil()
+            if message.text:
+                signal = self.parse_server_message(message.text)
+                if signal[0].pair:
+                    not_served_signal = await self.get_not_served_signal(signal[0].msg_id, signal[0].algorithm)
+                    if not_served_signal and type(not_served_signal) is not bool:
+                        market = await get_async_market()
+                        await not_served_signal.create_async_market_signal(market=market)
+                        await not_served_signal.make_signal_served(techannel_name=signal[0].algorithm,
+                                                                   outer_signal_id=signal[0].msg_id)
+                    if not not_served_signal and signal[0].current_price == 'close':
+                        not_served_signal.try_to_spoil()
 
     def parse_server_message(self, message_text):
         signals = []
@@ -1037,7 +1040,7 @@ class Telegram(BaseTelegram):
                                                             message.date, channel_abbr, message.id)
                         await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
                                                             message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.xlucrative), signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative), signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_tca_message(self, message_text, message_id):
@@ -1093,6 +1096,20 @@ class Telegram(BaseTelegram):
         is_shared = SignalOrig.objects.filter(is_shared=True, outer_signal_id=message_id,
                                               techannel__name=channel_abbr).exists()
         return is_shared
+
+    @sync_to_async
+    def get_not_served_signal(self, message_id, channel_abbr):
+        signal = SignalOrig.objects.filter(techannel__name=channel_abbr,
+                                           outer_signal_id=message_id).first()
+        if signal:
+            is_served = getattr(signal, 'is_served')
+            if not is_served:
+                return SignalOrig.objects.filter(techannel__name=channel_abbr,
+                                                 outer_signal_id=message_id).first()
+            if is_served:
+                return True
+        else:
+            return None
 
     @sync_to_async
     def is_lucrative_signal_handled(self, pair, channel_abbr, date_time):
