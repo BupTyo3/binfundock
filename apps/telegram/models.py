@@ -428,7 +428,7 @@ class Telegram(BaseTelegram):
                                                         f"{inserted_to_db}")
 
     async def parse_luck_channel(self):
-        chat_id = int(conf_obj.luck)
+        chat_id = int(conf_obj.Luck8414)
         async for message in self.client.iter_messages(chat_id, limit=15):
             if message.text:
                 signal = self.parse_lucrative_trend_message(message.text)
