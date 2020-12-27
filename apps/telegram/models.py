@@ -429,7 +429,7 @@ class Telegram(BaseTelegram):
 
     async def parse_luck_channel(self):
         chat_id = int(conf_obj.Luck8414)
-        async for message in self.client.iter_messages(chat_id, limit=15):
+        async for message in self.client.iter_messages(chat_id, limit=10):
             if message.text:
                 signal = self.parse_lucrative_trend_message(message.text)
                 is_shared = await self.is_signal_shared(signal[0].msg_id, signal[0].algorithm)
