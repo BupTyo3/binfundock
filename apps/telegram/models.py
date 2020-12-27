@@ -63,6 +63,23 @@ class Telegram(BaseTelegram):
     """
     name = 'Telegram'
 
+    def is_urgent_close_position(self, message, channel_abbr):
+        should_close_label = ['closing', 'closed', 'close']
+        should_close = any(x in should_close_label for x in message)
+        if should_close:
+            if 'BTC' in message.text:
+                obj = SignalOrig.objects.filter(
+                    symbol='BTCUSDT', techannel__name=channel_abbr).order_by('id').last()
+                if obj:
+                    logger.debug(f'please close the position: {obj}')
+            if 'ETH' in message.text:
+                obj = SignalOrig.objects.filter(
+                    symbol='ETHUSDT', techannel__name=channel_abbr).order_by('id').last()
+                if obj:
+                    logger.debug(f'please close the position: {obj}')
+            return True
+        return False
+
     def is_urgent_correct_position(self, message, channel_abbr):
         # TODO: add logic here as it is not relevant --->>> TRY_TO_SPOIL()
         should_move_label = ['move']
