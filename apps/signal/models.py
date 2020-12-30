@@ -4,7 +4,7 @@ from typing import Optional, List, Set, Union, TYPE_CHECKING
 
 from asgiref.sync import sync_to_async
 from django.db import models, transaction
-from django.db.models import QuerySet, Sum, F
+from django.db.models import QuerySet, Sum, F, Case, When
 from django.utils import timezone
 
 from utils.framework.models import (
@@ -21,7 +21,7 @@ from .utils import (
     SignalPosition,
     MarginType,
     calculate_position,
-    FORMED_PUSHED__SIG_STATS, SOLD__SIG_STATS,
+    FORMED_PUSHED__SIG_STATS, SOLD__SIG_STATS, FORMED__SIG_STATS,
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
     PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, BOUGHT_SOLD__SIG_STATS, BOUGHT__SIG_STATS,
     ERROR__SIG_STATS,
@@ -427,11 +427,36 @@ class Signal(BaseSignal):
     def __get_distribution_by_take_profits(self):
         return self.take_profits.count()
 
-    def _get_current_balance_of_main_coin(self, fake_balance: Optional[float] = None):
+    def _get_current_balance_of_main_coin(self, fake_balance: Optional[float] = None) -> float:
+        """
+        Get current available balance of main_coin minus amount of not_sent EP orders
+        """
         if fake_balance is not None:
             logger.debug(f"FAKE BALANCE: '{fake_balance}'")
-            return fake_balance
-        return self.market_logic.get_current_balance(self.main_coin)
+            result = fake_balance
+        else:
+            result = self.market_logic.get_current_balance(self.main_coin)
+        result -= self._get_sum_of_not_sent_orders_for_formed_signals()
+        return result
+
+    @debug_input_and_returned
+    def _get_sum_of_not_sent_orders_for_formed_signals(self) -> float:
+        """
+        Get amount of not_sent EP orders of Formed Signals
+        """
+        params = {
+            'main_coin': self.main_coin,
+            'market': self.market,
+            '_status__in': FORMED__SIG_STATS,
+        }
+        qs = Signal.objects.filter(**params).annotate(amount_by_ep_order=Sum(Case(
+            When(position='long', then=(
+                    F('buy_orders__quantity') * F('buy_orders__price') / F('leverage'))),
+            When(position='short', then=(
+                    F('sell_orders__quantity') * F('sell_orders__price') / F('leverage'))),
+            output_field=models.FloatField())))
+        qs = qs.aggregate(Sum('amount_by_ep_order'))
+        return qs['amount_by_ep_order__sum'] or 0
 
     def _get_current_price(self):
         return self.market_logic.get_current_price(self.symbol)
