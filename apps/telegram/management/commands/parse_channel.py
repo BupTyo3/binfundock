@@ -26,7 +26,7 @@ class Command(SystemCommand):
         self._client.start()
         self._telegram = Telegram(self._client)
 
-    def init_telegram_xy(self, session_name):
+    def init_telegram_luck(self, session_name):
         self._client_luck = TelegramClient(session_name, conf_obj.api_id_luck, conf_obj.api_hash_luck)
         self._client_luck.start()
         self._telegram_luck = Telegram(self._client_luck)
@@ -37,19 +37,19 @@ class Command(SystemCommand):
 
     def collect_info_from_china_channel(self):
         session_name = 'AI'
-        self.init_telegram_xy(session_name)
+        self.init_telegram(session_name)
         try:
-            with self._client_luck:
-                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_china_channel())
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_china_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client_luck.disconnect()
+            self._client.disconnect()
 
     def collect_info_from_angel_channel(self):
         session_name = 'CryptoAngel'
-        self.init_telegram_xy(session_name)
+        self.init_telegram_luck(session_name)
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_crypto_angel_channel())
@@ -85,7 +85,7 @@ class Command(SystemCommand):
 
     def collect_info_from_tca_origin_channel(self):
         session_name = 'CFTrader'
-        self.init_telegram_xy(session_name)
+        self.init_telegram_luck(session_name)
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_tca_origin_channel())
@@ -109,7 +109,7 @@ class Command(SystemCommand):
 
     def collect_info_from_white_bull_channel(self):
         session_name = 'WhiteBull'
-        self.init_telegram_xy(session_name)
+        self.init_telegram_luck(session_name)
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_white_bull_channel())
@@ -157,7 +157,7 @@ class Command(SystemCommand):
 
     def collect_info_from_raticoin_channel(self):
         session_name = 'RatiCoin'
-        self.init_telegram_xy(session_name)
+        self.init_telegram_luck(session_name)
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_raticoin_channel())
@@ -181,7 +181,7 @@ class Command(SystemCommand):
 
     def collect_info_from_bull_exclusive_channel(self):
         session_name = 'BullExclusive'
-        self.init_telegram_xy(session_name)
+        self.init_telegram_luck(session_name)
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_bull_exclusive_channel())
@@ -205,7 +205,7 @@ class Command(SystemCommand):
 
     def collect_info_from_klondike_channel(self):
         session_name = 'klondike'
-        self.init_telegram_xy(session_name)
+        self.init_telegram_luck(session_name)
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_klondike_channel())
