@@ -1,5 +1,7 @@
 import logging
 import uuid
+
+from asgiref.sync import sync_to_async
 from binance.exceptions import BinanceAPIException
 
 from functools import partial, wraps
@@ -102,6 +104,21 @@ def api_logging(func: Optional[Callable] = None, *, text: str = ""):
 
 
 def debug_input_and_returned(func):
+    """Decorator for logging signature and returned value"""
+    @wraps(func)
+    def wrapper_debug(*args, **kwargs):
+        args_repr = [repr(a) for a in args]
+        kwargs_repr = [f"{k}={v!r}" for k, v in kwargs.items()]
+        signature = ", ".join(args_repr + kwargs_repr)
+        logger.debug(f"Calling {func.__name__}({signature})")
+        value = func(*args, **kwargs)
+        logger.debug(f"{func.__name__!r} returned {value!r}")
+        return value
+    return wrapper_debug
+
+
+@sync_to_async
+def debug_async_input_and_returned(func):
     """Decorator for logging signature and returned value"""
     @wraps(func)
     def wrapper_debug(*args, **kwargs):

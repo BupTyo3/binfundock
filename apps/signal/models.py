@@ -42,7 +42,7 @@ from tools.tools import (
     rou,
     rounded_result,
     debug_input_and_returned,
-    subtract_fee,
+    subtract_fee, debug_async_input_and_returned,
 )
 
 if TYPE_CHECKING:
@@ -226,48 +226,6 @@ class SignalOrig(BaseSignalOrig):
             TakeProfit.objects.create(signal=signal, value=value)
         return signal
 
-    @sync_to_async
-    @transaction.atomic
-    def create_async_market_signal(self, market: BaseMarket, trail_stop: bool = False) -> 'Signal':
-        self._check_if_pair_does_not_exist_in_market(market)
-        # ValueError if SPOT & SHORT
-        self._check_inappropriate_position_to_market_type(market)
-        # Set leverage = 1 for Spot Market
-        leverage = self._default_leverage if market.is_spot_market() else self.leverage
-        signal = Signal.objects.create(
-            techannel=self.techannel,
-            symbol=self.symbol,
-            stop_loss=self.stop_loss,
-            outer_signal_id=self.outer_signal_id,
-            position=self.position,
-            leverage=leverage,
-            margin_type=self.margin_type,
-            message_date=self.message_date,
-            trailing_stop_enabled=trail_stop,
-            market=market,
-            signal_orig=self,
-        )
-        for entry_point in self.entry_points.all():
-            value = signal.get_not_fractional_price(entry_point.value)
-            EntryPoint.objects.create(signal=signal, value=value)
-        for take_profit in self.take_profits.all():
-            value = signal.get_not_fractional_price(take_profit.value)
-            TakeProfit.objects.create(signal=signal, value=value)
-        return signal
-
-    @sync_to_async
-    def make_signal_served(self, techannel_name: str, outer_signal_id: int):
-        """
-        Update signal
-        """
-        techannel, created = Techannel.objects.get_or_create(name=techannel_name)
-        sm_obj = SignalOrig.objects.filter(outer_signal_id=outer_signal_id,
-                                           techannel=techannel).update(is_served=True)
-        if not sm_obj:
-            return
-        logger.debug(f"SignalOrig updated: '{sm_obj}'")
-        return True
-
     def _get_main_coin(self, symbol) -> str:
         """
         Example:
@@ -319,6 +277,7 @@ class Signal(BaseSignal):
     trailing_stop_enabled = models.BooleanField(
         default=False,
         help_text="Trail SL if price has become above near EP (LONG) or lower (SHORT)")
+    is_served = models.BooleanField(default=False)
 
     objects = models.Manager()
 
@@ -331,6 +290,7 @@ class Signal(BaseSignal):
     symbol: str
     stop_loss: float
     leverage: int
+    is_served: bool
     margin_type: MarginType
 
     def __str__(self):
@@ -1082,6 +1042,19 @@ class Signal(BaseSignal):
         for index in excluded_indexes:
             qs = qs.exclude(index=index)
         return qs
+
+    @sync_to_async
+    def make_signal_served(self, techannel_name: str, outer_signal_id: int):
+        """
+        Update signal
+        """
+        techannel, created = Techannel.objects.get_or_create(name=techannel_name)
+        sm_obj = Signal.objects.filter(outer_signal_id=outer_signal_id,
+                                       techannel=techannel).update(is_served=True)
+        if not sm_obj:
+            return
+        logger.debug(f"Signal updated: '{sm_obj}'")
+        return True
 
     def __get_not_handled_worked_sell_orders(self,
                                              sl_orders: bool = False,
@@ -2205,7 +2178,7 @@ class Signal(BaseSignal):
         current_price = self._get_current_price()
         max_profit_price = TakeProfit.get_max_value(self)
         msg = f"Check try_to_spoil '{self}':" \
-              f" if: current_price <= min_profit_price: {current_price} <= {max_profit_price}?"
+              f" if: current_price <= max_profit_price: {current_price} <= {max_profit_price}?"
         if current_price <= max_profit_price:
             logger.debug(msg + ': Yes')
             return True
@@ -2222,6 +2195,21 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     # @transaction.atomic
     def try_to_spoil(self, force: bool = False):
+        """
+        Worker spoils the Signal if a current price reaches any of take_profits
+        and there are no worked Buy orders
+        """
+        if force:
+            self._spoil(force=True)
+            return
+        if self._status not in FORMED_PUSHED__SIG_STATS:
+            return
+        if self._check_is_ready_to_spoil():
+            self._spoil()
+
+    # @debug_async_input_and_returned
+    @sync_to_async
+    def try_to_aync_spoil(self, force: bool = False):
         """
         Worker spoils the Signal if a current price reaches any of take_profits
         and there are no worked Buy orders

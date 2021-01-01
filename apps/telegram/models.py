@@ -17,14 +17,13 @@ from django.conf import settings
 from pytesseract import image_to_string
 from telethon.tl.types import User, PeerUser, PeerChannel
 
-from apps.signal.models import SignalOrig, EntryPoint, TakeProfit
+from apps.signal.models import SignalOrig, Signal, EntryPoint, TakeProfit
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
 from tools.tools import countdown
 from utils.parse_channels.str_parser import left_numbers, check_pair, find_number_in_list
 from .base_model import BaseTelegram
 from .init_client import ShtClient
-from ..market.models import BiFuturesMarketLogic, get_async_market
 from ..signal.utils import MarginType
 
 logger = logging.getLogger(__name__)
@@ -960,15 +959,22 @@ class Telegram(BaseTelegram):
         async for message in self.client.iter_messages(channel_id, limit=5):
             if message.text:
                 signal = self.parse_server_message(message.text)
-                if signal[0].pair:
+                exists = await self.is_signal_handled(signal[0].msg_id, channel_abbr)
+                if signal[0].pair and not exists and signal[0].current_price != 'close':
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, signal[0].msg_id, message.date)
+                    if inserted_to_db != 'success':
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                            f"please check logs for '{signal[0].pair}' "
+                                                            f"related to the '{channel_abbr}' algorithm: "
+                                                            f"{inserted_to_db}")
+                if signal[0].pair and exists and 'close' in signal[0].current_price:
                     not_served_signal = await self.get_not_served_signal(signal[0].msg_id, signal[0].algorithm)
                     if not_served_signal and type(not_served_signal) is not bool:
-                        market = await get_async_market()
-                        await not_served_signal.create_async_market_signal(market=market)
+                        await not_served_signal.try_to_aync_spoil()
                         await not_served_signal.make_signal_served(techannel_name=signal[0].algorithm,
                                                                    outer_signal_id=signal[0].msg_id)
-                    if not not_served_signal and signal[0].current_price == 'close':
-                        not_served_signal.try_to_spoil()
+                    if not not_served_signal and type(not_served_signal) is bool:
+                        pass
 
     def parse_server_message(self, message_text):
         signals = []
@@ -1009,8 +1015,11 @@ class Telegram(BaseTelegram):
             if line.startswith(stop_label):
                 stop_loss = line[11:].replace('\'', '')
             if line.startswith(datetime_label):
-                current_price = line[7:].replace('\'', '')
-                current_price = current_price + '+02:00'
+                current_price = line[6:].replace('\'', '')
+                if 'close' in current_price:
+                    current_price = current_price
+                else:
+                    current_price = current_price + '+02:00'
             if line.startswith(algorithm):
                 algorithm = line[len(algorithm):].replace('\'', '')
             if line.startswith(outer_id_label):
@@ -1116,13 +1125,12 @@ class Telegram(BaseTelegram):
 
     @sync_to_async
     def get_not_served_signal(self, message_id, channel_abbr):
-        signal = SignalOrig.objects.filter(techannel__name=channel_abbr,
-                                           outer_signal_id=message_id).first()
+        signal = Signal.objects.filter(techannel__name=channel_abbr,
+                                       outer_signal_id=message_id).first()
         if signal:
             is_served = getattr(signal, 'is_served')
             if not is_served:
-                return SignalOrig.objects.filter(techannel__name=channel_abbr,
-                                                 outer_signal_id=message_id).first()
+                return signal
             if is_served:
                 return True
         else:
