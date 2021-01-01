@@ -44,14 +44,6 @@ def get_or_create_futures_market() -> BaseMarket:
     return market_obj
 
 
-@sync_to_async
-def get_async_market() -> BaseMarket:
-    market_obj, created = Market.objects.get_or_create(name=BiFuturesMarketLogic.name)
-    if created:
-        logger.debug(f"Market '{market_obj}' has been created")
-    return market_obj
-
-
 class PartialResponse(TypedDict):
     status: str
     status_updated: bool
