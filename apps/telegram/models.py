@@ -103,7 +103,7 @@ class Telegram(BaseTelegram):
         try:
             tca = int(conf_obj.CFTrader)
 
-            async for message in self.client.iter_messages(tca, limit=15):
+            async for message in self.client.iter_messages(tca, limit=8):
                 exists = await self.is_signal_handled(message.id, channel_abbr)
                 should_handle_msg = not exists
                 if message.text and should_handle_msg:
@@ -262,7 +262,7 @@ class Telegram(BaseTelegram):
     async def parse_simple_future_channel(self):
         chat_id = int(conf_obj.simple_future)
         channel_abbr = 'simple_future'
-        async for message in self.client.iter_messages(chat_id, limit=15):
+        async for message in self.client.iter_messages(chat_id, limit=7):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg:
@@ -327,7 +327,7 @@ class Telegram(BaseTelegram):
     async def parse_raticoin_channel(self):
         chat_id = int(conf_obj.raticoin)
         channel_abbr = 'recoin'
-        async for message in self.client.iter_messages(chat_id, limit=15):
+        async for message in self.client.iter_messages(chat_id, limit=7):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg:
@@ -414,7 +414,7 @@ class Telegram(BaseTelegram):
     async def parse_lucrative_trend_channel(self):
         chat_id = int(conf_obj.lucrative_channel)
         # channel_abbr = 'lucrative_trend'
-        async for message in self.client.iter_messages(chat_id, limit=15):
+        async for message in self.client.iter_messages(chat_id, limit=7):
             signal = self.parse_lucrative_trend_message(message.text)
             exists = await self.is_signal_handled(signal[0].msg_id, signal[0].algorithm)
             if not exists and signal[0].entry_points != '':
@@ -428,7 +428,7 @@ class Telegram(BaseTelegram):
 
     async def parse_luck_channel(self):
         chat_id = int(conf_obj.Luck8414)
-        async for message in self.client.iter_messages(chat_id, limit=10):
+        async for message in self.client.iter_messages(chat_id, limit=6):
             if message.text:
                 signal = self.parse_lucrative_trend_message(message.text)
                 is_shared = await self.is_signal_shared(signal[0].msg_id, signal[0].algorithm)
@@ -778,7 +778,7 @@ class Telegram(BaseTelegram):
         # entity = await self.client.get_entity('@WCSEBot')
         access_hash = 4349140352664297866
         channel_entity = User(id=channel_id, access_hash=access_hash)
-        async for message in self.client.iter_messages(entity=channel_entity, limit=10):
+        async for message in self.client.iter_messages(entity=channel_entity, limit=7):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
@@ -865,7 +865,7 @@ class Telegram(BaseTelegram):
         # entity = await self.client.get_entity('@WCSEBot')
         access_hash = 4349140352664297866
         channel_entity = User(id=channel_id, access_hash=access_hash)
-        async for message in self.client.iter_messages(entity=channel_entity, limit=10):
+        async for message in self.client.iter_messages(entity=channel_entity, limit=8):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
