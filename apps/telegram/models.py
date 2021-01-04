@@ -578,7 +578,7 @@ class Telegram(BaseTelegram):
 
     async def parse_white_bull_channel(self):
         channel_id = int(conf_obj.white_bull)
-        access_hash = -4326493311717887790
+        access_hash = -2290079952106309008
         # entity = await self.client.get_entity('@WhiteBullsVip_bot')
         channel_entity = User(id=channel_id, access_hash=access_hash)
         channel_abbr = 'white_bull'
