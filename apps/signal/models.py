@@ -496,7 +496,7 @@ class Signal(BaseSignal):
         step_quantity = pair.step_quantity
         toc = self.__get_turnover_by_coin_pair(fake_balance=fake_balance) * self.leverage
         logger.debug(f"TOC = {toc} (leverage = {self.leverage})")
-        quantity = toc / self.__get_distribution_by_take_profits()
+        quantity = toc / self.__get_distribution_by_entry_points()
         coin_quantity = convert_to_coin_quantity(quantity, entry_point_price)
         return self.__find_not_fractional_by_step(coin_quantity, step_quantity)
 
