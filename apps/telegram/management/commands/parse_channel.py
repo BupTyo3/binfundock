@@ -108,7 +108,7 @@ class Command(SystemCommand):
             self._client.disconnect()
 
     def collect_info_from_white_bull_channel(self):
-        session_name = 'WhiteBull'
+        session_name = 'White_Bull'
         self.init_telegram_luck(session_name)
         try:
             with self._client_luck:
