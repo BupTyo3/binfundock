@@ -144,7 +144,7 @@ class Command(SystemCommand):
             self._client.disconnect()
 
     def collect_info_from_luck_channel(self):
-        session_name = 'Lucrative'
+        session_name = 'Luck'
         self.init_telegram(session_name)
         try:
             with self._client:
@@ -296,7 +296,7 @@ class Command(SystemCommand):
         elif any(x in channel for x in lucrative_recommendation_matches):
             self.collect_info_from_lucrative_trend_channel()
 
-        if not get_or_create_crontask().luck:
+        if not get_or_create_crontask().luck8414:
             pass
         elif any(x in channel for x in luck_matches):
             self.collect_info_from_luck_channel()

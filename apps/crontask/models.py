@@ -39,7 +39,7 @@ class CronTask(CronTaskBase):
     white_bull = models.BooleanField(default=False)
     simple_future = models.BooleanField(default=False)
     lucrative_recommendations = models.BooleanField(default=False)
-    luck = models.BooleanField(default=False)
+    luck8414 = models.BooleanField(default=False)
     raticoin = models.BooleanField(default=False)
     bull_exclusive = models.BooleanField(default=False)
     crypto_zone = models.BooleanField(default=False)
