@@ -36,7 +36,7 @@ class Command(SystemCommand):
         parser.add_argument('--channel', type=str, help='Type a channel name')
 
     def collect_info_from_china_channel(self):
-        session_name = 'AI'
+        session_name = 'ArtificialIntelligence'
         self.init_telegram(session_name)
         try:
             with self._client:
