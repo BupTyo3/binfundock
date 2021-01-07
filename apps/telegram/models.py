@@ -516,8 +516,12 @@ class Telegram(BaseTelegram):
                                                         f"related to the '{channel_abbr}' algorithm: "
                                                         f"{inserted_to_db}")
                 else:
-                    await self.send_message_by_template('Eugene_Povetkin', signal[0],
-                                                        message.date, channel_abbr, message.id)
+                    await self.send_shared_message(int(conf_obj.lucrative), signal[0],
+                                                   message.date, channel_abbr, message.id)
+                    await self.send_shared_message(int(conf_obj.lucrative_channel), signal[0],
+                                                   message.date, channel_abbr, message.id)
+                    await self.send_shared_message(int(conf_obj.lucrative_trend), signal[0],
+                                                   message.date, channel_abbr, message.id)
 
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
