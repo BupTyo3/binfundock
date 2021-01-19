@@ -1225,6 +1225,10 @@ class Telegram(BaseTelegram):
         await self.client.send_message(channel_name, message)
 
     async def send_shared_message(self, channel_name, signal, message_date, channel_abbr, message_id):
+        if 'ai' in channel_abbr:
+            utc_time = message_date.replace(microsecond=0, tzinfo=None)
+            message_date = utc_time + timedelta(hours=2)
+            message_date = message_date.strftime('%Y-%m-%d %H:%M:%S')
         message_date = message_date.split('+')
         message_date = message_date[0]
         if not signal.leverage:
