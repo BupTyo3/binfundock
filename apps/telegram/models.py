@@ -131,12 +131,13 @@ class Telegram(BaseTelegram):
         signals = []
         splitted_info = message_text.splitlines()
         possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in  ', 'Get in : ', 'Gеt in :',
-                                'Get  in : ']
+                                'Get  in : ', 'Entry: ']
         possible_take_profits_label = ['Sell at', 'Targets', 'Тargets', 'Targеts', 'Tаrgets']
         possible_take_profits_label2 = ['Take profit', 'Takе profit', 'Tаkе profit', 'Tаke profit']
-        possible_stop_label = ['SL: ', 'SL : ']
-        pair_label = ['Pair: ', 'Рair: ']
+        possible_stop_label = ['SL: ', 'SL : ', 'Stop loss:']
+        pair_label = ['Pair: ', 'Рair: ', 'Аssеt:']
         pair = ''
+        position_label = 'Position:'
         current_price = ''
         margin_type = MarginType.CROSSED.value
         position = None
@@ -147,17 +148,23 @@ class Telegram(BaseTelegram):
         stop_loss = ['']
         signal_identification = 'CF Leverage  Trading Signal'
         for line in splitted_info:
-            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]):
+            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]) or line.startswith(pair_label[2]):
                 possible_position_info = line.split(' ')
                 position_info = list(filter(None, possible_position_info))
                 pair = ''.join(filter(str.isalpha, position_info[1]))
-                position = ''.join(filter(str.isalpha, position_info[2]))
+            if line.startswith(position_label):
+                possible_position_info = line.split(' ')
+                position = ''.join(filter(str.isalpha, possible_position_info[1]))
             if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1]) \
                     or line.startswith(possible_entry_label[2]) or line.startswith(possible_entry_label[3]) \
                     or line.startswith(possible_entry_label[4]) or line.startswith(possible_entry_label[5]) \
-                    or line.startswith(possible_entry_label[6]) or line.startswith(possible_entry_label[7]):
-                fake_entries = line[8:]
-                possible_entries = fake_entries.split(',')
+                    or line.startswith(possible_entry_label[6]) or line.startswith(possible_entry_label[7]) \
+                    or line.startswith(possible_entry_label[8]):
+                if line.startswith(possible_entry_label[8]):
+                    fake_entries = line[7:]
+                else:
+                    fake_entries = line[8:]
+                possible_entries = fake_entries.split('-')
                 if '(' in line:
                     last_entry = possible_entries[- 1].split('(')
                     entries = left_numbers(possible_entries[:-1] + last_entry[:-1])
@@ -168,13 +175,13 @@ class Telegram(BaseTelegram):
                 possible_take_profits_label[3]) \
                     or line.startswith(possible_take_profits_label[4]):
                 fake_profits = line[9:]
-                possible_profits = fake_profits.split(',')
+                possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
             if line.startswith(possible_take_profits_label2[0]) or line.startswith(possible_take_profits_label2[1]) \
                     or line.startswith(possible_take_profits_label2[2]) or line.startswith(
                 possible_take_profits_label2[3]):
                 fake_profits = line[11:]
-                possible_profits = fake_profits.split(',')
+                possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
             if line.startswith(possible_stop_label[0]) or line.startswith(possible_stop_label[1]):
                 if '(' in line:
@@ -184,12 +191,18 @@ class Telegram(BaseTelegram):
                 else:
                     stop_loss = line[4:]
                     stop_loss = left_numbers([stop_loss])
+            if line.startswith(possible_stop_label[2]):
+                stop_loss = line[10:]
+                stop_loss = left_numbers([stop_loss])
             if line.startswith(leverage_label[0]) or line.startswith(leverage_label[1]) \
                     or line.startswith(leverage_label[2]) or line.startswith(leverage_label[3]) \
                     or line.startswith(leverage_label[4]):
                 possible_leverage = line.split(' ')
                 possible_leverage = list(filter(None, possible_leverage))
-                leverage = ''.join(filter(str.isdigit, possible_leverage[2]))
+                try:
+                    leverage = ''.join(filter(str.isdigit, possible_leverage[2]))
+                except IndexError:
+                    leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
         """ Take only first 4 take profits: """
         profits = profits[:4]
         signals.append(SignalModel(pair, current_price, margin_type, position,
