@@ -369,7 +369,7 @@ class Telegram(BaseTelegram):
         pair = ''
         current_price = ''
         is_margin = False
-        position = 'Buy'
+        position = None
         leverage_label = 'Leverage: '
         leverage = ''
         entries = []
