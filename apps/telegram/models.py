@@ -97,7 +97,7 @@ class Telegram(BaseTelegram):
             return True
         return False
 
-    async def parse_tca_origin_channel(self):
+    async def parse_cf_trader_channel(self):
         channel_abbr = 'cf_tr'
         from telethon import errors
         try:
@@ -107,7 +107,7 @@ class Telegram(BaseTelegram):
                 exists = await self.is_signal_handled(message.id, channel_abbr)
                 should_handle_msg = not exists
                 if message.text and should_handle_msg:
-                    signal = self.parse_tca_origin_message(message.text, message.id)
+                    signal = self.parse_cf_trader_message(message.text, message.id)
                     if signal[0].pair:
                         inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                         if inserted_to_db != 'success':
@@ -127,7 +127,7 @@ class Telegram(BaseTelegram):
             logger.debug(f'Have to sleep {e.seconds} seconds')
             countdown(e.seconds)
 
-    def parse_tca_origin_message(self, message_text, message_id):
+    def parse_cf_trader_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
         possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in  ', 'Get in : ', 'Gеt in :',
@@ -157,7 +157,7 @@ class Telegram(BaseTelegram):
                     or line.startswith(possible_entry_label[4]) or line.startswith(possible_entry_label[5]) \
                     or line.startswith(possible_entry_label[6]) or line.startswith(possible_entry_label[7]):
                 fake_entries = line[8:]
-                possible_entries = fake_entries.split('-')
+                possible_entries = fake_entries.split(',')
                 if '(' in line:
                     last_entry = possible_entries[- 1].split('(')
                     entries = left_numbers(possible_entries[:-1] + last_entry[:-1])
@@ -168,13 +168,13 @@ class Telegram(BaseTelegram):
                 possible_take_profits_label[3]) \
                     or line.startswith(possible_take_profits_label[4]):
                 fake_profits = line[9:]
-                possible_profits = fake_profits.split('-')
+                possible_profits = fake_profits.split(',')
                 profits = left_numbers(possible_profits)
             if line.startswith(possible_take_profits_label2[0]) or line.startswith(possible_take_profits_label2[1]) \
                     or line.startswith(possible_take_profits_label2[2]) or line.startswith(
                 possible_take_profits_label2[3]):
                 fake_profits = line[11:]
-                possible_profits = fake_profits.split('-')
+                possible_profits = fake_profits.split(',')
                 profits = left_numbers(possible_profits)
             if line.startswith(possible_stop_label[0]) or line.startswith(possible_stop_label[1]):
                 if '(' in line:
