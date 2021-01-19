@@ -36,7 +36,7 @@ class Command(SystemCommand):
         parser.add_argument('--channel', type=str, help='Type a channel name')
 
     def collect_info_from_china_channel(self):
-        session_name = 'ArtificialIntelligence'
+        session_name = 'Artificial_Intelligence'
         self.init_telegram(session_name)
         try:
             with self._client:
@@ -83,12 +83,12 @@ class Command(SystemCommand):
         finally:
             self._client.disconnect()
 
-    def collect_info_from_tca_origin_channel(self):
+    def collect_info_from_cf_trader_channel(self):
         session_name = 'CFTrader'
         self.init_telegram_luck(session_name)
         try:
             with self._client_luck:
-                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_tca_origin_channel())
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_cf_trader_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
@@ -156,7 +156,7 @@ class Command(SystemCommand):
             self._client.disconnect()
 
     def collect_info_from_raticoin_channel(self):
-        session_name = 'RatiCoin'
+        session_name = 'Rati_Coin'
         self.init_telegram_luck(session_name)
         try:
             with self._client_luck:
@@ -168,7 +168,7 @@ class Command(SystemCommand):
             self._client_luck.disconnect()
 
     def collect_info_from_crypto_zone_channel(self):
-        session_name = 'CryptoZone'
+        session_name = 'Crypto_Zone'
         self.init_telegram(session_name)
         try:
             with self._client:
@@ -180,7 +180,7 @@ class Command(SystemCommand):
             self._client.disconnect()
 
     def collect_info_from_bull_exclusive_channel(self):
-        session_name = 'BullExclusive'
+        session_name = 'Bull_Exclusive'
         self.init_telegram_luck(session_name)
         try:
             with self._client_luck:
@@ -274,7 +274,7 @@ class Command(SystemCommand):
         if not get_or_create_crontask().assist_origin:
             pass
         elif any(x in channel for x in tca_origin_matches):
-            self.collect_info_from_tca_origin_channel()
+            self.collect_info_from_cf_trader_channel()
 
         if not get_or_create_crontask().margin_whale:
             pass
