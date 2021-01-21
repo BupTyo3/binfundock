@@ -376,10 +376,10 @@ class Signal(BaseSignal):
         raise MainCoinNotServicedError
 
     def _is_market_type_futures(self) -> bool:
-        return True if self.market.logic.type == MarketType.FUTURES.value else False
+        return True if self.market_logic.type == MarketType.FUTURES.value else False
 
     def _is_market_type_spot(self) -> bool:
-        return True if self.market.logic.type == MarketType.SPOT.value else False
+        return True if self.market_logic.type == MarketType.SPOT.value else False
 
     def __get_distribution_by_entry_points(self):
         return self.entry_points.count()
