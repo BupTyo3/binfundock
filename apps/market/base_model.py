@@ -9,6 +9,7 @@ from utils.framework.models import SystemBaseModel
 
 from apps.order.utils import OrderStatus
 from .base_client import BaseClient
+from .utils import MarketAPIExceptionError
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,20 @@ logger = logging.getLogger(__name__)
 class SymbolPriceDict(TypedDict):
     symbol: str
     price: str
+
+
+class BaseMarketException(ABC):
+    """
+    """
+    @property
+    @abstractmethod
+    def api_exception(self) -> Type[Exception]:
+        pass
+
+    @property
+    @abstractmethod
+    def api_errors(self) -> Type[MarketAPIExceptionError]:
+        pass
 
 
 class BaseMarketLogic(ABC):
@@ -58,6 +73,11 @@ class BaseMarketLogic(ABC):
     @property
     @abstractmethod
     def client_class(self) -> Type[BaseClient]:
+        pass
+
+    @property
+    @abstractmethod
+    def exception_class(self) -> Type[BaseMarketException]:
         pass
 
     @property

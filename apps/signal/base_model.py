@@ -90,6 +90,10 @@ class BaseSignal(BaseBaseSignal):
         return self.market.logic
 
     @property
+    def market_exception_class(self):
+        return self.market.logic.exception_class
+
+    @property
     def status(self):
         return self._status
 

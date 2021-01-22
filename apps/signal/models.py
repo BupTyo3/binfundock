@@ -1542,19 +1542,18 @@ class Signal(BaseSignal):
         }
         # push NOT_SENT SELL orders
         # TODO: Maybe move both try except into market.models
-        from binance.exceptions import BinanceAPIException
         error_status_flag = False
         for sell_order in self.sell_orders.filter(**orders_params_for_pushing):
             try:
                 sell_order.push_to_market()
-            except BinanceAPIException as ex:
+            except self.market_exception_class.api_exception as ex:
                 error_status_flag = True
                 logger.warning(f"Push order Error: Signal:'{self}' Order: '{sell_order}': Ex: '{ex}'")
         # push NOT_SENT BUY orders
         for buy_order in self.buy_orders.filter(**orders_params_for_pushing):
             try:
                 buy_order.push_to_market()
-            except BinanceAPIException as ex:
+            except self.market_exception_class.api_exception as ex:
                 error_status_flag = True
                 logger.warning(f"Push order Error: Signal:'{self}' Order: '{buy_order}': Ex: '{ex}'")
             # set status if at least one order has created
