@@ -793,13 +793,13 @@ class Telegram(BaseTelegram):
         channel_id = int(conf_obj.klondike)
         channel_abbr = 'klondike'
         # entity = await self.client.get_entity('@WCSEBot')
-        access_hash = 4349140352664297866
-        channel_entity = User(id=channel_id, access_hash=access_hash)
-        async for message in self.client.iter_messages(entity=channel_entity, limit=7):
+        # access_hash = 4349140352664297866
+        # channel_entity = User(id=channel_id, access_hash=access_hash)
+        async for message in self.client.iter_messages(channel_id, limit=4):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
-                signal = self.parse_wcse_message(message.text, message.id)
+                signal = self.parse_klondike_message(message.text, message.id)
                 if signal:
                     if signal[0].entry_points and signal[0].pair:
                         inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
@@ -815,13 +815,13 @@ class Telegram(BaseTelegram):
     def parse_klondike_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
-        is_new_signal = 'New Signal Created'
-        is_futures_label = 'BinanceFutures'
-        buy_label = '🔀 Entry Zone 🔀'
+        is_new_signal = '#SIGNAL'
+        is_futures_label = '🔑 Open'
+        buy_label = '🉐 Targets'
         long_label = 'Long'
         sell_label = 'Short'
         goals_label = '🔆 Exit Targets:🔆'
-        stop_label = '⛔ StopLoss ⛔'
+        stop_label = '❗️STOP LOSS'
         pair = ''
         current_price = ''
         is_margin = False
@@ -1079,11 +1079,7 @@ class Telegram(BaseTelegram):
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
                     else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.lucrative), signal[0],
+                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_tca_message(self, message_text, message_id):
@@ -1106,9 +1102,9 @@ class Telegram(BaseTelegram):
             return
         for line in splitted_info:
             if 'SHORT' in line:
-                position = 'Sell'
+                position = 'SHORT'
             if 'LONG' in line:
-                position = 'Buy'
+                position = 'LONG'
             if line.startswith(pair):
                 pair = ''.join(filter(str.isalpha, line[6:]))
             if line.startswith(buy_label):

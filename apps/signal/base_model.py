@@ -1,7 +1,7 @@
 import logging
 
 from abc import abstractmethod
-from typing import Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING, Union, Type
 
 from django.db import models
 
@@ -11,7 +11,7 @@ from .utils import SignalStatus, SignalPosition, MarginType
 
 if TYPE_CHECKING:
     from apps.techannel.base_model import TechannelBase
-    from apps.market.base_model import BaseMarket
+    from apps.market.base_model import BaseMarket, BaseMarketLogic, BaseMarketException
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,7 @@ class BaseBaseSignal(SystemBaseModel):
         else:
             near_tp = self.take_profits.order_by('value').first()
         if near_tp:
+            logger.debug(f"'{self}': '{near_tp}' will be deleted")
             near_tp.delete()
             return True
         return False
@@ -44,6 +45,7 @@ class BaseBaseSignal(SystemBaseModel):
         else:
             far_tp = self.take_profits.order_by('value').last()
         if far_tp:
+            logger.debug(f"'{self}': '{far_tp}' will be deleted")
             far_tp.delete()
             return True
         return False
@@ -54,6 +56,7 @@ class BaseBaseSignal(SystemBaseModel):
         else:
             far_ep = self.entry_points.order_by('value').first()
         if far_ep:
+            logger.debug(f"'{self}': '{far_ep}' will be deleted")
             far_ep.delete()
             return True
         return False
@@ -64,6 +67,7 @@ class BaseBaseSignal(SystemBaseModel):
         else:
             near_ep = self.entry_points.order_by('value').last()
         if near_ep:
+            logger.debug(f"'{self}': '{near_ep}' will be deleted")
             near_ep.delete()
             return True
         return False
@@ -86,8 +90,12 @@ class BaseSignal(BaseBaseSignal):
         abstract = True
 
     @property
-    def market_logic(self):
+    def market_logic(self) -> 'BaseMarketLogic':
         return self.market.logic
+
+    @property
+    def market_exception_class(self) -> 'BaseMarketException':
+        return self.market_logic.exception_class
 
     @property
     def status(self):
