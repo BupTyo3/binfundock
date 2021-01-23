@@ -4,13 +4,19 @@ from asgiref.sync import sync_to_async
 from django.db import models
 from django.contrib.auth import get_user_model
 
-from typing import Tuple, TypedDict, TYPE_CHECKING, Union, Callable, Type, Any, Optional
+from typing import (
+    Tuple, TypedDict, TYPE_CHECKING,
+    Union, Callable, Type, Any,
+    Optional, List
+)
 
 from binance import client
+from binance.exceptions import BinanceAPIException
 from apps.order.utils import OrderStatus
-from .base_model import BaseMarket, BaseMarketLogic
+from .base_model import BaseMarket, BaseMarketLogic, BaseMarketException
 from .utils import (
     MarketType,
+    MarketAPIExceptionError,
 )
 from .base_client import BaseClient
 from tools.tools import (
@@ -143,6 +149,13 @@ class BinanceFuturesDataMixin:
     order_type_stop_market = 'STOP_MARKET'
 
 
+class BiMarketException(BaseMarketException):
+    """
+    """
+    api_exception = BinanceAPIException
+    api_errors = MarketAPIExceptionError
+
+
 class BiMarketLogic(BaseMarketLogic,
                     BinanceDataMixin):
     type = MarketType.SPOT.value
@@ -152,6 +165,7 @@ class BiMarketLogic(BaseMarketLogic,
 
     order_id_separator = 'bim'
     client_class = BiClient
+    exception_class = BiMarketException
 
     ORDER_STATUSES_MATCH: dict = {
         client_class.ORDER_STATUS_CANCELED:
@@ -188,7 +202,8 @@ class BiMarketLogic(BaseMarketLogic,
         return self.my_client.get_asset_balance(coin)
 
     @catch_exception(
-        code=-2013, alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
+        code=exception_class.api_errors.NO_SUCH_ORDER.value.code,
+        alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
     @api_logging(text="Getting info by CustomOrderId")
     def _get_order_info_api(self, symbol, custom_order_id):
         """Send request to get order info"""
@@ -256,7 +271,8 @@ class BiMarketLogic(BaseMarketLogic,
         return response
 
     @catch_exception(
-        code=-2011, alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
+        code=exception_class.api_errors.CANCEL_REJECTED.value.code,
+        alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
     @api_logging(text="Cancel order into Market")
     def _cancel_order(self, symbol: str, custom_order_id: str):
         """Send request to cancel order"""
@@ -352,6 +368,13 @@ class BiMarketLogic(BaseMarketLogic,
                                     market=self.market)
 
 
+class BiFuturesMarketException(BaseMarketException):
+    """
+    """
+    api_exception = BinanceAPIException
+    api_errors = MarketAPIExceptionError
+
+
 class BiFuturesMarketLogic(BaseMarketLogic,
                            BinanceDataMixin,
                            BinanceFuturesDataMixin):
@@ -361,6 +384,7 @@ class BiFuturesMarketLogic(BaseMarketLogic,
     type = MarketType.FUTURES.value
 
     client_class = BiFuturesClient
+    exception_class = BiFuturesMarketException
 
     ORDER_STATUSES_MATCH: dict = {
         client_class.ORDER_STATUS_CANCELED:
@@ -414,7 +438,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         return self.order_statuses.UNKNOWN.value, False
 
     @catch_exception(
-        code=-2013, alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
+        code=exception_class.api_errors.NO_SUCH_ORDER.value.code,
+        alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
     @api_logging(text="Getting info by CustomOrderId")
     def _get_order_info_api(self, symbol, custom_order_id):
         """Send request to get order info"""
@@ -426,7 +451,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
 
     @catch_exception(
         # TODO: change alternative if needs
-        code=-4066, alternative={})
+        code=exception_class.api_errors.INVALID_OPTIONS_EVENT_TYPE.value.code,
+        alternative={})
     @api_logging
     def _change_margin_type(self, symbol, margin_type):
         """
@@ -579,7 +605,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         return response
 
     @catch_exception(
-        code=-2011, alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
+        code=exception_class.api_errors.CANCEL_REJECTED.value.code,
+        alternative={'status': OrderStatus.NOT_EXISTS.value, 'executedQty': 0.0, 'price': 0.0})
     @api_logging(text="Cancel order into Market")
     def _cancel_order(self, symbol: str, custom_order_id: str):
         """Send request to cancel order"""

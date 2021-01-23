@@ -31,7 +31,7 @@ from .exceptions import (
     ShortSpotCombinationError,
 )
 from apps.crontask.utils import get_or_create_crontask
-from apps.market.base_model import BaseMarket
+from apps.market.base_model import BaseMarket, BaseMarketException, BaseExternalAPIException
 from apps.market.models import Market
 from apps.market.utils import MarketType
 from apps.pair.exceptions import PairNotExistsError
@@ -376,10 +376,10 @@ class Signal(BaseSignal):
         raise MainCoinNotServicedError
 
     def _is_market_type_futures(self) -> bool:
-        return True if self.market.logic.type == MarketType.FUTURES.value else False
+        return True if self.market_logic.type == MarketType.FUTURES.value else False
 
     def _is_market_type_spot(self) -> bool:
-        return True if self.market.logic.type == MarketType.SPOT.value else False
+        return True if self.market_logic.type == MarketType.SPOT.value else False
 
     def __get_distribution_by_entry_points(self):
         return self.entry_points.count()
@@ -1489,6 +1489,16 @@ class Signal(BaseSignal):
         self.save()
         return True
 
+    @debug_input_and_returned
+    def __check_if_exists_any_objection_to_set_the_failing_flag(self, ex: BaseExternalAPIException) -> bool:
+        """
+        If no objections - return False
+        """
+        minor_codes_list = [self.market_exception_class.api_errors.INVALID_TIMESTAMP.value.code, ]
+        if ex.code not in minor_codes_list:
+            return False
+        return True
+
     # POINT PUSH JOB
 
     @debug_input_and_returned
@@ -1542,20 +1552,23 @@ class Signal(BaseSignal):
         }
         # push NOT_SENT SELL orders
         # TODO: Maybe move both try except into market.models
-        from binance.exceptions import BinanceAPIException
         error_status_flag = False
         for sell_order in self.sell_orders.filter(**orders_params_for_pushing):
             try:
                 sell_order.push_to_market()
-            except BinanceAPIException as ex:
-                error_status_flag = True
+            except self.market_exception_class.api_exception as ex:
+                # We don't set error if there is minor api exception, e.g. Timestamp error
+                # We hope the order will be pushed successfully the next time
+                if not self.__check_if_exists_any_objection_to_set_the_failing_flag(ex):
+                    error_status_flag = True
                 logger.warning(f"Push order Error: Signal:'{self}' Order: '{sell_order}': Ex: '{ex}'")
         # push NOT_SENT BUY orders
         for buy_order in self.buy_orders.filter(**orders_params_for_pushing):
             try:
                 buy_order.push_to_market()
-            except BinanceAPIException as ex:
-                error_status_flag = True
+            except self.market_exception_class.api_exception as ex:
+                if not self.__check_if_exists_any_objection_to_set_the_failing_flag(ex):
+                    error_status_flag = True
                 logger.warning(f"Push order Error: Signal:'{self}' Order: '{buy_order}': Ex: '{ex}'")
             # set status if at least one order has created
             if not error_status_flag and self.status not in PUSHED_BOUGHT_SOLD__SIG_STATS:
@@ -1568,6 +1581,32 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def _push_futures_orders(self):
         self._push_spot_orders()
+
+    @debug_input_and_returned
+    def __remove_take_profits_except_nearest(self):
+        """
+        This case was happened, because there is not enough bought_quantity for selling
+         distributed by all take_profits
+        """
+        limit_to_avoid_endless_loop = 10
+        for i in range(limit_to_avoid_endless_loop):
+            tp_count = self.__get_distribution_by_take_profits()
+            if tp_count <= 1:
+                return
+            self.remove_far_tp()
+
+    @debug_input_and_returned
+    def __handle_zero_quantity_of_second_formation(self):
+        logger.warning(f"'{self}: There is no quantity to form take_profits")
+        tp_count = self.__get_distribution_by_take_profits()
+        tp_count_enough_to_be_distributed = 1
+        if tp_count > tp_count_enough_to_be_distributed:
+            # This case appears if we couldn't distribute quantity among all take_profits
+            self.__remove_take_profits_except_nearest()
+        else:
+            logger.warning(f"'{self}': take_profits could not be removed")
+            self.status = SignalStatus.ERROR.value
+            self.save()
 
     # POINT BOUGHT WORKER
 
@@ -1605,6 +1644,9 @@ class Signal(BaseSignal):
                                                futures=futures)
         # Form sell orders if the signal doesn't have any
         elif not self.__get_sell_orders_exclude_indexes(excluded_indexes=[SellOrder.GL_SM_INDEX, ]).exists():
+            if not bought_quantity:
+                self.__handle_zero_quantity_of_second_formation()
+                return
             self._second_formation_sell_orders(sell_quantity=bought_quantity, futures=futures)
         self.__update_flag_handled_worked_buy_orders(worked_orders)
         # Change status
@@ -1749,6 +1791,9 @@ class Signal(BaseSignal):
                                                             buy_quantity=new_sold_quantity)
         # Form buy orders if the signal doesn't have any
         elif not self.__get_buy_orders_exclude_indexes(excluded_indexes=[BuyOrder.GL_SM_INDEX, ]).exists():
+            if not sold_quantity:
+                self.__handle_zero_quantity_of_second_formation()
+                return
             self._second_formation_buy_orders_futures_short(buy_quantity=sold_quantity)
         self.__update_flag_handled_worked_sell_orders(worked_orders)
         # Change status
