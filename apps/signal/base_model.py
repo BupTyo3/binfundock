@@ -34,6 +34,7 @@ class BaseBaseSignal(SystemBaseModel):
         else:
             near_tp = self.take_profits.order_by('value').first()
         if near_tp:
+            logger.debug(f"'{self}': '{near_tp}' will be deleted")
             near_tp.delete()
             return True
         return False
@@ -44,6 +45,7 @@ class BaseBaseSignal(SystemBaseModel):
         else:
             far_tp = self.take_profits.order_by('value').last()
         if far_tp:
+            logger.debug(f"'{self}': '{far_tp}' will be deleted")
             far_tp.delete()
             return True
         return False
@@ -54,6 +56,7 @@ class BaseBaseSignal(SystemBaseModel):
         else:
             far_ep = self.entry_points.order_by('value').first()
         if far_ep:
+            logger.debug(f"'{self}': '{far_ep}' will be deleted")
             far_ep.delete()
             return True
         return False
@@ -64,6 +67,7 @@ class BaseBaseSignal(SystemBaseModel):
         else:
             near_ep = self.entry_points.order_by('value').last()
         if near_ep:
+            logger.debug(f"'{self}': '{near_ep}' will be deleted")
             near_ep.delete()
             return True
         return False

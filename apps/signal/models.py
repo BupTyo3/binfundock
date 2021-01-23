@@ -1489,6 +1489,7 @@ class Signal(BaseSignal):
         self.save()
         return True
 
+    @debug_input_and_returned
     def __check_if_exists_any_objection_to_set_the_failing_flag(self, ex: BaseExternalAPIException) -> bool:
         """
         If no objections - return False
@@ -1581,6 +1582,32 @@ class Signal(BaseSignal):
     def _push_futures_orders(self):
         self._push_spot_orders()
 
+    @debug_input_and_returned
+    def __remove_take_profits_except_nearest(self):
+        """
+        This case was happened, because there is not enough bought_quantity for selling
+         distributed by all take_profits
+        """
+        limit_to_avoid_endless_loop = 10
+        for i in range(limit_to_avoid_endless_loop):
+            tp_count = self.__get_distribution_by_take_profits()
+            if tp_count <= 1:
+                return
+            self.remove_far_tp()
+
+    @debug_input_and_returned
+    def __handle_zero_quantity_of_second_formation(self):
+        logger.warning(f"'{self}: There is no quantity to form take_profits")
+        tp_count = self.__get_distribution_by_take_profits()
+        tp_count_enough_to_be_distributed = 1
+        if tp_count > tp_count_enough_to_be_distributed:
+            # This case appears if we couldn't distribute quantity among all take_profits
+            self.__remove_take_profits_except_nearest()
+        else:
+            logger.warning(f"'{self}': take_profits could not be removed")
+            self.status = SignalStatus.ERROR.value
+            self.save()
+
     # POINT BOUGHT WORKER
 
     @debug_input_and_returned
@@ -1617,6 +1644,9 @@ class Signal(BaseSignal):
                                                futures=futures)
         # Form sell orders if the signal doesn't have any
         elif not self.__get_sell_orders_exclude_indexes(excluded_indexes=[SellOrder.GL_SM_INDEX, ]).exists():
+            if not bought_quantity:
+                self.__handle_zero_quantity_of_second_formation()
+                return
             self._second_formation_sell_orders(sell_quantity=bought_quantity, futures=futures)
         self.__update_flag_handled_worked_buy_orders(worked_orders)
         # Change status
@@ -1761,6 +1791,9 @@ class Signal(BaseSignal):
                                                             buy_quantity=new_sold_quantity)
         # Form buy orders if the signal doesn't have any
         elif not self.__get_buy_orders_exclude_indexes(excluded_indexes=[BuyOrder.GL_SM_INDEX, ]).exists():
+            if not sold_quantity:
+                self.__handle_zero_quantity_of_second_formation()
+                return
             self._second_formation_buy_orders_futures_short(buy_quantity=sold_quantity)
         self.__update_flag_handled_worked_sell_orders(worked_orders)
         # Change status
