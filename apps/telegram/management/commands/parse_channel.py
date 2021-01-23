@@ -60,28 +60,28 @@ class Command(SystemCommand):
             self._client_luck.disconnect()
 
     def collect_info_from_tca_altcoin_channel(self):
-        session_name = 'Lucrative-altcoin'
-        self.init_telegram(session_name)
+        session_name = 'TCA_Altcoin'
+        self.init_telegram_luck(session_name)
         try:
-            with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_tca_channel('altcoin'))
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_tca_channel('altcoin'))
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client.disconnect()
+            self._client_luck.disconnect()
 
     def collect_info_from_tca_leverage_channel(self):
-        session_name = 'Lucrative-leverage'
-        self.init_telegram(session_name)
+        session_name = 'TCA_Leverage'
+        self.init_telegram_luck(session_name)
         try:
-            with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_tca_channel('leverage'))
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_tca_channel('leverage'))
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client.disconnect()
+            self._client_luck.disconnect()
 
     def collect_info_from_cf_trader_channel(self):
         session_name = 'CFTrader'
