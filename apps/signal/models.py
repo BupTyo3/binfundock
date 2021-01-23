@@ -31,7 +31,7 @@ from .exceptions import (
     ShortSpotCombinationError,
 )
 from apps.crontask.utils import get_or_create_crontask
-from apps.market.base_model import BaseMarket
+from apps.market.base_model import BaseMarket, BaseMarketException, BaseExternalAPIException
 from apps.market.models import Market
 from apps.market.utils import MarketType
 from apps.pair.exceptions import PairNotExistsError
@@ -1489,6 +1489,15 @@ class Signal(BaseSignal):
         self.save()
         return True
 
+    def __check_if_exists_any_objection_to_set_the_failing_flag(self, ex: BaseExternalAPIException) -> bool:
+        """
+        If no objections - return False
+        """
+        minor_codes_list = [self.market_exception_class.api_errors.INVALID_TIMESTAMP.value.code, ]
+        if ex.code not in minor_codes_list:
+            return False
+        return True
+
     # POINT PUSH JOB
 
     @debug_input_and_returned
@@ -1547,14 +1556,18 @@ class Signal(BaseSignal):
             try:
                 sell_order.push_to_market()
             except self.market_exception_class.api_exception as ex:
-                error_status_flag = True
+                # We don't set error if there is minor api exception, e.g. Timestamp error
+                # We hope the order will be pushed successfully the next time
+                if not self.__check_if_exists_any_objection_to_set_the_failing_flag(ex):
+                    error_status_flag = True
                 logger.warning(f"Push order Error: Signal:'{self}' Order: '{sell_order}': Ex: '{ex}'")
         # push NOT_SENT BUY orders
         for buy_order in self.buy_orders.filter(**orders_params_for_pushing):
             try:
                 buy_order.push_to_market()
             except self.market_exception_class.api_exception as ex:
-                error_status_flag = True
+                if not self.__check_if_exists_any_objection_to_set_the_failing_flag(ex):
+                    error_status_flag = True
                 logger.warning(f"Push order Error: Signal:'{self}' Order: '{buy_order}': Ex: '{ex}'")
             # set status if at least one order has created
             if not error_status_flag and self.status not in PUSHED_BOUGHT_SOLD__SIG_STATS:

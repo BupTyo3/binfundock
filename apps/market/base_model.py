@@ -19,12 +19,17 @@ class SymbolPriceDict(TypedDict):
     price: str
 
 
+class BaseExternalAPIException(Exception):
+    code: int
+    message: str
+
+
 class BaseMarketException(ABC):
     """
     """
     @property
     @abstractmethod
-    def api_exception(self) -> Type[Exception]:
+    def api_exception(self) -> BaseExternalAPIException:
         pass
 
     @property
@@ -77,7 +82,7 @@ class BaseMarketLogic(ABC):
 
     @property
     @abstractmethod
-    def exception_class(self) -> Type[BaseMarketException]:
+    def exception_class(self) -> BaseMarketException:
         pass
 
     @property

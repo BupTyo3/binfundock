@@ -1,7 +1,7 @@
 import logging
 
 from abc import abstractmethod
-from typing import Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING, Union, Type
 
 from django.db import models
 
@@ -11,7 +11,7 @@ from .utils import SignalStatus, SignalPosition, MarginType
 
 if TYPE_CHECKING:
     from apps.techannel.base_model import TechannelBase
-    from apps.market.base_model import BaseMarket
+    from apps.market.base_model import BaseMarket, BaseMarketLogic, BaseMarketException
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +86,12 @@ class BaseSignal(BaseBaseSignal):
         abstract = True
 
     @property
-    def market_logic(self):
+    def market_logic(self) -> 'BaseMarketLogic':
         return self.market.logic
 
     @property
-    def market_exception_class(self):
-        return self.market.logic.exception_class
+    def market_exception_class(self) -> 'BaseMarketException':
+        return self.market_logic.exception_class
 
     @property
     def status(self):
