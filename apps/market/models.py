@@ -1,6 +1,5 @@
 import logging
 
-from asgiref.sync import sync_to_async
 from django.db import models
 from django.contrib.auth import get_user_model
 
@@ -13,7 +12,12 @@ from typing import (
 from binance import client
 from binance.exceptions import BinanceAPIException
 from apps.order.utils import OrderStatus
-from .base_model import BaseMarket, BaseMarketLogic, BaseMarketException
+from .base_model import (
+    BaseMarket,
+    BaseMarketLogic,
+    BaseMarketException,
+    PartialResponse,
+)
 from .utils import (
     MarketType,
     MarketAPIExceptionError,
@@ -48,14 +52,6 @@ def get_or_create_futures_market() -> BaseMarket:
     if created:
         logger.debug(f"Market '{market_obj}' has been created")
     return market_obj
-
-
-class PartialResponse(TypedDict):
-    status: str
-    status_updated: bool
-    price: float
-    executed_quantity: float
-    avg_executed_market_price: float
 
 
 class BiClient(client.Client, BaseClient):
@@ -293,12 +289,6 @@ class BiMarketLogic(BaseMarketLogic,
         """Send request to get current average price by pair (symbol)"""
         response = self.my_client.get_avg_price(symbol=symbol)
         return response[self.price_]
-
-    @debug_input_and_returned
-    def get_order_info(self, symbol, custom_order_id) -> PartialResponse:
-        """Get transformed order info from the Market by api"""
-        response = self._get_order_info_api(symbol, custom_order_id)
-        return self._get_partially_order_data_from_response(response)
 
     def push_buy_limit_order(self, order: 'BuyOrder'):
         """Push Buy limit order"""
@@ -609,12 +599,6 @@ class BiFuturesMarketLogic(BaseMarketLogic,
     def _cancel_order(self, symbol: str, custom_order_id: str):
         """Send request to cancel order"""
         return self.my_client.futures_cancel_order(symbol=symbol, origClientOrderId=custom_order_id)
-
-    @debug_input_and_returned
-    def get_order_info(self, symbol: Union[str, models.CharField], custom_order_id: str) -> PartialResponse:
-        """Get transformed order info from the Market by api"""
-        response = self._get_order_info_api(symbol, custom_order_id)
-        return self._get_partially_order_data_from_response(response)
 
     def _push_preconditions(self, order: 'BaseOrder'):
         # Set leverage
