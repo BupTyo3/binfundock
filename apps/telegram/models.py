@@ -24,6 +24,7 @@ from tools.tools import countdown
 from utils.parse_channels.str_parser import left_numbers, check_pair, find_number_in_list
 from .base_model import BaseTelegram
 from .init_client import ShtClient
+from ..market.models import BiClient
 from ..signal.utils import MarginType
 
 logger = logging.getLogger(__name__)
@@ -1394,7 +1395,7 @@ class ChinaImageToSignal:
 
 
 class SignalVerification:
-    client = ShtClient(api_key=conf_obj.market_api_key, api_secret=conf_obj.market_api_secret)
+    client = BiClient
 
     def get_active_pairs_info(self, pairs):
         pairs_info = []
