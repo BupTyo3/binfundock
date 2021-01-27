@@ -21,6 +21,7 @@ from .utils import (
     SignalPosition,
     MarginType,
     calculate_position,
+    refuse_if_busy,
     FORMED_PUSHED__SIG_STATS, SOLD__SIG_STATS, FORMED__SIG_STATS,
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
     PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, BOUGHT_SOLD__SIG_STATS, BOUGHT__SIG_STATS,
@@ -42,7 +43,7 @@ from tools.tools import (
     rou,
     rounded_result,
     debug_input_and_returned,
-    subtract_fee, debug_async_input_and_returned,
+    subtract_fee,
 )
 
 if TYPE_CHECKING:
@@ -2126,7 +2127,7 @@ class Signal(BaseSignal):
 
     # POINT MAIN FOR ONE SIGNAL
 
-    # @transaction.atomic
+    @refuse_if_busy
     def first_formation_orders(self, fake_balance: Optional[float] = None) -> bool:
         """
         Function for first formation orders for NEW signal
@@ -2144,12 +2145,14 @@ class Signal(BaseSignal):
             return self._first_formation_spot_orders(fake_balance=fake_balance)
 
     @debug_input_and_returned
+    @refuse_if_busy
     def push_orders(self):
         if self._is_market_type_futures():
             return self._push_futures_orders()
         else:
             return self._push_spot_orders()
 
+    @refuse_if_busy
     def update_info_by_api(self):
         """
         Get info for all Signals (except NEW) from Real Market by SENT orders
@@ -2167,7 +2170,7 @@ class Signal(BaseSignal):
             sell_order.update_sell_order_info_by_api()
 
     @debug_input_and_returned
-    # @transaction.atomic
+    @refuse_if_busy
     def worker_for_bought_orders(self):
         """
         Worker for one signal.
@@ -2186,7 +2189,7 @@ class Signal(BaseSignal):
             return self._bought_worker_spot()
 
     @debug_input_and_returned
-    # @transaction.atomic
+    @refuse_if_busy
     def worker_for_sold_orders(self):
         """
         Worker for one signal.
@@ -2238,7 +2241,7 @@ class Signal(BaseSignal):
             return self._check_is_ready_to_spoil_spot_or_long()
 
     @debug_input_and_returned
-    # @transaction.atomic
+    @refuse_if_busy
     def try_to_spoil(self, force: bool = False):
         """
         Worker spoils the Signal if a current price reaches any of take_profits
@@ -2252,8 +2255,9 @@ class Signal(BaseSignal):
         if self._check_is_ready_to_spoil():
             self._spoil()
 
-    # @debug_async_input_and_returned
+    # TODO: check working of this function after adding the refuse_if_busy decorator here
     @sync_to_async
+    @refuse_if_busy
     def try_to_aync_spoil(self, force: bool = False):
         """
         Worker spoils the Signal if a current price reaches any of take_profits
@@ -2268,7 +2272,7 @@ class Signal(BaseSignal):
             self._spoil()
 
     @debug_input_and_returned
-    # @transaction.atomic
+    @refuse_if_busy
     def try_to_close(self):
         """
         Worker closes the Signal if it has no opened Buy orders and no opened Sell orders
@@ -2281,7 +2285,7 @@ class Signal(BaseSignal):
             return self._try_to_close_spot()
 
     @debug_input_and_returned
-    # @transaction.atomic
+    @refuse_if_busy
     def trail_stop(self, fake_price: Optional[float] = None):
         """
         """

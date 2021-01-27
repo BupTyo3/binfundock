@@ -1,7 +1,11 @@
 import logging
 
 from enum import Enum
-from typing import List, Union
+from functools import partial, wraps
+from typing import List, Union, TYPE_CHECKING, Callable, Optional
+
+if TYPE_CHECKING:
+    from .base_model import BaseSignal
 
 
 logger = logging.getLogger(__name__)
@@ -118,3 +122,26 @@ def calculate_position(stop_loss: Union[float, str],
         return 'error'
     return position
 
+
+def refuse_if_busy(func: Optional[Callable] = None):
+    """
+    Decorator to refuse doing the task if the object
+     of Signal model is busy with another task
+    @refuse_if_busy
+    @refuse_if_busy()
+    """
+    if func is None:
+        return partial(refuse_if_busy)
+
+    @wraps(func)
+    def wrapper(self: 'BaseSignal', *args, **kwargs):
+        if self.is_busy:
+            logger.debug(f"'{self}' - IS_BUSY_NOW")
+            return
+        self.is_busy = True
+        self.save()
+        result = func(self, *args, **kwargs)
+        self.is_busy = False
+        self.save()
+        return result
+    return wrapper
