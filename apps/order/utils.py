@@ -26,6 +26,9 @@ SENT_ORDER_STATUSES = [
 COMPLETED_ORDER_STATUSES = [
     OrderStatus.COMPLETED.value,
 ]
+NOT_EXISTS_ORDER_STATUSES = [
+    OrderStatus.NOT_EXISTS.value,
+]
 
 
 class OrderType(Enum):

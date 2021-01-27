@@ -1,4 +1,5 @@
 import logging
+import time
 
 from abc import ABC, abstractmethod
 from typing import Tuple, Union, Optional, Callable, Type, List, TypedDict
@@ -7,9 +8,11 @@ from django.db import models
 
 from utils.framework.models import SystemBaseModel
 
-from apps.order.utils import OrderStatus
+from apps.order.utils import OrderStatus, NOT_EXISTS_ORDER_STATUSES
 from .base_client import BaseClient
 from .utils import MarketAPIExceptionError
+
+from tools.tools import debug_input_and_returned
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,14 @@ class SymbolPriceDict(TypedDict):
 class BaseExternalAPIException(Exception):
     code: int
     message: str
+
+
+class PartialResponse(TypedDict):
+    status: str
+    status_updated: bool
+    price: float
+    executed_quantity: float
+    avg_executed_market_price: float
 
 
 class BaseMarketException(ABC):
@@ -39,6 +50,10 @@ class BaseMarketException(ABC):
 
 
 class BaseMarketLogic(ABC):
+
+    get_order_info_retry_count_default = 2
+    get_order_info_retry_delay_default = 0.2
+
     asset_ = 'asset'
     balance_ = 'balance'
     balances_ = 'balances'
@@ -54,6 +69,43 @@ class BaseMarketLogic(ABC):
     type_ = 'type'
 
     order_statuses: OrderStatus = OrderStatus
+
+    @abstractmethod
+    def _get_partially_order_data_from_response(self, response: dict) -> PartialResponse:
+        """Get partially order data"""
+        pass
+
+    @abstractmethod
+    def _get_order_info_api(self, symbol: str, custom_order_id: str) -> dict:
+        """Send request to get order info"""
+        pass
+
+    @debug_input_and_returned
+    def get_order_info(self,
+                       symbol: Union[str, models.CharField],
+                       custom_order_id: str,
+                       retry_statuses: Optional[List[str]] = None,
+                       retry_count: int = get_order_info_retry_count_default,
+                       retry_delay: float = get_order_info_retry_delay_default,
+                       ) -> PartialResponse:
+        """
+        Get transformed order info from the Market by api.
+        Added Retry functionality:
+        If we get not_exists status we do retry to get order info from the Market
+        retry_statuses: the same from alternative part in @catch_exception decorator
+         above _get_order_info_api to catch Market exceptions
+        """
+        data = dict()
+        retry_statuses = NOT_EXISTS_ORDER_STATUSES if not retry_statuses else retry_statuses
+
+        for i in range(retry_count):
+            if i:
+                time.sleep(retry_delay)
+            response = self._get_order_info_api(symbol, custom_order_id)
+            data = self._get_partially_order_data_from_response(response)
+            if data.get('status') not in retry_statuses:
+                break
+        return data
 
     @property
     @abstractmethod
@@ -108,10 +160,6 @@ class BaseMarketLogic(ABC):
         pass
 
     def get_ticker_current_prices(self, symbol: Optional[str] = None) -> List[SymbolPriceDict]:
-        pass
-
-    @abstractmethod
-    def get_order_info(self, symbol: Union[str, models.CharField], custom_order_id: str) -> Tuple[OrderStatus, float]:
         pass
 
     @abstractmethod
