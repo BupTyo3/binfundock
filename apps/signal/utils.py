@@ -140,8 +140,12 @@ def refuse_if_busy(func: Optional[Callable] = None):
             return
         self.is_busy = True
         self.save()
-        result = func(self, *args, **kwargs)
-        self.is_busy = False
-        self.save()
+        try:
+            result = func(self, *args, **kwargs)
+        except Exception as ex:
+            logger.warning(f"IS_BUSY_EXCEPTION: '{ex}'")
+            self.is_busy = False
+            self.save()
+            raise ex
         return result
     return wrapper
