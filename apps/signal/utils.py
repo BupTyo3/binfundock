@@ -144,8 +144,14 @@ def refuse_if_busy(func: Optional[Callable] = None):
             result = func(self, *args, **kwargs)
         except Exception as ex:
             logger.warning(f"IS_BUSY_EXCEPTION: '{ex}'")
+            # Code duplicating to unset the flag
+            # failed to access the variable ex outside the block
+            # but anyway we want to raise the exception to understand what happened
+            # TODO: Maybe should handle DB lock exception
             self.is_busy = False
             self.save()
             raise ex
+        self.is_busy = False
+        self.save()
         return result
     return wrapper
