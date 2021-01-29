@@ -226,37 +226,37 @@ class SignalAdmin(admin.ModelAdmin):
 
     @notifications_handling('')
     def _form_one(self, request, signal):
-        is_success = signal.first_formation_orders()
+        is_success = signal.first_formation_orders_by_one_signal()
         if not is_success:
             raise ValueError("Couldn't form Signal")
 
     @notifications_handling('')
     def _push_order_one(self, request, signal):
-        signal.push_orders()
+        signal.push_orders_by_one_signal()
 
     @notifications_handling('')
     def _update_by_api_one(self, request, signal):
-        signal.update_info_by_api()
+        signal.update_orders_info_by_one_signal()
 
     @notifications_handling('')
     def _run_bought_worker_one(self, request, signal):
-        signal.worker_for_bought_orders()
+        signal.worker_for_bought_orders_by_one_signal()
 
     @notifications_handling('')
     def _run_sold_worker_one(self, request, signal):
-        signal.worker_for_sold_orders()
+        signal.worker_for_sold_orders_by_one_signal()
 
     @notifications_handling('')
     def _sell_by_market_one(self, request, signal):
-        signal.try_to_spoil(force=True)
+        signal.try_to_spoil_by_one_signal(force=True)
 
     @notifications_handling('')
     def _try_to_close(self, request, signal):
-        signal.try_to_close()
+        signal.try_to_close_by_one_signal()
 
     @notifications_handling('')
     def _trail_stop(self, request, signal):
-        res = signal.trail_stop()
+        res = signal.trail_stop_by_one_signal()
         if res:
             msg = f"Stop loss was MOVED for T_ID={signal.id}: {signal.symbol}"
             messages.success(request, msg)

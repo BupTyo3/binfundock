@@ -1,6 +1,11 @@
 version: '3.7'
 
 services:
+  redis:
+    image: redis:alpine
+    hostname: redis
+    ports:
+      - ${REDIS_PORT:-6379}:6379
   db:
     image: postgres:12.3-alpine
 #    ports:
@@ -31,11 +36,25 @@ services:
       - ./crontab:/etc/cron.d/cron-task
     depends_on:
       - db
+      - redis
   cronjobs:
     build: .
     command: ["cron", "-f"]
     volumes:
       - .:/binfun
+  celery:
+    build: .
+    volumes:
+      - .:/binfun
+    links:
+      - web
+      - redis
+      - db
+    command: celery -A binfun worker -B -l DEBUG
+    depends_on:
+      - db
+      - web
+      - redis
   nginx:
     build: ./nginx
     volumes:
