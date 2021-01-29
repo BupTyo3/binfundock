@@ -178,7 +178,22 @@ PROJECT_TITLE = 'Pet signal'
 
 API_VERSION = 'v1'
 
+
+# CELERY settings
+REDIS_URL = f'redis://redis:6379/0'
+CELERY_BROKER_URL = REDIS_URL
+
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 10 * 60
+CELERY_TIMEZONE = 'Europe/Kiev'
+
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+
 # Project
+
+# CRON TASKS
+DEFAULT_COMMON_PERIOD_OF_CRON_CELERY_TASKS_SECS = '7.0'
 
 # Project Telegram
 
@@ -266,6 +281,8 @@ class Config:
         self.market_fee: float = market.getfloat('market_fee')
         self.futures_market_fee: float = market.getfloat('futures_market_fee')
         logic = config['Logic']
+        self.common_period_of_cron_celery_tasks_secs: float = float(logic.get(
+            'common_period_of_cron_celery_tasks_secs', DEFAULT_COMMON_PERIOD_OF_CRON_CELERY_TASKS_SECS))
         signal = config['Signal']
         self.accessible_main_coins: List[str] = signal['accessible_main_coins'].split(',')
         self.all_accessible_main_coins: List[str] = signal['all_accessible_main_coins'].split(',')

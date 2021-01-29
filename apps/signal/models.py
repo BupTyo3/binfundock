@@ -2128,7 +2128,7 @@ class Signal(BaseSignal):
     # POINT MAIN FOR ONE SIGNAL
 
     @refuse_if_busy
-    def first_formation_orders(self, fake_balance: Optional[float] = None) -> bool:
+    def first_formation_orders_by_one_signal(self, fake_balance: Optional[float] = None) -> bool:
         """
         Function for first formation orders for NEW signal
         """
@@ -2146,14 +2146,14 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @refuse_if_busy
-    def push_orders(self):
+    def push_orders_by_one_signal(self):
         if self._is_market_type_futures():
             return self._push_futures_orders()
         else:
             return self._push_spot_orders()
 
     @refuse_if_busy
-    def update_info_by_api(self):
+    def update_orders_info_by_one_signal(self):
         """
         Get info for all Signals (except NEW) from Real Market by SENT orders
         """
@@ -2171,7 +2171,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @refuse_if_busy
-    def worker_for_bought_orders(self):
+    def worker_for_bought_orders_by_one_signal(self):
         """
         Worker for one signal.
         Run if at least one Buy order has worked.
@@ -2190,7 +2190,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @refuse_if_busy
-    def worker_for_sold_orders(self):
+    def worker_for_sold_orders_by_one_signal(self):
         """
         Worker for one signal.
         Run if at least one Sell order has worked.
@@ -2212,7 +2212,7 @@ class Signal(BaseSignal):
     def _check_is_ready_to_spoil_spot_or_long(self) -> bool:
         current_price = self._get_current_price()
         min_profit_price = TakeProfit.get_min_value(self)
-        msg = f"Check try_to_spoil '{self}':" \
+        msg = f"Check try_to_spoil_by_one_signal '{self}':" \
               f" if: current_price >= min_profit_price: {current_price} >= {min_profit_price}?"
         if current_price >= min_profit_price:
             logger.debug(msg + ': Yes')
@@ -2225,7 +2225,7 @@ class Signal(BaseSignal):
     def _check_is_ready_to_spoil_futures_short(self) -> bool:
         current_price = self._get_current_price()
         max_profit_price = TakeProfit.get_max_value(self)
-        msg = f"Check try_to_spoil '{self}':" \
+        msg = f"Check try_to_spoil_by_one_signal '{self}':" \
               f" if: current_price <= max_profit_price: {current_price} <= {max_profit_price}?"
         if current_price <= max_profit_price:
             logger.debug(msg + ': Yes')
@@ -2242,7 +2242,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @refuse_if_busy
-    def try_to_spoil(self, force: bool = False):
+    def try_to_spoil_by_one_signal(self, force: bool = False):
         """
         Worker spoils the Signal if a current price reaches any of take_profits
         and there are no worked Buy orders
@@ -2273,7 +2273,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @refuse_if_busy
-    def try_to_close(self):
+    def try_to_close_by_one_signal(self):
         """
         Worker closes the Signal if it has no opened Buy orders and no opened Sell orders
         """
@@ -2286,7 +2286,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @refuse_if_busy
-    def trail_stop(self, fake_price: Optional[float] = None):
+    def trail_stop_by_one_signal(self, fake_price: Optional[float] = None):
         """
         """
         if self._status not in BOUGHT_SOLD__SIG_STATS:
@@ -2301,6 +2301,7 @@ class Signal(BaseSignal):
 
     @classmethod
     def handle_new_signals(cls,
+                           only_get_ids: bool = False,
                            outer_signal_id: Optional[int] = None,
                            techannel_abbr: Optional[str] = None,
                            fake_balance: Optional[float] = None):
@@ -2310,11 +2311,14 @@ class Signal(BaseSignal):
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
         new_signals = Signal.objects.filter(**params)
+        if only_get_ids:
+            return new_signals.values_list('id', flat=True)
         for signal in new_signals:
-            signal.first_formation_orders(fake_balance=fake_balance)
+            signal.first_formation_orders_by_one_signal(fake_balance=fake_balance)
 
     @classmethod
     def push_signals(cls,
+                     only_get_ids: bool = False,
                      outer_signal_id: Optional[int] = None,
                      techannel_abbr: Optional[str] = None):
         """Handle all FORMED signals: Step 3"""
@@ -2323,11 +2327,14 @@ class Signal(BaseSignal):
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
         ready_for_push_signals = Signal.objects.filter(**params)
+        if only_get_ids:
+            return ready_for_push_signals.values_list('id', flat=True)
         for signal in ready_for_push_signals:
-            signal.push_orders()
+            signal.push_orders_by_one_signal()
 
     @classmethod
     def update_signals_info_by_api(cls,
+                                   only_get_ids: bool = False,
                                    outer_signal_id: Optional[int] = None,
                                    techannel_abbr: Optional[str] = None):
         """
@@ -2338,11 +2345,14 @@ class Signal(BaseSignal):
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
         formed_signals = Signal.objects.filter(**params)
+        if only_get_ids:
+            return formed_signals.values_list('id', flat=True)
         for signal in formed_signals:
-            signal.update_info_by_api()
+            signal.update_orders_info_by_one_signal()
 
     @classmethod
     def bought_orders_worker(cls,
+                             only_get_ids: bool = False,
                              outer_signal_id: Optional[int] = None,
                              techannel_abbr: Optional[str] = None):
         """Handle all PUSHED signals. Buy orders worker"""
@@ -2351,11 +2361,14 @@ class Signal(BaseSignal):
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
         formed_signals = Signal.objects.filter(**params)
+        if only_get_ids:
+            return formed_signals.values_list('id', flat=True)
         for signal in formed_signals:
-            signal.worker_for_bought_orders()
+            signal.worker_for_bought_orders_by_one_signal()
 
     @classmethod
     def sold_orders_worker(cls,
+                           only_get_ids: bool = False,
                            outer_signal_id: Optional[int] = None,
                            techannel_abbr: Optional[str] = None):
         """Handle all BOUGHT signals. Sell orders worker"""
@@ -2364,11 +2377,14 @@ class Signal(BaseSignal):
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
         formed_signals = Signal.objects.filter(**params)
+        if only_get_ids:
+            return formed_signals.values_list('id', flat=True)
         for signal in formed_signals:
-            signal.worker_for_sold_orders()
+            signal.worker_for_sold_orders_by_one_signal()
 
     @classmethod
     def spoil_worker(cls,
+                     only_get_ids: bool = False,
                      outer_signal_id: Optional[int] = None,
                      techannel_abbr: Optional[str] = None):
         """Handle all signals. Try_to_spoil worker"""
@@ -2377,11 +2393,14 @@ class Signal(BaseSignal):
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
         formed_signals = Signal.objects.filter(**params)
+        if only_get_ids:
+            return formed_signals.values_list('id', flat=True)
         for signal in formed_signals:
-            signal.try_to_spoil()
+            signal.try_to_spoil_by_one_signal()
 
     @classmethod
     def close_worker(cls,
+                     only_get_ids: bool = False,
                      outer_signal_id: Optional[int] = None,
                      techannel_abbr: Optional[str] = None):
         """Handle all signals. Try_to_close worker"""
@@ -2390,11 +2409,14 @@ class Signal(BaseSignal):
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
         signals = Signal.objects.filter(**params)
+        if only_get_ids:
+            return signals.values_list('id', flat=True)
         for signal in signals:
-            signal.try_to_close()
+            signal.try_to_close_by_one_signal()
 
     @classmethod
     def trailing_stop_worker(cls,
+                             only_get_ids: bool = False,
                              outer_signal_id: Optional[int] = None,
                              techannel_abbr: Optional[str] = None,
                              fake_price: Optional[float] = None):
@@ -2407,8 +2429,10 @@ class Signal(BaseSignal):
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
         signals = Signal.objects.filter(**params)
+        if only_get_ids:
+            return signals.values_list('id', flat=True)
         for signal in signals:
-            signal.trail_stop(fake_price=fake_price)
+            signal.trail_stop_by_one_signal(fake_price=fake_price)
 
 
 class EntryPointOrig(BasePointOrig):
