@@ -871,8 +871,8 @@ class Telegram(BaseTelegram):
                 stop_loss = possible_stop[0].split(' ')
                 stop_loss = stop_loss[1]
 
-                """ Take only first 4 take profits: """
-                profits = profits[:4]
+                """ Take only first 5 take profits: """
+                profits = profits[:5]
                 signals.append(SignalModel(pair, current_price, is_margin, position,
                                            leverage, entries, profits, stop_loss, message_id))
         return signals
@@ -1119,7 +1119,7 @@ class Telegram(BaseTelegram):
             if line.startswith(stop_label):
                 stop_loss = line[11:]
         """ Take only first 4 take profits: """
-        profits = profits[:4]
+        profits = profits[:6]
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
