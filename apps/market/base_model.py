@@ -51,7 +51,7 @@ class BaseMarketException(ABC):
 
 class BaseMarketLogic(ABC):
 
-    get_order_info_retry_count_default = 2
+    get_order_info_retry_count_default = 7
     get_order_info_retry_delay_default = 0.2
 
     asset_ = 'asset'

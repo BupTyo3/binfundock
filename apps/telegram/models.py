@@ -963,7 +963,7 @@ class Telegram(BaseTelegram):
                 stop_loss = stop_loss[1]
 
                 """ Take only first 4 take profits: """
-                profits = profits[:4]
+                profits = profits[:5]
                 signals.append(SignalModel(pair, current_price, is_margin, position,
                                            leverage, entries, profits, stop_loss, message_id))
         return signals
