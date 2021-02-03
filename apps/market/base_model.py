@@ -99,6 +99,7 @@ class BaseMarketLogic(ABC):
         retry_statuses = NOT_EXISTS_ORDER_STATUSES if not retry_statuses else retry_statuses
 
         for i in range(retry_count):
+            logger.debug(f"The Attempt number '{i}' to get order_info by order: '{custom_order_id}'")
             if i:
                 time.sleep(retry_delay)
             response = self._get_order_info_api(symbol, custom_order_id)
