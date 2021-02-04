@@ -22,7 +22,8 @@ from .utils import (
     MarginType,
     calculate_position,
     refuse_if_busy,
-    FORMED_PUSHED__SIG_STATS, SOLD__SIG_STATS, FORMED__SIG_STATS,
+    SIG_STATS_FOR_SPOIL_WORKER,
+    SOLD__SIG_STATS, FORMED__SIG_STATS,
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
     PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, BOUGHT_SOLD__SIG_STATS, BOUGHT__SIG_STATS,
     ERROR__SIG_STATS,
@@ -2256,7 +2257,7 @@ class Signal(BaseSignal):
         if force:
             self._spoil(force=True)
             return
-        if self._status not in FORMED_PUSHED__SIG_STATS:
+        if self._status not in SIG_STATS_FOR_SPOIL_WORKER:
             return
         if self._check_is_ready_to_spoil():
             self._spoil()
@@ -2272,7 +2273,7 @@ class Signal(BaseSignal):
         if force:
             self._spoil(force=True)
             return
-        if self._status not in FORMED_PUSHED__SIG_STATS:
+        if self._status not in SIG_STATS_FOR_SPOIL_WORKER:
             return
         if self._check_is_ready_to_spoil():
             self._spoil()
@@ -2394,7 +2395,7 @@ class Signal(BaseSignal):
                      outer_signal_id: Optional[int] = None,
                      techannel_abbr: Optional[str] = None):
         """Handle all signals. Try_to_spoil worker"""
-        params = {'_status__in': FORMED_PUSHED__SIG_STATS}
+        params = {'_status__in': SIG_STATS_FOR_SPOIL_WORKER}
         if outer_signal_id:
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})

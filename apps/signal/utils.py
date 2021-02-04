@@ -38,6 +38,11 @@ class MarginType(Enum):
 FORMED__SIG_STATS = [
     SignalStatus.FORMED.value,
 ]
+NEW_FORMED_PUSHED__SIG_STATS = [
+    SignalStatus.NEW.value,
+    SignalStatus.FORMED.value,
+    SignalStatus.PUSHED.value,
+]
 FORMED_PUSHED__SIG_STATS = [
     SignalStatus.FORMED.value,
     SignalStatus.PUSHED.value,
@@ -84,6 +89,8 @@ BOUGHT__SIG_STATS = [
 ERROR__SIG_STATS = [
     SignalStatus.ERROR.value,
 ]
+
+SIG_STATS_FOR_SPOIL_WORKER = NEW_FORMED_PUSHED__SIG_STATS
 
 
 class SignalPosition(Enum):
