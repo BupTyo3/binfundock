@@ -1067,7 +1067,7 @@ class Telegram(BaseTelegram):
         if sub_type == 'leverage':
             channel_abbr = 'assist_leverage'
             chat_id = int(conf_obj.tca_leverage)
-        async for message in self.client.iter_messages(chat_id, limit=10):
+        async for message in self.client.iter_messages(chat_id, limit=5):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
@@ -1093,7 +1093,7 @@ class Telegram(BaseTelegram):
         current_price = ''
         is_margin = False
         position = None
-        leverage = None
+        leverage = 10
         entries = ''
         profits = ''
         stop_loss = ''
@@ -1118,7 +1118,7 @@ class Telegram(BaseTelegram):
                 profits = left_numbers(possible_profits)
             if line.startswith(stop_label):
                 stop_loss = line[11:]
-        """ Take only first 4 take profits: """
+        """ Take only first 6 take profits: """
         profits = profits[:6]
         signals.append(SignalModel(pair, current_price, is_margin, position,
                                    leverage, entries, profits, stop_loss, message_id))
@@ -1406,7 +1406,7 @@ class SignalVerification:
             price_json = ''
             pair_info_object = ''
             try:
-                pair_info_object = self.client.get_symbol_info(pair_object.pair)
+                # pair_info_object = self.client.get_symbol_info(pair_object.pair)
                 # pair_info_object = self.client.get_avg_price(symbol=pair_object.pair)
                 price_json = urllib.request.urlopen(
                     'https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_object.pair))
@@ -1418,7 +1418,7 @@ class SignalVerification:
                     price_json = urllib.request.urlopen(
                         'https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_corrected))
 
-                    pair_info_object = self.client.get_symbol_info(pair_corrected)
+                    # pair_info_object = self.client.get_symbol_info(pair_corrected)
                 if usdt_position > 0:
                     pair_corrected = pair_object.pair[0: usdt_position:] + pair_object.pair[usdt_position::]
                     if pair_corrected == 'COTVUSDT':
@@ -1429,7 +1429,7 @@ class SignalVerification:
                         pair_corrected = 'ZILUSDT'
                     price_json = urllib.request.urlopen(
                         'https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_corrected))
-                    pair_info_object = self.client.get_symbol_info(pair_corrected)
+                    # pair_info_object = self.client.get_symbol_info(pair_corrected)
 
             current_pair = json.load(price_json)
             pairs_info.append(current_pair)
@@ -1439,7 +1439,7 @@ class SignalVerification:
             stop_loss = self.verify_stop(pair_object, current_pair)
 
             logger.debug(f"Pair: {current_pair['symbol']}")
-            logger.debug(f"Margin allowed: {pair_info_object['isMarginTradingAllowed']}")
+            # logger.debug(f"Margin allowed: {pair_info_object['isMarginTradingAllowed']}")
             logger.debug(f"Current price: {current_pair['price']}")
             logger.debug(f"Position: {pair_object.position}")
             if pair_object.leverage:
@@ -1451,7 +1451,7 @@ class SignalVerification:
             logger.debug(f"Stop-loss: {stop_loss}")
             logger.debug('==========================================')
             signals.append(
-                SignalModel(current_pair['symbol'], current_pair['price'], pair_info_object['isMarginTradingAllowed'],
+                SignalModel(current_pair['symbol'], current_pair['price'], '',
                             pair_object.position, pair_object.leverage, entries, profits, stop_loss,
                             pair_object.msg_id))
         return signals
