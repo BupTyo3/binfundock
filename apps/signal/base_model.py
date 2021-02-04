@@ -7,7 +7,12 @@ from django.db import models
 
 from utils.framework.models import SystemBaseModel, SystemBaseModelWithoutModified
 from tools.tools import debug_input_and_returned
-from .utils import SignalStatus, SignalPosition, MarginType
+from .utils import (
+    SignalStatus,
+    SignalPosition,
+    MarginType,
+    CORRECT_SIGNAL_POSITIONS,
+)
 
 if TYPE_CHECKING:
     from apps.techannel.base_model import TechannelBase
@@ -27,6 +32,9 @@ class BaseBaseSignal(SystemBaseModel):
 
     def is_position_short(self) -> bool:
         return True if self.position == SignalPosition.SHORT.value else False
+
+    def is_position_correct(self) -> bool:
+        return True if self.position in CORRECT_SIGNAL_POSITIONS else False
 
     def remove_near_tp(self):
         if self.is_position_short():

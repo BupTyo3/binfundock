@@ -96,6 +96,12 @@ class SignalPosition(Enum):
         return [(key.value, key.name) for key in cls]
 
 
+CORRECT_SIGNAL_POSITIONS = [
+    SignalPosition.LONG.value,
+    SignalPosition.SHORT.value,
+]
+
+
 def calculate_position(stop_loss: Union[float, str],
                        entry_points: List[Union[float, str]],
                        take_profits: List[Union[float, str]]):
