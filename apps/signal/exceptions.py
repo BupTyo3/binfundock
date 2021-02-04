@@ -9,3 +9,9 @@ class ShortSpotCombinationError(ValueError):
     def __init__(self, signal='', add_message=''):
         message = f"Can't create SHORT to SPOT. SignalOrig: '{signal}'"
         super().__init__('; '.join((message, add_message)))
+
+
+class IncorrectSignalPositionError(ValueError):
+    def __init__(self, signal='', add_message=''):
+        message = f"Can't create Signal due to incorrect position. SignalOrig: '{signal}'"
+        super().__init__('; '.join((message, add_message)))

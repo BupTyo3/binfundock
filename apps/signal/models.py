@@ -30,6 +30,7 @@ from .utils import (
 from .exceptions import (
     MainCoinNotServicedError,
     ShortSpotCombinationError,
+    IncorrectSignalPositionError,
 )
 from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket, BaseMarketException, BaseExternalAPIException
@@ -111,6 +112,10 @@ class SignalOrig(BaseSignalOrig):
     def _check_inappropriate_position_to_market_type(self, market: BaseMarket) -> None:
         if market.is_spot_market() and self.is_position_short():
             raise ShortSpotCombinationError(signal=self)
+
+    def _check_correct_position(self) -> None:
+        if not self.is_position_correct():
+            raise IncorrectSignalPositionError(signal=self)
 
     def _create_into_markets_if_auto(self) -> List['Signal']:
         """
@@ -204,6 +209,7 @@ class SignalOrig(BaseSignalOrig):
         self._check_if_pair_does_not_exist_in_market(market)
         # ValueError if SPOT & SHORT
         self._check_inappropriate_position_to_market_type(market)
+        self._check_correct_position()
         # Set leverage = 1 for Spot Market
         leverage = self._default_leverage if market.is_spot_market() else self.leverage
         signal = Signal.objects.create(
