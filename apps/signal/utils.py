@@ -38,6 +38,11 @@ class MarginType(Enum):
 FORMED__SIG_STATS = [
     SignalStatus.FORMED.value,
 ]
+NEW_FORMED_PUSHED__SIG_STATS = [
+    SignalStatus.NEW.value,
+    SignalStatus.FORMED.value,
+    SignalStatus.PUSHED.value,
+]
 FORMED_PUSHED__SIG_STATS = [
     SignalStatus.FORMED.value,
     SignalStatus.PUSHED.value,
@@ -85,6 +90,8 @@ ERROR__SIG_STATS = [
     SignalStatus.ERROR.value,
 ]
 
+SIG_STATS_FOR_SPOIL_WORKER = NEW_FORMED_PUSHED__SIG_STATS
+
 
 class SignalPosition(Enum):
     LONG = 'long'  # BUY
@@ -94,6 +101,12 @@ class SignalPosition(Enum):
     @classmethod
     def choices(cls):
         return [(key.value, key.name) for key in cls]
+
+
+CORRECT_SIGNAL_POSITIONS = [
+    SignalPosition.LONG.value,
+    SignalPosition.SHORT.value,
+]
 
 
 def calculate_position(stop_loss: Union[float, str],

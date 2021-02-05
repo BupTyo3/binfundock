@@ -22,7 +22,8 @@ from .utils import (
     MarginType,
     calculate_position,
     refuse_if_busy,
-    FORMED_PUSHED__SIG_STATS, SOLD__SIG_STATS, FORMED__SIG_STATS,
+    SIG_STATS_FOR_SPOIL_WORKER,
+    SOLD__SIG_STATS, FORMED__SIG_STATS,
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
     PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, BOUGHT_SOLD__SIG_STATS, BOUGHT__SIG_STATS,
     ERROR__SIG_STATS,
@@ -30,6 +31,7 @@ from .utils import (
 from .exceptions import (
     MainCoinNotServicedError,
     ShortSpotCombinationError,
+    IncorrectSignalPositionError,
 )
 from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket, BaseMarketException, BaseExternalAPIException
@@ -111,6 +113,10 @@ class SignalOrig(BaseSignalOrig):
     def _check_inappropriate_position_to_market_type(self, market: BaseMarket) -> None:
         if market.is_spot_market() and self.is_position_short():
             raise ShortSpotCombinationError(signal=self)
+
+    def _check_correct_position(self) -> None:
+        if not self.is_position_correct():
+            raise IncorrectSignalPositionError(signal=self)
 
     def _create_into_markets_if_auto(self) -> List['Signal']:
         """
@@ -204,6 +210,7 @@ class SignalOrig(BaseSignalOrig):
         self._check_if_pair_does_not_exist_in_market(market)
         # ValueError if SPOT & SHORT
         self._check_inappropriate_position_to_market_type(market)
+        self._check_correct_position()
         # Set leverage = 1 for Spot Market
         leverage = self._default_leverage if market.is_spot_market() else self.leverage
         signal = Signal.objects.create(
@@ -2250,7 +2257,7 @@ class Signal(BaseSignal):
         if force:
             self._spoil(force=True)
             return
-        if self._status not in FORMED_PUSHED__SIG_STATS:
+        if self._status not in SIG_STATS_FOR_SPOIL_WORKER:
             return
         if self._check_is_ready_to_spoil():
             self._spoil()
@@ -2266,7 +2273,7 @@ class Signal(BaseSignal):
         if force:
             self._spoil(force=True)
             return
-        if self._status not in FORMED_PUSHED__SIG_STATS:
+        if self._status not in SIG_STATS_FOR_SPOIL_WORKER:
             return
         if self._check_is_ready_to_spoil():
             self._spoil()
@@ -2388,7 +2395,7 @@ class Signal(BaseSignal):
                      outer_signal_id: Optional[int] = None,
                      techannel_abbr: Optional[str] = None):
         """Handle all signals. Try_to_spoil worker"""
-        params = {'_status__in': FORMED_PUSHED__SIG_STATS}
+        params = {'_status__in': SIG_STATS_FOR_SPOIL_WORKER}
         if outer_signal_id:
             params.update({'outer_signal_id': outer_signal_id,
                            'techannel__abbr': techannel_abbr})
