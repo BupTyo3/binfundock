@@ -20,13 +20,21 @@ OPENED_ORDER_STATUSES = [
     OrderStatus.NOT_SENT.value,
     OrderStatus.SENT.value,
 ]
-SENT_ORDER_STATUSES = [
-    OrderStatus.SENT.value,
-]
 COMPLETED_ORDER_STATUSES = [
     OrderStatus.COMPLETED.value,
 ]
 NOT_EXISTS_ORDER_STATUSES = [
+    OrderStatus.NOT_EXISTS.value,
+]
+
+ORDER_STATUSES_FOR_PULL_JOB = [
+    OrderStatus.SENT.value,
+    OrderStatus.NOT_EXISTS.value,
+]
+NOT_FINISHED_ORDERS_STATUSES = [
+    OrderStatus.NOT_SENT.value,
+    OrderStatus.SENT.value,
+    OrderStatus.PARTIAL.value,
     OrderStatus.NOT_EXISTS.value,
 ]
 

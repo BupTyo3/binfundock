@@ -1380,14 +1380,9 @@ class Signal(BaseSignal):
         """
         Check Signal if it has no opened Buy orders and no opened Sell orders
         """
-        from apps.order.utils import OrderStatus
-        not_finished_orders_statuses = [
-            OrderStatus.NOT_SENT.value,
-            OrderStatus.SENT.value,
-            OrderStatus.PARTIAL.value,
-        ]
+        from apps.order.utils import NOT_FINISHED_ORDERS_STATUSES
         not_finished_orders_params = {
-            '_status__in': not_finished_orders_statuses,
+            '_status__in': NOT_FINISHED_ORDERS_STATUSES,
         }
         if self.buy_orders.filter(**not_finished_orders_params).exists():
             return False
@@ -2177,12 +2172,12 @@ class Signal(BaseSignal):
         """
         Get info for all Signals (except NEW) from Real Market by SENT orders
         """
-        from apps.order.utils import SENT_ORDER_STATUSES
+        from apps.order.utils import ORDER_STATUSES_FOR_PULL_JOB
         if self._status not in PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS:
             return
 
         params = {
-            '_status__in': SENT_ORDER_STATUSES,
+            '_status__in': ORDER_STATUSES_FOR_PULL_JOB,
         }
         for buy_order in self.buy_orders.filter(**params):
             buy_order.update_buy_order_info_by_api()
