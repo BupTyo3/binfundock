@@ -5,7 +5,7 @@ from typing import Optional, TYPE_CHECKING
 from django.db import models, transaction
 from django.contrib.auth import get_user_model
 
-from apps.order.utils import OrderStatus, OrderType
+from apps.order.utils import OrderStatus, OrderType, ORDER_STATUSES_FOR_PULL_JOB
 from apps.market.models import Market
 from apps.signal.models import Signal
 from .base_model import (
@@ -205,8 +205,7 @@ class BuyOrder(BaseBuyOrder):
         Only for SENT BUY orders.
         Get info from Market api and update OrderHistory table if we got new data
         """
-        statuses_ = [OrderStatus.SENT.value, ]
-        if self.status not in statuses_:
+        if self.status not in ORDER_STATUSES_FOR_PULL_JOB:
             return
         logger.debug(f"Get info about BUY order by API: {self}")
         data = self.market_logic.get_order_info(self.symbol, self.custom_order_id)
@@ -475,8 +474,7 @@ class SellOrder(BaseSellOrder):
         Only for SENT SELL orders.
         Get info from Market api and update OrderHistory table if we got new data
         """
-        statuses_ = [OrderStatus.SENT.value, ]
-        if self.status not in statuses_:
+        if self.status not in ORDER_STATUSES_FOR_PULL_JOB:
             return
         logger.debug(f"Get info about SELL order by API: {self}")
         data = self.market_logic.get_order_info(self.symbol, self.custom_order_id)
