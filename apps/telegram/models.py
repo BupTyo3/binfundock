@@ -792,11 +792,11 @@ class Telegram(BaseTelegram):
 
     async def parse_klondike_channel(self):
         channel_id = int(conf_obj.klondike)
-        channel_abbr = 'klondike'
+        channel_abbr = 'kl_mg'
         # entity = await self.client.get_entity('@WCSEBot')
         # access_hash = 4349140352664297866
         # channel_entity = User(id=channel_id, access_hash=access_hash)
-        async for message in self.client.iter_messages(channel_id, limit=4):
+        async for message in self.client.iter_messages(channel_id, limit=5):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
@@ -817,11 +817,10 @@ class Telegram(BaseTelegram):
         signals = []
         splitted_info = message_text.splitlines()
         is_new_signal = '#SIGNAL'
-        is_futures_label = '🔑 Open'
-        buy_label = '🉐 Targets'
-        long_label = 'Long'
-        sell_label = 'Short'
-        goals_label = '🔆 Exit Targets:🔆'
+        price_between_label = 'the price between'
+        long_label = 'LONG'
+        sell_label = 'SHORT'
+        goals_label = '🉐 Targets:'
         stop_label = '❗️STOP LOSS'
         pair = ''
         current_price = ''
@@ -832,49 +831,47 @@ class Telegram(BaseTelegram):
         profits = []
         stop_loss = ''
         if is_new_signal in splitted_info[0]:
-            pair_info = splitted_info[1].split('#')
+            pair_info = splitted_info[0].split(' ')
             pair = ''.join(filter(str.isalpha, pair_info[1]))
-            if is_futures_label in splitted_info[2]:
-                if long_label in splitted_info[2]:
-                    position = 'Long'
-                elif sell_label in splitted_info[2]:
-                    position = 'Short'
-                possible_leverage = splitted_info[2].split('(')
-                leverage = left_numbers([possible_leverage[1].split(' ')[1]])
-                leverage = leverage[0]
-                try:
-                    entry_index = splitted_info.index(buy_label)
-                except ValueError as e:
-                    return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                                      leverage, entries, profits, stop_loss, message_id))
-                possible_entries = splitted_info[entry_index + 1:entry_index + 3]
-                for possible_entry in possible_entries:
-                    entry = possible_entry.split(' ')
-                    entries.append(entry[1])
 
-                try:
-                    goals_index = splitted_info.index(goals_label)
-                except ValueError as e:
-                    return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                                      leverage, entries, profits, stop_loss, message_id))
-                possible_targets = splitted_info[goals_index + 1:goals_index + 5]
-                for possible_target in possible_targets:
-                    target = possible_target.split(' ')
-                    profits.append(target[1])
+        try:
+            price_index = [i for i, s in enumerate(splitted_info) if price_between_label in s]
+        except ValueError as e:
+            return signals.append(SignalModel(pair, current_price, is_margin, position,
+                                              leverage, entries, profits, stop_loss, message_id))
 
-                try:
-                    stop_index = splitted_info.index(stop_label)
-                except ValueError as e:
-                    return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                                      leverage, entries, profits, stop_loss, message_id))
-                possible_stop = splitted_info[stop_index + 1:stop_index + 2]
-                stop_loss = possible_stop[0].split(' ')
-                stop_loss = stop_loss[1]
+        if price_index:
+            price_index = price_index[0]
+            if long_label in splitted_info[price_index]:
+                position = 'LONG'
+            if sell_label in splitted_info[price_index]:
+                position = 'SHORT'
+            possible_leverage = splitted_info[price_index].split('X')
+            leverage = possible_leverage[1].split(' ')
+            leverage = leverage[0]
 
-                """ Take only first 5 take profits: """
-                profits = profits[:5]
-                signals.append(SignalModel(pair, current_price, is_margin, position,
-                                           leverage, entries, profits, stop_loss, message_id))
+            possible_entries = splitted_info[price_index].split(' - ')
+            possible_entry1 = possible_entries[0].split(' ')
+            possible_entry2 = possible_entries[1].split(' ')
+            entries.append(''.join(filter(str.isdigit, possible_entry1[-1])))
+            entries.append(''.join(filter(str.isdigit, possible_entry2[0])))
+
+            try:
+                goals_index = splitted_info.index(goals_label)
+            except ValueError as e:
+                return signals.append(SignalModel(pair, current_price, is_margin, position,
+                                                 leverage, entries, profits, stop_loss, message_id))
+            possible_targets = splitted_info[goals_index + 2:goals_index + 7]
+            for possible_target in possible_targets:
+                target = possible_target.split('$')
+                profits.append(target[1])
+
+            if stop_label in splitted_info[-1]:
+                possible_stop = splitted_info[-1].split('$')
+                stop_loss = possible_stop[1]
+
+        signals.append(SignalModel(pair, current_price, is_margin, position,
+                                   leverage, entries, profits, stop_loss, message_id))
         return signals
 
     async def parse_wcse_channel(self):

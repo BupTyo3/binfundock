@@ -75,6 +75,12 @@ class BaseOrder(SystemBaseModel):
                 message_id=self.signal.outer_signal_id,
                 techannel_abbr=self.signal.techannel.abbr,
                 index=self.index)
+            # Check uniqueness of custom_order_id
+            # Don't create if exists
+            if type(self).objects.filter(custom_order_id=self.custom_order_id).exists():
+                logger.warning(f"Order '{self}' could not be created due to"
+                               f" custom_order_id already exists: '{self.custom_order_id}'")
+                return
         super().save(*args, **kwargs)
 
     @property

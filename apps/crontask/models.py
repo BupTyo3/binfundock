@@ -11,6 +11,7 @@ class CronTask(CronTaskBase):
     """
     _default_slip_delta_stop_loss_percentage = 0.2
     default_balance_percentage_by_signal = 3
+    default_trim_leverage_to = 10
 
     first_forming_enabled = models.BooleanField(default=False)
     push_job_enabled = models.BooleanField(default=False)
@@ -54,6 +55,14 @@ class CronTask(CronTaskBase):
     slip_delta_sl_perc = models.FloatField(
         default=_default_slip_delta_stop_loss_percentage,
         help_text='slip delta stop loss percentage'
+    )
+    trim_leverage_to = models.PositiveIntegerField(
+        default=default_trim_leverage_to,
+        help_text='Trim leverage when create the Signal from SignalOrig'
+    )
+    allow_remove_tps_of_eps_for_first_formation = models.BooleanField(
+        default=False,
+        help_text='Take profits or EPs will be deleted one by one if balance is not enough to form Signal'
     )
 
     objects = models.Manager()

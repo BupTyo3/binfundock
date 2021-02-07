@@ -46,6 +46,8 @@ from tools.tools import (
     rounded_result,
     debug_input_and_returned,
     subtract_fee,
+    convert_to_coin_quantity,
+    convert_to_amount,
 )
 
 if TYPE_CHECKING:
@@ -213,6 +215,9 @@ class SignalOrig(BaseSignalOrig):
         self._check_correct_position()
         # Set leverage = 1 for Spot Market
         leverage = self._default_leverage if market.is_spot_market() else self.leverage
+        # Trim leverage
+        trimmed_leverage = get_or_create_crontask().trim_leverage_to
+        leverage = trimmed_leverage if leverage > trimmed_leverage else leverage
         signal = Signal.objects.create(
             techannel=self.techannel,
             symbol=self.symbol,
@@ -448,6 +453,13 @@ class Signal(BaseSignal):
         return res
         # return res / n_distribution  # эквивалент 33 долларов
 
+    @debug_input_and_returned
+    def __get_distributed_quantity_to_form_tp_orders(self, executed_quantity: float):
+        """
+        How much quantity will be by one TP order
+        """
+        return executed_quantity / self.__get_distribution_by_take_profits()
+
     @staticmethod
     @rounded_result
     def __find_not_fractional_by_step(value: float, step: float) -> float:
@@ -480,7 +492,6 @@ class Signal(BaseSignal):
         Calculate quantity for one coin
         Fraction by step
         """
-        from tools.tools import convert_to_coin_quantity
         pair = self._get_pair()
         step_quantity = pair.step_quantity
         toc = self.__get_turnover_by_coin_pair(fake_balance=fake_balance) * self.leverage
@@ -499,7 +510,6 @@ class Signal(BaseSignal):
         Calculate quantity for one coin
         Fraction by step
         """
-        from tools.tools import convert_to_coin_quantity
         pair = self._get_pair()
         step_quantity = pair.step_quantity
         toc = self.__get_turnover_by_coin_pair(fake_balance=fake_balance) * self.leverage
@@ -782,7 +792,6 @@ class Signal(BaseSignal):
         Enough for create buy orders and then (after one buy order has worked) - sell orders
         """
         # TODO check
-        from tools.tools import convert_to_coin_quantity
         pair = self._get_pair()
         # get amount and subtract fee for buy orders
         amount_quantity = subtract_fee(self.__get_amount_quantity(fake_balance=fake_balance),
@@ -800,16 +809,16 @@ class Signal(BaseSignal):
         return False
 
     @debug_input_and_returned
-    def _check_if_quantity_enough_for_sell(self, quantity: float, price: float) -> bool:
+    def _check_if_quantity_enough_to_form_tp_order(self,
+                                                   quantity: float,
+                                                   price: Optional[float] = None) -> bool:
         """
-        Check if quantity enough for Sell.
-        For Futures always True
+        Check if quantity enough to form TakeProfit order.
         """
-        # TODO check
-        if self._is_market_type_futures():
-            # We always can close position in Futures
-            return True
-        from tools.tools import convert_to_amount
+        if not quantity:
+            return False
+        # check if we could form TP order by extreme price - stop loss
+        price = self.stop_loss if not price else price
         pair = self._get_pair()
         amount_quantity = convert_to_amount(quantity, price)
         logger.debug(f"'{self}':amount_quantity={amount_quantity}")
@@ -1374,14 +1383,9 @@ class Signal(BaseSignal):
         """
         Check Signal if it has no opened Buy orders and no opened Sell orders
         """
-        from apps.order.utils import OrderStatus
-        not_finished_orders_statuses = [
-            OrderStatus.NOT_SENT.value,
-            OrderStatus.SENT.value,
-            OrderStatus.PARTIAL.value,
-        ]
+        from apps.order.utils import NOT_FINISHED_ORDERS_STATUSES
         not_finished_orders_params = {
-            '_status__in': not_finished_orders_statuses,
+            '_status__in': NOT_FINISHED_ORDERS_STATUSES,
         }
         if self.buy_orders.filter(**not_finished_orders_params).exists():
             return False
@@ -1410,7 +1414,7 @@ class Signal(BaseSignal):
         residual_quantity = self._get_residual_quantity(ignore_fee=ignore_fee)
         price = self._get_current_price()
         if residual_quantity > 0 and\
-                self._check_if_quantity_enough_for_sell(quantity=residual_quantity, price=price):
+                self._check_if_quantity_enough_to_form_tp_order(quantity=residual_quantity, price=price):
             if self.is_position_short():
                 self.__form_buy_market_order(quantity=residual_quantity, price=price)
             else:
@@ -1484,6 +1488,9 @@ class Signal(BaseSignal):
         if not self._check_if_balance_enough_for_signal(fake_balance=fake_balance):
             # TODO: Add sent message to yourself telegram
             logger.debug(f"Not enough amount for Signal '{self}'")
+            # Remove some TPs or EPs
+            if get_or_create_crontask().allow_remove_tps_of_eps_for_first_formation:
+                self.__handle_insufficient_quantity_of_first_formation()
             return False
         self.status = SignalStatus.FORMED.value
         for index, entry_point in enumerate(self.entry_points.all()):
@@ -1604,8 +1611,11 @@ class Signal(BaseSignal):
             self.remove_far_tp()
 
     @debug_input_and_returned
-    def __handle_zero_quantity_of_second_formation(self):
-        logger.warning(f"'{self}: There is no quantity to form take_profits")
+    def __handle_insufficient_quantity_of_second_formation(self):
+        """
+        Remove some TPs if the Signal has them more than 1
+        """
+        logger.warning(f"'{self}: There is insufficient quantity to form take_profits")
         tp_count = self.__get_distribution_by_take_profits()
         tp_count_enough_to_be_distributed = 1
         if tp_count > tp_count_enough_to_be_distributed:
@@ -1615,6 +1625,24 @@ class Signal(BaseSignal):
             logger.warning(f"'{self}': take_profits could not be removed")
             self.status = SignalStatus.ERROR.value
             self.save()
+
+    @debug_input_and_returned
+    def __handle_insufficient_quantity_of_first_formation(self):
+        """
+        Remove some TPs if the Signal has them more than 1 (min_tps_count_should_be_left)
+        """
+        min_tps_count_should_be_left = 1
+        min_eps_count_should_be_left = 1
+        logger.debug(f"'{self}: There is insufficient quantity for first_formation")
+        tp_count = self.__get_distribution_by_take_profits()
+        ep_count = self.__get_distribution_by_entry_points()
+        if tp_count > min_tps_count_should_be_left:
+            self.remove_far_tp()
+        elif ep_count > min_eps_count_should_be_left:
+            self.remove_far_ep()
+        else:
+            logger.debug(f"'{self}': take_profits could not be removed"
+                         f" because there are min count TPs and EPs")
 
     # POINT BOUGHT WORKER
 
@@ -1652,8 +1680,10 @@ class Signal(BaseSignal):
                                                futures=futures)
         # Form sell orders if the signal doesn't have any
         elif not self.__get_sell_orders_exclude_indexes(excluded_indexes=[SellOrder.GL_SM_INDEX, ]).exists():
-            if not bought_quantity:
-                self.__handle_zero_quantity_of_second_formation()
+            calculated_distributed_quantity = self.__get_distributed_quantity_to_form_tp_orders(bought_quantity)
+            if not self._check_if_quantity_enough_to_form_tp_order(calculated_distributed_quantity):
+                self.__handle_insufficient_quantity_of_second_formation()
+                # The next time we will try again after removing some TPs
                 return
             self._second_formation_sell_orders(sell_quantity=bought_quantity, futures=futures)
         self.__update_flag_handled_worked_buy_orders(worked_orders)
@@ -1799,8 +1829,10 @@ class Signal(BaseSignal):
                                                             buy_quantity=new_sold_quantity)
         # Form buy orders if the signal doesn't have any
         elif not self.__get_buy_orders_exclude_indexes(excluded_indexes=[BuyOrder.GL_SM_INDEX, ]).exists():
-            if not sold_quantity:
-                self.__handle_zero_quantity_of_second_formation()
+            calculated_distributed_quantity = self.__get_distributed_quantity_to_form_tp_orders(sold_quantity)
+            if not self._check_if_quantity_enough_to_form_tp_order(calculated_distributed_quantity):
+                self.__handle_insufficient_quantity_of_second_formation()
+                # The next time we will try again after removing some TPs
                 return
             self._second_formation_buy_orders_futures_short(buy_quantity=sold_quantity)
         self.__update_flag_handled_worked_sell_orders(worked_orders)
@@ -2164,12 +2196,12 @@ class Signal(BaseSignal):
         """
         Get info for all Signals (except NEW) from Real Market by SENT orders
         """
-        from apps.order.utils import SENT_ORDER_STATUSES
+        from apps.order.utils import ORDER_STATUSES_FOR_PULL_JOB
         if self._status not in PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS:
             return
 
         params = {
-            '_status__in': SENT_ORDER_STATUSES,
+            '_status__in': ORDER_STATUSES_FOR_PULL_JOB,
         }
         for buy_order in self.buy_orders.filter(**params):
             buy_order.update_buy_order_info_by_api()
@@ -2456,7 +2488,7 @@ class EntryPointOrig(BasePointOrig):
         unique_together = ['signal', 'value']
 
     def __str__(self):
-        return f"{self.signal.symbol}:{self.value}"
+        return f"EPOr:{self.signal.symbol}:{self.value}"
 
 
 class EntryPoint(BaseEntryPoint):
@@ -2473,7 +2505,7 @@ class EntryPoint(BaseEntryPoint):
         unique_together = ['signal', 'value']
 
     def __str__(self):
-        return f"{self.signal.symbol}:{self.value}"
+        return f"EP:{self.signal.symbol}:{self.value}"
 
 
 class TakeProfitOrig(BasePointOrig):
@@ -2490,7 +2522,7 @@ class TakeProfitOrig(BasePointOrig):
         unique_together = ['signal', 'value']
 
     def __str__(self):
-        return f"{self.signal.symbol}:{self.value}"
+        return f"TPOr:{self.signal.symbol}:{self.value}"
 
 
 class TakeProfit(BaseTakeProfit):
@@ -2507,7 +2539,7 @@ class TakeProfit(BaseTakeProfit):
         unique_together = ['signal', 'value']
 
     def __str__(self):
-        return f"{self.signal.symbol}:{self.value}"
+        return f"TP:{self.signal.symbol}:{self.value}"
 
 
 class HistorySignal(BaseHistorySignal):
