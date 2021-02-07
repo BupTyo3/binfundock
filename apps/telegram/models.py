@@ -1489,8 +1489,10 @@ class SignalVerification:
     def verify_stop(self, pair_object, current_pair_info):
         dot_position = current_pair_info['price'].index('.')
         stop_loss = ''
+        if pair_object.stop_loss.find('.') > 0:
+            return stop_loss
         if dot_position:
-            if pair_object.stop_loss.find('.') > 0 and pair_object.stop_loss.find('.') != dot_position:
+            if pair_object.stop_loss.find('.') != dot_position:
                 stop_loss = pair_object.stop_loss[:dot_position] + "." + pair_object.stop_loss[dot_position:]
             else:
                 stop_loss = pair_object.stop_loss
