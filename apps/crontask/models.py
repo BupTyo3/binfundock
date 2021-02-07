@@ -60,6 +60,10 @@ class CronTask(CronTaskBase):
         default=default_trim_leverage_to,
         help_text='Trim leverage when create the Signal from SignalOrig'
     )
+    allow_remove_tps_of_eps_for_first_formation = models.BooleanField(
+        default=False,
+        help_text='Take profits or EPs will be deleted one by one if balance is not enough to form Signal'
+    )
 
     objects = models.Manager()
 

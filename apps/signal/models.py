@@ -1488,6 +1488,9 @@ class Signal(BaseSignal):
         if not self._check_if_balance_enough_for_signal(fake_balance=fake_balance):
             # TODO: Add sent message to yourself telegram
             logger.debug(f"Not enough amount for Signal '{self}'")
+            # Remove some TPs or EPs
+            if get_or_create_crontask().allow_remove_tps_of_eps_for_first_formation:
+                self.__handle_insufficient_quantity_of_first_formation()
             return False
         self.status = SignalStatus.FORMED.value
         for index, entry_point in enumerate(self.entry_points.all()):
@@ -1622,6 +1625,24 @@ class Signal(BaseSignal):
             logger.warning(f"'{self}': take_profits could not be removed")
             self.status = SignalStatus.ERROR.value
             self.save()
+
+    @debug_input_and_returned
+    def __handle_insufficient_quantity_of_first_formation(self):
+        """
+        Remove some TPs if the Signal has them more than 1 (min_tps_count_should_be_left)
+        """
+        min_tps_count_should_be_left = 1
+        min_eps_count_should_be_left = 1
+        logger.debug(f"'{self}: There is insufficient quantity for first_formation")
+        tp_count = self.__get_distribution_by_take_profits()
+        ep_count = self.__get_distribution_by_entry_points()
+        if tp_count > min_tps_count_should_be_left:
+            self.remove_far_tp()
+        elif ep_count > min_eps_count_should_be_left:
+            self.remove_far_ep()
+        else:
+            logger.debug(f"'{self}': take_profits could not be removed"
+                         f" because there are min count TPs and EPs")
 
     # POINT BOUGHT WORKER
 
@@ -2467,7 +2488,7 @@ class EntryPointOrig(BasePointOrig):
         unique_together = ['signal', 'value']
 
     def __str__(self):
-        return f"{self.signal.symbol}:{self.value}"
+        return f"EPOr:{self.signal.symbol}:{self.value}"
 
 
 class EntryPoint(BaseEntryPoint):
@@ -2484,7 +2505,7 @@ class EntryPoint(BaseEntryPoint):
         unique_together = ['signal', 'value']
 
     def __str__(self):
-        return f"{self.signal.symbol}:{self.value}"
+        return f"EP:{self.signal.symbol}:{self.value}"
 
 
 class TakeProfitOrig(BasePointOrig):
@@ -2501,7 +2522,7 @@ class TakeProfitOrig(BasePointOrig):
         unique_together = ['signal', 'value']
 
     def __str__(self):
-        return f"{self.signal.symbol}:{self.value}"
+        return f"TPOr:{self.signal.symbol}:{self.value}"
 
 
 class TakeProfit(BaseTakeProfit):
@@ -2518,7 +2539,7 @@ class TakeProfit(BaseTakeProfit):
         unique_together = ['signal', 'value']
 
     def __str__(self):
-        return f"{self.signal.symbol}:{self.value}"
+        return f"TP:{self.signal.symbol}:{self.value}"
 
 
 class HistorySignal(BaseHistorySignal):
