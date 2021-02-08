@@ -34,7 +34,7 @@ class BaseBaseSignal(SystemBaseModel):
         return True if self.position == SignalPosition.SHORT.value else False
 
     def is_position_correct(self) -> bool:
-        return True if self.position in CORRECT_SIGNAL_POSITIONS else False
+        return True if self.position.upper() in map(str.upper, CORRECT_SIGNAL_POSITIONS) else False
 
     def remove_near_tp(self):
         if self.is_position_short():
