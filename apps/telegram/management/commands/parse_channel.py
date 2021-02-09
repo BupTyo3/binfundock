@@ -234,7 +234,7 @@ class Command(SystemCommand):
         tca_altcoin_matches = ["tca_altcoin", "altcoin", "altcoins"]
         tca_leverage_matches = ["tca_leverage", "leverage"]
         tca_origin_matches = ["tca_origin", "origin"]
-        margin_whale_matches = ["margin", "whale", "marginwhale", "margin_whale"]
+        margin_whale_matches = ["marginwhale"]
         white_bull_matches = ["white_bulls", "whitebull", "white", "margin_whale"]
         simple_future_matches = ["simple_future"]
         lucrative_recommendation_matches = ["recommend"]
