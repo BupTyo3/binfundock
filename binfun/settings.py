@@ -307,7 +307,7 @@ class Config:
         self.crypto_zone = telegram.get('CryptoZone', None)
         self.wcse = telegram.get('wcse', None)
         self.lucrative = telegram.get('Lucrative', None)
-        self.klondike = telegram.get('klondike', None)
+        self.klondike_margin = telegram.get('klondike_margin', None)
         self.server = telegram.get('Server', None)
 
 
