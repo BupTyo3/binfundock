@@ -204,7 +204,7 @@ class Command(SystemCommand):
             self._client.disconnect()
 
     def collect_info_from_klondike_channel(self):
-        session_name = 'klondike'
+        session_name = 'klondike_margin'
         self.init_telegram_luck(session_name)
         try:
             with self._client_luck:
@@ -243,7 +243,7 @@ class Command(SystemCommand):
         bull_exclusive_matches = ["bull_exclusive"]
         crypto_zone_matches = ["crypto_zone"]
         wcse_matches = ["wcse"]
-        klondike_matches = ["klondike"]
+        klondike_margin_matches = ["klondike_margin"]
         server_matches = ["server"]
 
         if not get_or_create_crontask().server:
@@ -321,7 +321,7 @@ class Command(SystemCommand):
         elif any(x in channel for x in wcse_matches):
             self.collect_info_from_wcse_channel()
 
-        if not get_or_create_crontask().klondike:
+        if not get_or_create_crontask().klondike_margin:
             pass
-        elif any(x in channel for x in klondike_matches):
+        elif any(x in channel for x in klondike_margin_matches):
             self.collect_info_from_klondike_channel()

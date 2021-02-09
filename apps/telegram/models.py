@@ -791,7 +791,7 @@ class Telegram(BaseTelegram):
         return signals
 
     async def parse_klondike_channel(self):
-        channel_id = int(conf_obj.klondike)
+        channel_id = int(conf_obj.klondike_margin)
         channel_abbr = 'kl_mg'
         # entity = await self.client.get_entity('@WCSEBot')
         # access_hash = 4349140352664297866
@@ -810,7 +810,7 @@ class Telegram(BaseTelegram):
                                                                 f"related to the '{channel_abbr}' algorithm: "
                                                                 f"{inserted_to_db}")
                         else:
-                            await self.send_message_by_template('@Eugene_Povetkin', signal[0],
+                            await self.send_message_by_template('Eugene_Povetkin', signal[0],
                                                                 message.date, channel_abbr, message.id)
 
     def parse_klondike_message(self, message_text, message_id):
