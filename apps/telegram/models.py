@@ -853,8 +853,8 @@ class Telegram(BaseTelegram):
             possible_entries = splitted_info[price_index].split(' - ')
             possible_entry1 = possible_entries[0].split(' ')
             possible_entry2 = possible_entries[1].split(' ')
-            entries.append(''.join(filter(str.isdigit, possible_entry1[-1])))
-            entries.append(''.join(filter(str.isdigit, possible_entry2[0])))
+            entries.append(possible_entry1[-1].replace('$', ''))
+            entries.append(possible_entry2[0].replace('$', ''))
 
             try:
                 goals_index = splitted_info.index(goals_label)
