@@ -136,7 +136,7 @@ class Telegram(BaseTelegram):
         possible_take_profits_label = ['Sell at', 'Targets', 'Тargets', 'Targеts', 'Tаrgets']
         possible_take_profits_label2 = ['Take profit', 'Takе profit', 'Tаkе profit', 'Tаke profit']
         possible_stop_label = ['SL: ', 'SL : ', 'Stop loss:']
-        pair_label = ['Pair: ', 'Рair: ', 'Аssеt:']
+        pair_label = ['Pair: ', 'Рair: ', 'Аssеt:', 'Asset']
         pair = ''
         position_label = 'Position:'
         current_price = ''
@@ -149,7 +149,7 @@ class Telegram(BaseTelegram):
         stop_loss = ['']
         signal_identification = 'CF Leverage  Trading Signal'
         for line in splitted_info:
-            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]) or line.startswith(pair_label[2]):
+            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]) or line.startswith(pair_label[2]) or line.startswith(pair_label[3]):
                 possible_position_info = line.split(' ')
                 position_info = list(filter(None, possible_position_info))
                 pair = ''.join(filter(str.isalpha, position_info[1]))

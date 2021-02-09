@@ -84,7 +84,7 @@ class Command(SystemCommand):
             self._client_luck.disconnect()
 
     def collect_info_from_cf_trader_channel(self):
-        session_name = 'CFTrader'
+        session_name = 'CF_Trader'
         self.init_telegram_luck(session_name)
         try:
             with self._client_luck:
