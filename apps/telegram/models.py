@@ -880,7 +880,7 @@ class Telegram(BaseTelegram):
         # entity = await self.client.get_entity('@WCSEBot')
         access_hash = 4349140352664297866
         channel_entity = User(id=channel_id, access_hash=access_hash)
-        async for message in self.client.iter_messages(entity=channel_entity, limit=8):
+        async for message in self.client.iter_messages(entity=channel_entity, limit=6):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
@@ -935,7 +935,7 @@ class Telegram(BaseTelegram):
                 except ValueError as e:
                     return signals.append(SignalModel(pair, current_price, is_margin, position,
                                                       leverage, entries, profits, stop_loss, message_id))
-                possible_entries = splitted_info[entry_index + 1:entry_index + 3]
+                possible_entries = splitted_info[entry_index + 1:entry_index + 4]
                 for possible_entry in possible_entries:
                     entry = possible_entry.split(' ')
                     entries.append(entry[1])
@@ -959,8 +959,8 @@ class Telegram(BaseTelegram):
                 stop_loss = possible_stop[0].split(' ')
                 stop_loss = stop_loss[1]
 
-                """ Take only first 4 take profits: """
-                profits = profits[:5]
+                """ Take only first 6 take profits: """
+                profits = profits[:6]
                 signals.append(SignalModel(pair, current_price, is_margin, position,
                                            leverage, entries, profits, stop_loss, message_id))
         return signals
