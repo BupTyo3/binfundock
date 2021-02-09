@@ -217,7 +217,7 @@ class SignalOrig(BaseSignalOrig):
         leverage = self._default_leverage if market.is_spot_market() else self.leverage
         # Trim leverage
         trimmed_leverage = get_or_create_crontask().trim_leverage_to
-        leverage = trimmed_leverage if leverage > trimmed_leverage else leverage
+        leverage = trimmed_leverage if int(leverage) > trimmed_leverage else leverage
         signal = Signal.objects.create(
             techannel=self.techannel,
             symbol=self.symbol,
