@@ -27,6 +27,9 @@ NOT_EXISTS_ORDER_STATUSES = [
     OrderStatus.NOT_EXISTS.value,
 ]
 
+ORDER_STATUSES_FOR_PUSH_JOB = [
+    OrderStatus.NOT_SENT.value,
+]
 ORDER_STATUSES_FOR_PULL_JOB = [
     OrderStatus.SENT.value,
     OrderStatus.NOT_EXISTS.value,
@@ -36,6 +39,14 @@ NOT_FINISHED_ORDERS_STATUSES = [
     OrderStatus.SENT.value,
     OrderStatus.PARTIAL.value,
     OrderStatus.NOT_EXISTS.value,
+]
+SENT_ORDERS_STATUSES = [
+    OrderStatus.SENT.value,
+    OrderStatus.PARTIAL.value,
+    OrderStatus.NOT_EXISTS.value,
+]
+NOT_SENT_ORDERS_STATUSES = [
+    OrderStatus.NOT_SENT.value,
 ]
 
 
