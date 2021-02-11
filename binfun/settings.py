@@ -194,6 +194,7 @@ CELERY_TASK_SERIALIZER = 'json'
 
 # CRON TASKS
 DEFAULT_COMMON_PERIOD_OF_CRON_CELERY_TASKS_SECS = '7.0'
+DEFAULT_PERIOD_OF_PRICES_UPDATE_TASKS_SECS = '50.0'
 
 # Project Telegram
 
@@ -283,6 +284,8 @@ class Config:
         logic = config['Logic']
         self.common_period_of_cron_celery_tasks_secs: float = float(logic.get(
             'common_period_of_cron_celery_tasks_secs', DEFAULT_COMMON_PERIOD_OF_CRON_CELERY_TASKS_SECS))
+        self.period_of_prices_update_tasks_secs: float = float(logic.get(
+            'period_of_prices_update_tasks_secs', DEFAULT_PERIOD_OF_PRICES_UPDATE_TASKS_SECS))
         signal = config['Signal']
         self.accessible_main_coins: List[str] = signal['accessible_main_coins'].split(',')
         self.all_accessible_main_coins: List[str] = signal['all_accessible_main_coins'].split(',')
