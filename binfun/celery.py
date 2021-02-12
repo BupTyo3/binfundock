@@ -106,5 +106,12 @@ app.conf.beat_schedule = {
         "options": {"expires": _COMMON_EXPIRES_OF_CRON_TASK_SECS},
         "schedule": _COMMON_CRON_PERIOD_SECS + (_COMMON_CRON_DELTA_SECS * _LIST_OF_DELTAS_FACTOR.pop()),
     },
+    # UPDATE PRICES WORKER
+    "update_prices_task": {
+        "task": "apps.pair.tasks.update_prices_task",
+
+        "options": {"expires": _COMMON_EXPIRES_OF_CRON_TASK_SECS},
+        "schedule": conf_obj.period_of_prices_update_tasks_secs,
+    },
 }
 

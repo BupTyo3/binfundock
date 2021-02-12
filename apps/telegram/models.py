@@ -900,11 +900,21 @@ class Telegram(BaseTelegram):
                                                                 message.date, channel_abbr, message.id)
                             await self.send_message_by_template(int(conf_obj.lucrative), signal[0],
                                                                 message.date, channel_abbr, message.id)
+                    urgent_action = signal[0].current_price
+                    obj = SignalOrig.objects.filter(
+                        symbol=signal[0].pair, techannel__name=channel_abbr).order_by('id').last()
+                    if urgent_action == 'activate':
+                        'obj buy by market'
+                    if urgent_action == 'cancel':
+                        'obj sell by market'
+
 
     def parse_wcse_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
         is_new_signal = 'New Signal Created'
+        is_signal_activated = 'Signal Activated'
+        is_signal_cancelled = 'Signal Cancelled'
         is_futures_label = 'BinanceFutures'
         buy_label = '🔀 Entry Zone 🔀'
         long_label = 'Long'
@@ -919,6 +929,19 @@ class Telegram(BaseTelegram):
         entries = []
         profits = []
         stop_loss = ''
+
+        if is_signal_activated in splitted_info[0]:
+            pair_info = splitted_info[1].split('#')
+            pair = ''.join(filter(str.isalpha, pair_info[1]))
+            current_price = 'activate'
+            return signals.append(SignalModel(pair, current_price, is_margin, position,
+                                              leverage, entries, profits, stop_loss, message_id))
+        if is_signal_cancelled in splitted_info[0]:
+            pair_info = splitted_info[1].split('#')
+            pair = ''.join(filter(str.isalpha, pair_info[1]))
+            current_price = 'cancel'
+            return signals.append(SignalModel(pair, current_price, is_margin, position,
+                                              leverage, entries, profits, stop_loss, message_id))
         if is_new_signal in splitted_info[0]:
             pair_info = splitted_info[1].split('#')
             pair = ''.join(filter(str.isalpha, pair_info[1]))

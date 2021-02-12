@@ -17,6 +17,7 @@ WEB_GLOB_PORT=8100
 ```ini
 [Logic]
 common_period_of_cron_celery_tasks_secs=7.0
+period_of_prices_update_tasks_secs=50.0
 [Market]
 market_api_key=xxx
 market_api_secret=xxx

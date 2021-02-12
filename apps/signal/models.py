@@ -1530,7 +1530,9 @@ class Signal(BaseSignal):
         7)Change Signal status (NEW -> PUSHED) if this is the first launch
 
         """
-        from apps.order.utils import OrderStatus
+        from apps.order.utils import (
+            NOT_SENT_ORDERS_STATUSES, SENT_ORDERS_STATUSES, ORDER_STATUSES_FOR_PUSH_JOB,
+        )
         cancelled_params = {
             'local_canceled': True,
         }
@@ -1538,11 +1540,10 @@ class Signal(BaseSignal):
             'no_need_push': False,
         }
         not_sent_params = {
-            '_status__in': [OrderStatus.NOT_SENT.value, ]
+            '_status__in': NOT_SENT_ORDERS_STATUSES,
         }
         sent_params = {
-            '_status__in': [OrderStatus.SENT.value,
-                            OrderStatus.PARTIAL.value]
+            '_status__in': SENT_ORDERS_STATUSES,
         }
         # cancel NOT_SENT local_cancelled BUY orders
         for local_cancelled_order in self.buy_orders.filter(
@@ -1561,7 +1562,7 @@ class Signal(BaseSignal):
                 **cancelled_params).filter(**sent_params).filter(**no_need_push_params):
             local_cancelled_order.cancel_into_market()
         orders_params_for_pushing = {
-            '_status': OrderStatus.NOT_SENT.value,
+            '_status__in': ORDER_STATUSES_FOR_PUSH_JOB,
             'local_canceled': False,
             'no_need_push': False,
         }
