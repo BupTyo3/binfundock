@@ -5,7 +5,7 @@ from typing import Optional, TYPE_CHECKING
 from django.db import models, transaction
 from django.contrib.auth import get_user_model
 
-from apps.order.utils import OrderStatus, OrderType, ORDER_STATUSES_FOR_PULL_JOB
+from apps.order.utils import OrderStatus, OrderType, COMPLETED_ORDER_STATUSES, ORDER_STATUSES_FOR_PULL_JOB
 from apps.market.models import Market
 from apps.signal.models import Signal
 from .base_model import (
@@ -210,7 +210,8 @@ class BuyOrder(BaseBuyOrder):
         logger.debug(f"Get info about BUY order by API: {self}")
         data = self.market_logic.get_order_info(self.symbol, self.custom_order_id)
         status, bought_quantity = data.get('status'), data.get('executed_quantity')
-        self.update_order_api_history(status, bought_quantity)
+        avg_executed_market_price = data.get('avg_executed_market_price')
+        self.update_order_api_history(status, bought_quantity, avg_executed_market_price)
 
     # @transaction.atomic
     def update_order_api_history(self, status, executed_quantity, price=None):
@@ -222,10 +223,14 @@ class BuyOrder(BaseBuyOrder):
         last_api_history = HistoryApiBuyOrder.objects.filter(main_order=self).last()
         if not last_api_history or (last_api_history.status != status or
                                     last_api_history.bought_quantity != executed_quantity):
+            if price and status in COMPLETED_ORDER_STATUSES:
+                logger.debug(f"'{self}': Update price field for COMPLETED order '{self.price}' -> '{price}'")
+                self.price = price
             self.status = status
             self.bought_quantity = executed_quantity
             HistoryApiBuyOrder.objects.create(main_order=self,
                                               status=status,
+                                              price=price,
                                               bought_quantity=executed_quantity)
         self.save()
 
@@ -479,7 +484,10 @@ class SellOrder(BaseSellOrder):
         logger.debug(f"Get info about SELL order by API: {self}")
         data = self.market_logic.get_order_info(self.symbol, self.custom_order_id)
         status, sold_quantity, price = data.get('status'), data.get('executed_quantity'), data.get('price')
-        self.update_order_api_history(status, sold_quantity, price)
+        avg_executed_market_price = data.get('avg_executed_market_price')
+        self.update_order_api_history(status,
+                                      sold_quantity,
+                                      avg_executed_market_price or price)
 
     # @transaction.atomic
     def update_order_api_history(self, status: str, executed_quantity: float, price: Optional[float] = None):
@@ -492,6 +500,9 @@ class SellOrder(BaseSellOrder):
         if not last_api_history or (last_api_history.status != status or
                                     last_api_history.sold_quantity != executed_quantity):
             # Update order
+            if price and status in COMPLETED_ORDER_STATUSES:
+                logger.debug(f"'{self}': Update price field for COMPLETED order '{self.price}' -> '{price}'")
+                self.price = price
             self.status = status
             self.sold_quantity = executed_quantity
             if self.type == OrderType.MARKET.value and price:
@@ -500,14 +511,12 @@ class SellOrder(BaseSellOrder):
             # Create history record
             HistoryApiSellOrder.objects.create(main_order=self,
                                                status=status,
+                                               price=price,
                                                sold_quantity=executed_quantity)
         self.save()
 
 
 class HistoryApiBuyOrder(HistoryApiBaseOrder):
-    status = models.CharField(max_length=32,
-                              choices=OrderStatus.choices(),
-                              default=OrderStatus.NOT_SENT.value)
     main_order = models.ForeignKey(to=BuyOrder,
                                    related_name='api_history',
                                    on_delete=models.CASCADE)
@@ -520,9 +529,6 @@ class HistoryApiBuyOrder(HistoryApiBaseOrder):
 
 
 class HistoryApiSellOrder(HistoryApiBaseOrder):
-    status = models.CharField(max_length=32,
-                              choices=OrderStatus.choices(),
-                              default=OrderStatus.NOT_SENT.value)
     main_order = models.ForeignKey(to=SellOrder,
                                    related_name='api_history',
                                    on_delete=models.CASCADE)

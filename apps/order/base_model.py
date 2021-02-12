@@ -38,6 +38,7 @@ class BaseOrder(SystemBaseModel):
     symbol = models.CharField(max_length=16)
     quantity = models.FloatField()
     price = models.FloatField()
+    init_price = models.FloatField(default=0)
     _status = models.CharField(max_length=32,
                                choices=OrderStatus.choices(),
                                default=OrderStatus.NOT_SENT.value,
@@ -70,6 +71,8 @@ class BaseOrder(SystemBaseModel):
         """
         Addition: Form custom_order_id on creation
         """
+        if not self.pk:
+            self.init_price = self.price
         if not self.pk and not self.custom_order_id:
             self.custom_order_id = self.form_order_id(
                 message_id=self.signal.outer_signal_id,
@@ -225,6 +228,10 @@ class BaseSellOrder(BaseOrder):
 
 
 class HistoryApiBaseOrder(SystemBaseModelWithoutModified):
+    status = models.CharField(max_length=32,
+                              choices=OrderStatus.choices(),
+                              default=OrderStatus.NOT_SENT.value)
+    price = models.FloatField(default=0)
 
     class Meta:
         abstract = True
