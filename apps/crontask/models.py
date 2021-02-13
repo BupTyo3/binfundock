@@ -46,6 +46,7 @@ class CronTask(CronTaskBase):
     crypto_zone = models.BooleanField(default=False)
     wcse = models.BooleanField(default=False)
     klondike_margin = models.BooleanField(default=False)
+    klondike_scalp = models.BooleanField(default=False)
     server = models.BooleanField(default=False)
 
     balance_to_signal_perc = models.FloatField(

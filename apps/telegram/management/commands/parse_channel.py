@@ -235,6 +235,20 @@ class Command(SystemCommand):
             self._client_luck.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
+    def collect_info_from_klondike_scalp_channel(self):
+        session_name = 'klondike_scalp'
+        self.init_telegram_luck(session_name)
+        logger.debug(f'Session {session_name} initialized')
+        try:
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_klondike_channel('scalp'))
+        except Exception as e:
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
+        finally:
+            self._client_luck.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
+
     def collect_info_from_server_channel(self):
         session_name = 'Server'
         self.init_telegram(session_name)
@@ -266,6 +280,7 @@ class Command(SystemCommand):
         crypto_zone_matches = ["crypto_zone"]
         wcse_matches = ["wcse"]
         klondike_margin_matches = ["klondike_margin"]
+        klondike_scalp_matches = ["klondike_scalp"]
         server_matches = ["server"]
 
         if not get_or_create_crontask().server:
@@ -347,3 +362,8 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in klondike_margin_matches):
             self.collect_info_from_klondike_channel()
+
+        if not get_or_create_crontask().klondike_scalp:
+            pass
+        elif any(x in channel for x in klondike_scalp_matches):
+            self.collect_info_from_klondike_scalp_channel()
