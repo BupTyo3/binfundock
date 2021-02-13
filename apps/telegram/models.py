@@ -931,14 +931,16 @@ class Telegram(BaseTelegram):
         stop_loss = ''
 
         if is_signal_activated in splitted_info[0]:
-            pair_info = splitted_info[1].split('#')
-            pair = ''.join(filter(str.isalpha, pair_info[1]))
+            pair_info = splitted_info[0].split('#')
+            pair_info = pair_info[1].split('** **')
+            pair = ''.join(filter(str.isalpha, pair_info[0]))
             current_price = 'activate'
             return signals.append(SignalModel(pair, current_price, is_margin, position,
                                               leverage, entries, profits, stop_loss, message_id))
         if is_signal_cancelled in splitted_info[0]:
-            pair_info = splitted_info[1].split('#')
-            pair = ''.join(filter(str.isalpha, pair_info[1]))
+            pair_info = splitted_info[0].split('#')
+            pair_info = pair_info[1].split('** **')
+            pair = ''.join(filter(str.isalpha, pair_info[0]))
             current_price = 'cancel'
             return signals.append(SignalModel(pair, current_price, is_margin, position,
                                               leverage, entries, profits, stop_loss, message_id))
@@ -958,7 +960,7 @@ class Telegram(BaseTelegram):
                 except ValueError as e:
                     return signals.append(SignalModel(pair, current_price, is_margin, position,
                                                       leverage, entries, profits, stop_loss, message_id))
-                possible_entries = splitted_info[entry_index + 1:entry_index + 3]
+                possible_entries = splitted_info[entry_index + 1:entry_index + 4]
                 for possible_entry in possible_entries:
                     entry = possible_entry.split(' ')
                     entries.append(entry[1])
@@ -1513,7 +1515,7 @@ class SignalVerification:
         dot_position = current_pair_info['price'].index('.')
         stop_loss = ''
         if pair_object.stop_loss.find('.') > 0:
-            return stop_loss
+            return pair_object.stop_loss
         if dot_position:
             if pair_object.stop_loss.find('.') != dot_position:
                 stop_loss = pair_object.stop_loss[:dot_position] + "." + pair_object.stop_loss[dot_position:]
