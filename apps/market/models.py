@@ -130,14 +130,14 @@ class BinanceDataMixin:
         return response[self.executed_quantity_]
 
     @floated_result
-    def _get_avg_executed_price(self, response) -> Optional[float]:
+    def _get_avg_executed_price(self, response) -> float:
         """Get partially data by key price"""
         avg_price = response.get(self.avgPrice_)
         if avg_price:
             return avg_price
         fills = response.get(self.fills_)
         if not fills:
-            return None
+            return 0
         res = 0
         n = 0
         for order in fills:
