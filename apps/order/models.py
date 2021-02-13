@@ -230,7 +230,7 @@ class BuyOrder(BaseBuyOrder):
             self.bought_quantity = executed_quantity
             HistoryApiBuyOrder.objects.create(main_order=self,
                                               status=status,
-                                              price=price,
+                                              price=price if price else 0,
                                               bought_quantity=executed_quantity)
         self.save()
 
@@ -511,7 +511,7 @@ class SellOrder(BaseSellOrder):
             # Create history record
             HistoryApiSellOrder.objects.create(main_order=self,
                                                status=status,
-                                               price=price,
+                                               price=price if price else 0,
                                                sold_quantity=executed_quantity)
         self.save()
 

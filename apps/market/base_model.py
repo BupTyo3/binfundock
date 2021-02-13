@@ -32,7 +32,7 @@ class PartialResponse(TypedDict):
     status_updated: bool
     price: float
     executed_quantity: float
-    avg_executed_market_price: float
+    avg_executed_market_price: Optional[float]
 
 
 class BaseMarketException(ABC):
