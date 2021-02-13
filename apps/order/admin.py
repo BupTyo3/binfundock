@@ -82,6 +82,7 @@ class BuyOrderAdmin(admin.ModelAdmin):
                     's_id',
                     's_status',
                     'price',
+                    'init_price',
                     'quantity',
                     'bought_quantity',
                     'trigger',
@@ -123,6 +124,7 @@ class SellOrderAdmin(admin.ModelAdmin):
                     's_id',
                     's_status',
                     'price',
+                    'init_price',
                     'quantity',
                     'sold_quantity',
                     'trigger',
@@ -176,7 +178,10 @@ class HistoryApiBuyOrderAdmin(admin.ModelAdmin):
     list_display = ['id',
                     's_id',
                     's_status',
-                    'main_order', 'status', 'bought_quantity',
+                    'main_order',
+                    'status',
+                    'price',
+                    'bought_quantity',
                     'created',
                     ]
     select_related_fields = ['main_order', 'main_order__signal', ]
@@ -202,7 +207,10 @@ class HistoryApiSellOrderAdmin(admin.ModelAdmin):
     list_display = ['id',
                     's_id',
                     's_status',
-                    'main_order', 'status', 'sold_quantity',
+                    'main_order',
+                    'status',
+                    'price',
+                    'sold_quantity',
                     'created',
                     ]
     select_related_fields = ['main_order', 'main_order__signal', ]

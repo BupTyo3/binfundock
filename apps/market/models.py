@@ -98,6 +98,7 @@ class Market(BaseMarket):
 
 class BinanceDataMixin:
     askPrice_ = 'askPrice'
+    avgPrice_ = 'avgPrice'
     baseAsset_ = 'baseAsset'
     bidPrice_ = 'bidPrice'
     fills_ = 'fills'
@@ -131,7 +132,12 @@ class BinanceDataMixin:
     @floated_result
     def _get_avg_executed_price(self, response) -> float:
         """Get partially data by key price"""
+        avg_price = response.get(self.avgPrice_)
+        if avg_price:
+            return avg_price
         fills = response.get(self.fills_)
+        if not fills:
+            return 0
         res = 0
         n = 0
         for order in fills:
@@ -213,7 +219,7 @@ class BiMarketLogic(BaseMarketLogic,
             'status': order_status,
             'status_updated': updated,
             'price': self._get_price(response) if response.get(self.price_) else None,
-            'avg_executed_market_price': self._get_avg_executed_price(response) if response.get(self.fills_) else None,
+            'avg_executed_market_price': self._get_avg_executed_price(response),
             'executed_quantity': self._get_executed_quantity(response)
         })
         return res
@@ -296,7 +302,8 @@ class BiMarketLogic(BaseMarketLogic,
             symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
         data = self._get_partially_order_data_from_response(response)
         status, executed_quantity = data.get('status'), data.get('executed_quantity')
-        order.update_order_api_history(status, executed_quantity)
+        avg_executed_market_price = data.get('avg_executed_market_price')
+        order.update_order_api_history(status, executed_quantity, avg_executed_market_price)
         return response
 
     def push_sell_oco_order(self, order: 'SellOrder'):
@@ -312,8 +319,8 @@ class BiMarketLogic(BaseMarketLogic,
             trigger=order.sl_order.trigger, stop_limit_price=order.sl_order.price)
         default_executed_quantity = 0.0
         default_status = OrderStatus.SENT.value
-        order.update_order_api_history(default_status, default_executed_quantity)
-        order.sl_order.update_order_api_history(default_status, default_executed_quantity)
+        order.update_order_api_history(default_status, default_executed_quantity, order.price)
+        order.sl_order.update_order_api_history(default_status, default_executed_quantity, order.sl_order.price)
         return response
 
     def push_sell_market_order(self, order: 'SellOrder'):
@@ -459,7 +466,7 @@ class BiFuturesMarketLogic(BaseMarketLogic,
             'status': order_status,
             'status_updated': updated,
             'price': self._get_price(response) if response.get(self.price_) else None,
-            'avg_executed_market_price': self._get_avg_executed_price(response) if response.get(self.fills_) else None,
+            'avg_executed_market_price': self._get_avg_executed_price(response),
             'executed_quantity': self._get_executed_quantity(response)
         })
         return res
@@ -614,7 +621,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
             symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
         data = self._get_partially_order_data_from_response(response)
         status, executed_quantity = data.get('status'), data.get('executed_quantity')
-        order.update_order_api_history(status, executed_quantity)
+        avg_executed_market_price = data.get('avg_executed_market_price')
+        order.update_order_api_history(status, executed_quantity, avg_executed_market_price)
         return response
 
     def push_sell_limit_order(self, order: 'BuyOrder'):
@@ -625,7 +633,8 @@ class BiFuturesMarketLogic(BaseMarketLogic,
             symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
         data = self._get_partially_order_data_from_response(response)
         status, executed_quantity = data.get('status'), data.get('executed_quantity')
-        order.update_order_api_history(status, executed_quantity)
+        avg_executed_market_price = data.get('avg_executed_market_price')
+        order.update_order_api_history(status, executed_quantity, avg_executed_market_price)
         return response
 
     def push_sell_market_order(self, order):
@@ -670,7 +679,7 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         data = self._get_partially_order_data_from_response(response)
         status, executed_quantity = data.get('status'), data.get('executed_quantity')
         avg_executed_market_price = data.get('avg_executed_market_price')
-        order.update_order_api_history(status, executed_quantity, avg_executed_market_price)
+        order.update_order_api_history(status, executed_quantity, avg_executed_market_price or order.price)
         return response
 
     def push_buy_gl_sl_market_order(self, order):
@@ -685,7 +694,7 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         data = self._get_partially_order_data_from_response(response)
         status, executed_quantity = data.get('status'), data.get('executed_quantity')
         avg_executed_market_price = data.get('avg_executed_market_price')
-        order.update_order_api_history(status, executed_quantity, avg_executed_market_price)
+        order.update_order_api_history(status, executed_quantity, avg_executed_market_price or order.price)
         return response
 
     def push_sell_oco_order(self, order):
@@ -702,7 +711,7 @@ class BiFuturesMarketLogic(BaseMarketLogic,
             custom_order_id=order.custom_order_id, stop_trigger=order.trigger)
         default_executed_quantity = 0.0
         default_status = OrderStatus.SENT.value
-        order.update_order_api_history(default_status, default_executed_quantity)
+        order.update_order_api_history(default_status, default_executed_quantity, order.price)
         return response
 
     def push_buy_tp_order(self, order: 'SellOrder'):
@@ -716,7 +725,7 @@ class BiFuturesMarketLogic(BaseMarketLogic,
             custom_order_id=order.custom_order_id, stop_trigger=order.trigger)
         default_executed_quantity = 0.0
         default_status = OrderStatus.SENT.value
-        order.update_order_api_history(default_status, default_executed_quantity)
+        order.update_order_api_history(default_status, default_executed_quantity, order.price)
         return response
 
     def cancel_order(self, order: 'BaseOrder'):

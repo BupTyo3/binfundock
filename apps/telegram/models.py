@@ -958,7 +958,7 @@ class Telegram(BaseTelegram):
                 except ValueError as e:
                     return signals.append(SignalModel(pair, current_price, is_margin, position,
                                                       leverage, entries, profits, stop_loss, message_id))
-                possible_entries = splitted_info[entry_index + 1:entry_index + 4]
+                possible_entries = splitted_info[entry_index + 1:entry_index + 3]
                 for possible_entry in possible_entries:
                     entry = possible_entry.split(' ')
                     entries.append(entry[1])
