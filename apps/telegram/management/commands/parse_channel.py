@@ -38,6 +38,7 @@ class Command(SystemCommand):
     def collect_info_from_china_channel(self):
         session_name = 'Artificial_Intelligence'
         self.init_telegram(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_china_channel())
@@ -46,10 +47,12 @@ class Command(SystemCommand):
             traceback.print_exc()
         finally:
             self._client.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
 
     def collect_info_from_angel_channel(self):
         session_name = 'CryptoAngel'
         self.init_telegram_luck(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_crypto_angel_channel())
@@ -58,10 +61,12 @@ class Command(SystemCommand):
             traceback.print_exc()
         finally:
             self._client_luck.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
 
     def collect_info_from_tca_altcoin_channel(self):
         session_name = 'TCA_Altcoin'
         self.init_telegram_luck(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_tca_channel('altcoin'))
@@ -74,6 +79,7 @@ class Command(SystemCommand):
     def collect_info_from_tca_leverage_channel(self):
         session_name = 'TCA_Leverage'
         self.init_telegram_luck(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_tca_channel('leverage'))
@@ -82,10 +88,12 @@ class Command(SystemCommand):
             traceback.print_exc()
         finally:
             self._client_luck.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
 
     def collect_info_from_cf_trader_channel(self):
         session_name = 'CF_Trader'
         self.init_telegram_luck(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_cf_trader_channel())
@@ -94,10 +102,12 @@ class Command(SystemCommand):
             traceback.print_exc()
         finally:
             self._client_luck.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
 
     def collect_info_from_margin_whales_channel(self):
         session_name = 'Lucrative-Whales'
         self.init_telegram(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_margin_whale_channel())
@@ -110,6 +120,7 @@ class Command(SystemCommand):
     def collect_info_from_white_bull_channel(self):
         session_name = 'White_Bull'
         self.init_telegram_luck(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_white_bull_channel())
@@ -134,6 +145,7 @@ class Command(SystemCommand):
     def collect_info_from_lucrative_trend_channel(self):
         session_name = 'LucrativeRecommendations'
         self.init_telegram(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_lucrative_trend_channel())
@@ -142,10 +154,12 @@ class Command(SystemCommand):
             traceback.print_exc()
         finally:
             self._client.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
 
     def collect_info_from_luck_channel(self):
         session_name = 'Luck'
         self.init_telegram(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_luck_channel())
@@ -154,10 +168,12 @@ class Command(SystemCommand):
             traceback.print_exc()
         finally:
             self._client.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
 
     def collect_info_from_raticoin_channel(self):
         session_name = 'Rati_Coin'
         self.init_telegram_luck(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_raticoin_channel())
@@ -194,6 +210,7 @@ class Command(SystemCommand):
     def collect_info_from_wcse_channel(self):
         session_name = 'WCSE'
         self.init_telegram(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_wcse_channel())
@@ -202,10 +219,12 @@ class Command(SystemCommand):
             traceback.print_exc()
         finally:
             self._client.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
 
     def collect_info_from_klondike_channel(self):
         session_name = 'klondike_margin'
         self.init_telegram_luck(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client_luck:
                 self._client_luck.loop.run_until_complete(self._telegram_luck.parse_klondike_channel())
@@ -214,10 +233,12 @@ class Command(SystemCommand):
             traceback.print_exc()
         finally:
             self._client_luck.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
 
     def collect_info_from_server_channel(self):
         session_name = 'Server'
         self.init_telegram(session_name)
+        logger.debug(f'Session {session_name} initialized')
         try:
             with self._client:
                 self._client.loop.run_until_complete(self._telegram.parse_server_channel())
@@ -226,6 +247,7 @@ class Command(SystemCommand):
             traceback.print_exc()
         finally:
             self._client.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
 
     def handle(self, *args, **options):
         channel = options['channel']
