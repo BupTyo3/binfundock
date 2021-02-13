@@ -311,6 +311,7 @@ class Config:
         self.wcse = telegram.get('wcse', None)
         self.lucrative = telegram.get('Lucrative', None)
         self.klondike_margin = telegram.get('klondike_margin', None)
+        self.klondike_scalp = telegram.get('klondike_scalp', None)
         self.server = telegram.get('Server', None)
 
 
