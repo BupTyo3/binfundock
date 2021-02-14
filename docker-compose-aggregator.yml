@@ -1,0 +1,50 @@
+version: '3.7'
+
+services:
+  db:
+    image: postgres:12.3-alpine
+#    ports:
+#      - 9876:5432
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    environment:
+#    Init db. Just for order
+      POSTGRES_DB: "${DB_NAME}"
+      POSTGRES_USER: "${DB_USER}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+  web:
+    build:
+      context: .
+    command:
+      - bash
+      - -c
+      - |
+          gunicorn \
+            --bind=0.0.0.0:8300 \
+            --capture-output \
+            binfun.wsgi:application
+    expose:
+      - 8300
+    volumes:
+      - .:/binfun
+      - static_volume:/binfun/static
+      - ./crontab:/etc/cron.d/cron-task
+    depends_on:
+      - db
+  cronjobs:
+    build: .
+    command: ["cron", "-f"]
+    volumes:
+      - .:/binfun
+  nginx:
+    build: ./nginx
+    volumes:
+      - static_volume:/binfun/static
+      - ./nginx/nginx.binfun.conf:/etc/nginx/conf.d/web.conf
+    ports:
+      - ${WEB_GLOB_PORT}:8100
+    depends_on:
+      - web
+
+volumes:
+  static_volume:

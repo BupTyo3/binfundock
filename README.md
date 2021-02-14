@@ -59,9 +59,24 @@ mkdir parsed-images
 docker-compose build
 ```
 
+- Build containers for separate AGGREGATOR service (SignalOrig)
+```bash
+docker-compose -f docker-compose-aggregator.yml build
+```
+
 - Start containers (without -d flag - not in daemon mode)
 ```bash
 docker-compose up -d
+```
+
+- Start containers for separate AGGREGATOR service (without -d flag - not in daemon mode)
+```bash
+docker-compose -f docker-compose-aggregator.yml up -d
+```
+
+- Start specific containers (without -d flag - not in daemon mode)
+```bash
+docker-compose up -d web nginx celery
 ```
 
 - Run BASH commands or django SHELL `web` WEB container
@@ -106,6 +121,15 @@ python manage.py createsuperuser
 ##### Remove DB data completely. Be careful! Make a copy first! 
 ```bash
 rm -r pgdata
+```
+
+### Add into AUTOLOAD after reboot
+```bash
+crontab -e
+```
+Add to the end of the file (change path_to_work_directory with yours)
+```
+@reboot /usr/local/bin/docker-compose -f /home/ubuntu/path_to_work_directory/binfundock/docker-compose.yml up -d > /dev/null
 ```
 
 
