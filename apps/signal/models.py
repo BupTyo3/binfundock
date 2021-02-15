@@ -4,7 +4,7 @@ from typing import Optional, List, Set, Union, TYPE_CHECKING
 
 from asgiref.sync import sync_to_async
 from django.db import models, transaction
-from django.db.models import QuerySet, Sum, F, Case, When
+from django.db.models import QuerySet, Sum, F, Case, When, Avg
 from django.utils import timezone
 
 from utils.framework.models import (
@@ -610,6 +610,16 @@ class Signal(BaseSignal):
         pair = self._get_pair()
         step_quantity = pair.step_quantity
         return self.__find_not_fractional_by_step(residual_quantity, step_quantity)
+
+    @debug_input_and_returned
+    @rounded_result
+    def _get_avg_executed_price(self) -> float:
+        """
+        Get average executed price.
+        """
+        completed_orders = self.__get_completed_sell_orders() if \
+            self.is_position_short() else self.__get_completed_buy_orders()
+        return completed_orders.aggregate(Avg('price'))['price__avg'] or 0
 
     @debug_input_and_returned
     def __form_buy_order(self, distributed_toc: float,
@@ -1963,7 +1973,10 @@ class Signal(BaseSignal):
         opened_gl_sl_orders = self.__get_gl_sl_buy_orders(statuses=OPENED_ORDER_STATUSES)
         gl_sl_order = opened_gl_sl_orders.first()
         sl_value = gl_sl_order.price
-        zero_value = EntryPoint.get_min_value(self)
+        zero_value = self._get_avg_executed_price()
+        if not zero_value:
+            logger.warning(f"No zero_value for Signal '{self}'")
+            return False
         if fake_price:
             current_price = fake_price
             logger.debug(f"Fake price for Trailing stop: '{fake_price}'")
@@ -2082,7 +2095,10 @@ class Signal(BaseSignal):
         opened_gl_sl_orders = self.__get_gl_sl_sell_orders(statuses=OPENED_ORDER_STATUSES)
         gl_sl_order = opened_gl_sl_orders.last()
         sl_value = gl_sl_order.price
-        zero_value = EntryPoint.get_max_value(self)
+        zero_value = self._get_avg_executed_price()
+        if not zero_value:
+            logger.warning(f"No zero_value for Signal '{self}'")
+            return False
         if fake_price:
             current_price = fake_price
             logger.debug(f"Fake price for Trailing stop: '{fake_price}'")
