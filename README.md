@@ -1,8 +1,7 @@
 ### Example `.env` File
-
+Required
 ```dotenv
 SECRET_KEY=XXX
-DEBUG=False
 
 DB_HOST=db
 DB_NAME=binfun_name
@@ -10,6 +9,11 @@ DB_USER=binfun_user
 DB_PASSWORD=binfun_password_xxx
 
 WEB_GLOB_PORT=8100
+```
+Optional
+```dotenv
+DEBUG=False
+TELETHON_LOG_LEVEL=30
 ```
 
 ### Sample `config.ini` File
@@ -25,6 +29,7 @@ futures_market_api_key=xxx
 futures_market_api_secret=xxx
 market_fee=0.1
 futures_market_fee=0.03
+inviolable_balance_perc=15.0
 [Signal]
 # for table Signal
 accessible_main_coins=USDT,
