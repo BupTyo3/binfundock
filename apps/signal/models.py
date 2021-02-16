@@ -1393,9 +1393,13 @@ class Signal(BaseSignal):
         """
         Check Signal if it has no opened Buy orders and no opened Sell orders
         """
-        from apps.order.utils import NOT_FINISHED_ORDERS_STATUSES
+        from apps.order.utils import NOT_FINISHED_ORDERS_STATUSES, COMPLETED_ORDER_STATUSES
         not_finished_orders_params = {
             '_status__in': NOT_FINISHED_ORDERS_STATUSES,
+        }
+        completed_not_handled_params = {
+            '_status__in': COMPLETED_ORDER_STATUSES,
+            'handled_worked': False,
         }
         if self.buy_orders.filter(**not_finished_orders_params).exists():
             return False
@@ -1403,6 +1407,12 @@ class Signal(BaseSignal):
         if self.sell_orders.filter(**not_finished_orders_params).exists():
             return False
         logger.debug(f"2/2:Signal '{self}' has no Opened SELL orders")
+        if self.buy_orders.filter(**completed_not_handled_params).exists():
+            return False
+        logger.debug(f"3/4:Signal '{self}' has no Completed not handled BUY orders")
+        if self.sell_orders.filter(**completed_not_handled_params).exists():
+            return False
+        logger.debug(f"4/4:Signal '{self}' has no Completed not handled SELL orders")
         return True
 
     @debug_input_and_returned
