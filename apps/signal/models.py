@@ -447,8 +447,10 @@ class Signal(BaseSignal):
         How much money we allocate for one Signal
         If free_balance 1000 usd, 10% - config parameter, so
          result will be 100 usd"""
-        res = (self._get_current_balance_of_main_coin(fake_balance=fake_balance) *
-               self.techannel.balance_to_signal_perc /
+        current_balance = self._get_current_balance_of_main_coin(fake_balance=fake_balance)
+        # subtract inviolable balance
+        current_balance_minus_inviolable = subtract_fee(current_balance, self.conf.inviolable_balance_perc)
+        res = (current_balance_minus_inviolable * self.techannel.balance_to_signal_perc /
                self.conf.one_hundred_percent)
         return res
         # return res / n_distribution  # эквивалент 33 долларов

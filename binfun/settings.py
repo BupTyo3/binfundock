@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.0/ref/settings/
 """
 import configparser
+import logging
 import os
 
 from pathlib import Path
@@ -191,6 +192,7 @@ CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 
 # Project
+DEFAULT_INVIOLABLE_BALANCE_PERC = '15.0'
 
 # CRON TASKS
 DEFAULT_COMMON_PERIOD_OF_CRON_CELERY_TASKS_SECS = '7.0'
@@ -201,6 +203,12 @@ DEFAULT_PERIOD_OF_PRICES_UPDATE_TASKS_SECS = '50.0'
 PARSED_IMAGES_STORAGE = f'{BASE_DIR}/parsed-images'
 
 # Logger
+
+# Change telethon logging level
+logging.getLogger('telethon').setLevel(
+    level=int(os.getenv('TELETHON_LOG_LEVEL', logging.WARNING)))
+
+# Main logger settings
 
 LOGGING = {
     'version': 1,
@@ -281,6 +289,8 @@ class Config:
         self.futures_market_api_secret = market.get('futures_market_api_secret', None)
         self.market_fee: float = market.getfloat('market_fee')
         self.futures_market_fee: float = market.getfloat('futures_market_fee')
+        self.inviolable_balance_perc: float = float(market.get(
+            'inviolable_balance_perc', DEFAULT_INVIOLABLE_BALANCE_PERC))
         logic = config['Logic']
         self.common_period_of_cron_celery_tasks_secs: float = float(logic.get(
             'common_period_of_cron_celery_tasks_secs', DEFAULT_COMMON_PERIOD_OF_CRON_CELERY_TASKS_SECS))
