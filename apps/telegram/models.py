@@ -791,12 +791,12 @@ class Telegram(BaseTelegram):
         return signals
 
     async def parse_klondike_channel(self, name=None):
-        channel_id = int(conf_obj.klondike_scalp)
+        channel_id = None
         if name:
             channel_id = int(conf_obj.klondike_scalp)
             channel_abbr = 'kl_sc'
         else:
-            int(conf_obj.klondike_margin)
+            channel_id = int(conf_obj.klondike_margin)
             channel_abbr = 'kl_mg'
 
         # entity = await self.client.get_entity('@WCSEBot')
@@ -1204,6 +1204,7 @@ class Telegram(BaseTelegram):
         if not signal[0].pair:
             return
         signal[0].pair = check_pair(signal[0].pair)
+        signal[0].pair = '1INCHUSDT' if signal[0].pair == 'INCHUSDT' else signal[0].pair
         sm_obj = SignalOrig.objects.filter(outer_signal_id=message_id, techannel__name=channel_abbr).first()
         if sm_obj:
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists")
