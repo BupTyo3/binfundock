@@ -447,8 +447,10 @@ class Signal(BaseSignal):
         How much money we allocate for one Signal
         If free_balance 1000 usd, 10% - config parameter, so
          result will be 100 usd"""
-        res = (self._get_current_balance_of_main_coin(fake_balance=fake_balance) *
-               self.techannel.balance_to_signal_perc /
+        current_balance = self._get_current_balance_of_main_coin(fake_balance=fake_balance)
+        # subtract inviolable balance
+        current_balance_minus_inviolable = subtract_fee(current_balance, self.conf.inviolable_balance_perc)
+        res = (current_balance_minus_inviolable * self.techannel.balance_to_signal_perc /
                self.conf.one_hundred_percent)
         return res
         # return res / n_distribution  # эквивалент 33 долларов
@@ -1393,9 +1395,13 @@ class Signal(BaseSignal):
         """
         Check Signal if it has no opened Buy orders and no opened Sell orders
         """
-        from apps.order.utils import NOT_FINISHED_ORDERS_STATUSES
+        from apps.order.utils import NOT_FINISHED_ORDERS_STATUSES, COMPLETED_ORDER_STATUSES
         not_finished_orders_params = {
             '_status__in': NOT_FINISHED_ORDERS_STATUSES,
+        }
+        completed_not_handled_params = {
+            '_status__in': COMPLETED_ORDER_STATUSES,
+            'handled_worked': False,
         }
         if self.buy_orders.filter(**not_finished_orders_params).exists():
             return False
@@ -1403,6 +1409,12 @@ class Signal(BaseSignal):
         if self.sell_orders.filter(**not_finished_orders_params).exists():
             return False
         logger.debug(f"2/2:Signal '{self}' has no Opened SELL orders")
+        if self.buy_orders.filter(**completed_not_handled_params).exists():
+            return False
+        logger.debug(f"3/4:Signal '{self}' has no Completed not handled BUY orders")
+        if self.sell_orders.filter(**completed_not_handled_params).exists():
+            return False
+        logger.debug(f"4/4:Signal '{self}' has no Completed not handled SELL orders")
         return True
 
     @debug_input_and_returned
