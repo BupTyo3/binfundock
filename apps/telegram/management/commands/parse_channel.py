@@ -104,19 +104,6 @@ class Command(SystemCommand):
             self._client_luck.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
-    def collect_info_from_margin_whales_channel(self):
-        session_name = 'Lucrative-Whales'
-        self.init_telegram(session_name)
-        logger.debug(f'Session {session_name} initialized')
-        try:
-            with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_margin_whale_channel())
-        except Exception as e:
-            logger.error(f'Session {session_name} ERROR: {e}')
-            traceback.print_exc()
-        finally:
-            self._client.disconnect()
-
     def collect_info_from_white_bull_channel(self):
         session_name = 'White_Bull'
         self.init_telegram_luck(session_name)
@@ -129,18 +116,6 @@ class Command(SystemCommand):
             traceback.print_exc()
         finally:
             self._client_luck.disconnect()
-
-    def collect_info_from_simple_future_channel(self):
-        session_name = 'Simple-Future'
-        self.init_telegram(session_name)
-        try:
-            with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_simple_future_channel())
-        except Exception as e:
-            logger.error(f'Session {session_name} ERROR: {e}')
-            traceback.print_exc()
-        finally:
-            self._client.disconnect()
 
     def collect_info_from_lucrative_trend_channel(self):
         session_name = 'LucrativeRecommendations'
@@ -169,43 +144,6 @@ class Command(SystemCommand):
         finally:
             self._client.disconnect()
             logger.debug(f'Session {session_name} disconnected')
-
-    def collect_info_from_raticoin_channel(self):
-        session_name = 'Rati_Coin'
-        self.init_telegram_luck(session_name)
-        logger.debug(f'Session {session_name} initialized')
-        try:
-            with self._client_luck:
-                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_raticoin_channel())
-        except Exception as e:
-            logger.error(f'Session {session_name} ERROR: {e}')
-            traceback.print_exc()
-        finally:
-            self._client_luck.disconnect()
-
-    def collect_info_from_crypto_zone_channel(self):
-        session_name = 'Crypto_Zone'
-        self.init_telegram(session_name)
-        try:
-            with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_crypto_zone_channel())
-        except Exception as e:
-            logger.error(f'Session {session_name} ERROR: {e}')
-            traceback.print_exc()
-        finally:
-            self._client.disconnect()
-
-    def collect_info_from_bull_exclusive_channel(self):
-        session_name = 'Bull_Exclusive'
-        self.init_telegram_luck(session_name)
-        try:
-            with self._client_luck:
-                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_bull_exclusive_channel())
-        except Exception as e:
-            logger.error(f'Session {session_name} ERROR: {e}')
-            traceback.print_exc()
-        finally:
-            self._client_luck.disconnect()
 
     def collect_info_from_wcse_channel(self):
         session_name = 'WCSE'
@@ -270,14 +208,9 @@ class Command(SystemCommand):
         tca_altcoin_matches = ["tca_altcoin", "altcoin", "altcoins"]
         tca_leverage_matches = ["tca_leverage", "leverage"]
         tca_origin_matches = ["tca_origin", "origin"]
-        margin_whale_matches = ["marginwhale"]
-        white_bull_matches = ["white_bulls", "whitebull", "white", "margin_whale"]
-        simple_future_matches = ["simple_future"]
+        white_bull_matches = ["white_bulls", "whitebull", "white"]
         lucrative_recommendation_matches = ["recommend"]
         luck_matches = ["luck"]
-        raticoin_matches = ["raticoin"]
-        bull_exclusive_matches = ["bull_exclusive"]
-        crypto_zone_matches = ["crypto_zone"]
         wcse_matches = ["wcse"]
         klondike_margin_matches = ["klondike_margin"]
         klondike_scalp_matches = ["klondike_scalp"]
@@ -313,20 +246,10 @@ class Command(SystemCommand):
         elif any(x in channel for x in tca_origin_matches):
             self.collect_info_from_cf_trader_channel()
 
-        if not get_or_create_crontask().margin_whale:
-            pass
-        elif any(x in channel for x in margin_whale_matches):
-            self.collect_info_from_margin_whales_channel()
-
         if not get_or_create_crontask().white_bull:
             pass
         elif any(x in channel for x in white_bull_matches):
             self.collect_info_from_white_bull_channel()
-
-        if not get_or_create_crontask().simple_future:
-            pass
-        elif any(x in channel for x in simple_future_matches):
-            self.collect_info_from_simple_future_channel()
 
         if not get_or_create_crontask().lucrative_recommendations:
             pass
@@ -337,21 +260,6 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in luck_matches):
             self.collect_info_from_luck_channel()
-
-        if not get_or_create_crontask().raticoin:
-            pass
-        elif any(x in channel for x in raticoin_matches):
-            self.collect_info_from_raticoin_channel()
-
-        if not get_or_create_crontask().crypto_zone:
-            pass
-        elif any(x in channel for x in crypto_zone_matches):
-            self.collect_info_from_crypto_zone_channel()
-
-        if not get_or_create_crontask().bull_exclusive:
-            pass
-        elif any(x in channel for x in bull_exclusive_matches):
-            self.collect_info_from_bull_exclusive_channel()
 
         if not get_or_create_crontask().wcse:
             pass
