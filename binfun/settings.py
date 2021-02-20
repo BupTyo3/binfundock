@@ -17,12 +17,12 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 from dotenv import load_dotenv
 
-
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path, override=True)
+logging.getLogger('telethon').setLevel(level=logging.WARNING)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
