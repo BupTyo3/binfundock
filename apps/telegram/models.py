@@ -136,7 +136,8 @@ class Telegram(BaseTelegram):
         stop_loss = ['']
         signal_identification = 'CF Leverage  Trading Signal'
         for line in splitted_info:
-            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]) or line.startswith(pair_label[2]) or line.startswith(pair_label[3]):
+            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]) or line.startswith(
+                    pair_label[2]) or line.startswith(pair_label[3]):
                 possible_position_info = line.split(' ')
                 position_info = list(filter(None, possible_position_info))
                 pair = ''.join(filter(str.isalpha, position_info[1]))
@@ -440,9 +441,12 @@ class Telegram(BaseTelegram):
 
     async def parse_klondike_channel(self, name=None):
         channel_id = None
-        if name:
+        if name == 'scalp':
             channel_id = int(conf_obj.klondike_scalp)
             channel_abbr = 'kl_sc'
+        elif name == 'altcoin':
+            channel_id = int(conf_obj.klondike_altcoin)
+            channel_abbr = 'kl_al'
         else:
             channel_id = int(conf_obj.klondike_margin)
             channel_abbr = 'kl_mg'
@@ -471,7 +475,7 @@ class Telegram(BaseTelegram):
         signals = []
         splitted_info = message_text.splitlines()
         is_new_signal = '#SIGNAL'
-        price_between_label = 'the price between'
+        price_between_label = 'price between'
         long_label = 'LONG'
         sell_label = 'SHORT'
         goals_label = 'Targets:'
@@ -501,12 +505,16 @@ class Telegram(BaseTelegram):
                 position = 'LONG'
             if sell_label in splitted_info[price_index]:
                 position = 'SHORT'
+            if sell_label and long_label not in splitted_info[price_index]:
+                position = 'LONG'
             if cross_leverage_label in splitted_info[price_index]:
                 leverage = 25
-            else:
+            if 'X' in splitted_info[price_index]:
                 possible_leverage = splitted_info[price_index].split('X')
                 leverage = possible_leverage[1].split(' ')
                 leverage = leverage[0]
+            else:
+                leverage = 3
 
             possible_entries = splitted_info[price_index].split(' - ')
             possible_entry1 = possible_entries[0].split(' ')
@@ -516,11 +524,10 @@ class Telegram(BaseTelegram):
 
             try:
                 goals_index = [i for i, s in enumerate(splitted_info) if goals_label in s]
-                # goals_index = splitted_info.index(goals_label)
             except ValueError as e:
                 return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                                 leverage, entries, profits, stop_loss, message_id))
-            possible_targets = splitted_info[goals_index[0] + 2 : goals_index[0] + 7]
+                                                  leverage, entries, profits, stop_loss, message_id))
+            possible_targets = splitted_info[goals_index[0] + 2: goals_index[0] + 7]
             for possible_target in possible_targets:
                 target = possible_target.split('$')
                 profits.append(target[1])
@@ -567,7 +574,6 @@ class Telegram(BaseTelegram):
                         'obj buy by market'
                     if urgent_action == 'cancel':
                         'obj sell by market'
-
 
     def parse_wcse_message(self, message_text, message_id):
         signals = []

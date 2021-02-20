@@ -187,6 +187,20 @@ class Command(SystemCommand):
             self._client_luck.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
+    def collect_info_from_klondike_altcoin_channel(self):
+        session_name = 'klondike_altcoin'
+        self.init_telegram_luck(session_name)
+        logger.debug(f'Session {session_name} initialized')
+        try:
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_klondike_channel('altcoin'))
+        except Exception as e:
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
+        finally:
+            self._client_luck.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
+
     def collect_info_from_server_channel(self):
         session_name = 'Server'
         self.init_telegram(session_name)
@@ -214,6 +228,7 @@ class Command(SystemCommand):
         wcse_matches = ["wcse"]
         klondike_margin_matches = ["klondike_margin"]
         klondike_scalp_matches = ["klondike_scalp"]
+        klondike_altcoin_matches = ["klondike_altcoin"]
         server_matches = ["server"]
 
         if not get_or_create_crontask().server:
@@ -275,3 +290,8 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in klondike_scalp_matches):
             self.collect_info_from_klondike_scalp_channel()
+
+        if not get_or_create_crontask().klondike_altcoin:
+            pass
+        elif any(x in channel for x in klondike_altcoin_matches):
+            self.collect_info_from_klondike_altcoin_channel()

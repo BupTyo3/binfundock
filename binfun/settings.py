@@ -317,6 +317,7 @@ class Config:
         self.lucrative = telegram.get('Lucrative', None)
         self.klondike_margin = telegram.get('klondike_margin', None)
         self.klondike_scalp = telegram.get('klondike_scalp', None)
+        self.klondike_altcoin = telegram.get('klondike_altcoin', None)
         self.server = telegram.get('Server', None)
 
 
