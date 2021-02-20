@@ -1,40 +1,27 @@
-import json
 import logging
-import random
-import os
-import shutil
-import time
-import urllib.request
-from datetime import datetime, timedelta
-from sys import platform
 
-import numpy as np
+from datetime import timedelta
+from sys import platform
 import pytesseract
-import regex
-from PIL import Image
+
 from asgiref.sync import sync_to_async
-from django.conf import settings
-from pytesseract import image_to_string
-from telethon.tl.types import User, PeerUser, PeerChannel
+from telethon.tl.types import User
 
 from apps.signal.models import SignalOrig, Signal, EntryPoint, TakeProfit
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
 from tools.tools import countdown
-from utils.parse_channels.str_parser import left_numbers, check_pair, find_number_in_list
+from utils.parse_channels.str_parser import left_numbers, check_pair
 from .base_model import BaseTelegram
-from .init_client import ShtClient
-from ..market.models import BiClient
+from .image_parser import ChinaImageToSignal
+
+from .verify_signal import SignalVerification
 from ..signal.utils import MarginType
 
 logger = logging.getLogger(__name__)
 
 if platform == "win32":
     pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
-leverage_matches = ["LATHFFA", "EFA", "FFA", "EEA", "LETHEFA", "LATHEFA", "LETHFFA", "#LAT", "#LET", "HFFA"]
-regexp_numbers = '\d+\.?\d+'
-regexp_stop = '\d+\.?\d+$'
 
 
 class SignalModel:
@@ -149,7 +136,8 @@ class Telegram(BaseTelegram):
         stop_loss = ['']
         signal_identification = 'CF Leverage  Trading Signal'
         for line in splitted_info:
-            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]) or line.startswith(pair_label[2]) or line.startswith(pair_label[3]):
+            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]) or line.startswith(
+                    pair_label[2]) or line.startswith(pair_label[3]):
                 possible_position_info = line.split(' ')
                 position_info = list(filter(None, possible_position_info))
                 pair = ''.join(filter(str.isalpha, position_info[1]))
@@ -208,221 +196,6 @@ class Telegram(BaseTelegram):
         profits = profits[:4]
         signals.append(SignalModel(pair, current_price, margin_type, position,
                                    leverage, entries, profits, stop_loss[0], message_id))
-        return signals
-
-    async def parse_margin_whale_channel(self):
-        chat_id = int(conf_obj.margin_whales)
-        channel_abbr = 'margin_whale'
-        async for message in self.client.iter_messages(chat_id, limit=5):
-            exists = await self.is_signal_handled(message.id, channel_abbr)
-            should_handle_msg = not exists
-            if should_handle_msg:
-                signal = self.parse_margin_whale_message(message.text, message.id)
-                if not signal[0].pair:
-                    return
-                inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
-                if inserted_to_db != 'success':
-                    await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                        f"please check logs for '{signal[0].pair}' "
-                                                        f"related to the '{channel_abbr}' algorithm: "
-                                                        f"{inserted_to_db}")
-                else:
-                    await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                        message.date, channel_abbr, message.id)
-                    await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                        message.date, channel_abbr, message.id)
-                    await self.send_message_by_template(int(conf_obj.lucrative), signal[0],
-                                                        message.date, channel_abbr, message.id)
-
-    def parse_margin_whale_message(self, message_text, message_id):
-        signals = []
-        splitted_info = message_text.splitlines()
-        buy_label = ['ENTRY  : ', 'ENTRY : ']
-        margin_label = '#MARGIN'
-        goals_label = 'Target'
-        stop_label = 'STOP LOSS: '
-        pair = ''
-        current_price = ''
-        is_margin = False
-        position = None
-        leverage = 'Leverage : '
-        entries = ''
-        profits = []
-        stop_loss = ''
-        for line in splitted_info:
-            if line.startswith(margin_label):
-                fake_pair = line.split(' ')
-                possible_pair = fake_pair[2]
-                if 'XBT' in possible_pair:
-                    pair = 'BTCUSDT'
-            if line.startswith(buy_label[0]) or line.startswith(buy_label[1]):
-                fake_entries = line[8:]
-                possible_entries = fake_entries.split('-')
-                entries = left_numbers(possible_entries)
-            if line.startswith(leverage):
-                possible_leverage = line.split(':')
-                leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
-            if line.startswith(goals_label):
-                possible_profits = line.split('-')
-                profits.append(possible_profits[1].replace(' ', ''))
-            if line.startswith(stop_label):
-                stop_loss = line[11:]
-        """ Take only first 4 take profits: """
-        profits = profits[:4]
-        signals.append(SignalModel(pair, current_price, is_margin, position,
-                                   leverage, entries, profits, stop_loss, message_id))
-        return signals
-
-    async def parse_simple_future_channel(self):
-        chat_id = int(conf_obj.simple_future)
-        channel_abbr = 'simple_future'
-        async for message in self.client.iter_messages(chat_id, limit=7):
-            exists = await self.is_signal_handled(message.id, channel_abbr)
-            should_handle_msg = not exists
-            if should_handle_msg:
-                signal = self.parse_simple_future_message(message.text, message.id)
-                if signal[0].entry_points != '':
-                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
-                    if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{channel_abbr}' algorithm: "
-                                                            f"{inserted_to_db}")
-                    else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                            message.date, channel_abbr, message.id)
-                        await self.send_message_by_template(int(conf_obj.lucrative), signal[0],
-                                                            message.date, channel_abbr, message.id)
-
-    def parse_simple_future_message(self, message_text, message_id):
-        signals = []
-        splitted_info = message_text.splitlines()
-        buy_label = ['🔸Short:', '🔹Buy:']
-        pair_label = '#'
-        goals_label = '📈Target'
-        stop_label = '📉Stop Loss:'
-        pair = ''
-        current_price = ''
-        is_margin = False
-        position = None
-        leverage = 'Leverage: '
-        entries = ''
-        profits = []
-        stop_loss = ''
-        for line in splitted_info:
-            if line.startswith(pair_label):
-                possible_pair = line.split(' ')
-                pair = ''.join(filter(str.isalpha, possible_pair[0]))
-            if line.startswith(leverage):
-                possible_leverage = line.split(':')
-                leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
-            if line.startswith(buy_label[0]) or line.startswith(buy_label[1]):
-                if line.startswith(buy_label[0]):
-                    position = 'Short'
-                    possible_entry = line[7:]
-                    entries = [possible_entry.replace(' ', '')]
-                if line.startswith(buy_label[1]):
-                    position = 'Long'
-                    possible_entry = line[5:]
-                    entries = [possible_entry.replace(' ', '')]
-            if line.startswith(goals_label):
-                possible_profits = line.split(':')
-                profits.append(possible_profits[1].replace(' ', ''))
-            if line.startswith(stop_label):
-                stop_loss = line[11:]
-        """ Take only first 4 take profits: """
-        profits = profits[:4]
-        signals.append(SignalModel(pair, current_price, is_margin, position,
-                                   leverage, entries, profits, stop_loss, message_id))
-        return signals
-
-    async def parse_raticoin_channel(self):
-        chat_id = int(conf_obj.raticoin)
-        channel_abbr = 'recoin'
-        async for message in self.client.iter_messages(chat_id, limit=7):
-            exists = await self.is_signal_handled(message.id, channel_abbr)
-            should_handle_msg = not exists
-            if should_handle_msg:
-                signal = self.parse_raticoin_message(message.text, message.id)
-                if signal:
-                    if signal[0].entry_points:
-                        inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
-                        if inserted_to_db != 'success':
-                            await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                                f"please check logs for '{signal[0].pair}' "
-                                                                f"related to the '{channel_abbr}' algorithm: "
-                                                                f"{inserted_to_db}")
-                        else:
-                            await self.send_message_by_template('Eugene_Povetkin', signal[0],
-                                                                message.date, channel_abbr, message.id)
-
-    def parse_raticoin_message(self, message_text, message_id):
-        signals = []
-        splitted_info = message_text.splitlines()
-        buy_label = '(LONG)'
-        short_label = '(SHORT)'
-        pair_label = '#'
-        entry_label = 'Entry Zone:'
-        goals_label = 'Take-Profit Targets:'
-        stop_label = 'Stop Targets:'
-        pair = ''
-        current_price = ''
-        is_margin = False
-        position = None
-        leverage_label = 'Leverage: '
-        leverage = ''
-        entries = []
-        profits = []
-        stop_loss = ''
-        for line in splitted_info:
-            if pair_label in line:
-                possible_pair = line.split(' ')
-                pair = ''.join(filter(str.isalpha, possible_pair[1]))
-            if line.startswith(leverage_label) and 'X)' in line:
-                possible_leverage = line.split(' ')
-                leverage = left_numbers([possible_leverage[2]])
-                leverage = leverage[0].split('.')
-                leverage = leverage[0]
-            if buy_label in line:
-                position = 'Long'
-            if short_label in line:
-                position = 'Short'
-        try:
-            entry_index = splitted_info.index(entry_label)
-        except ValueError as e:
-            return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                              leverage, entries, profits, stop_loss, message_id))
-        possible_entries = splitted_info[entry_index + 1:entry_index + 2]
-        for possible_entry in possible_entries:
-            entry = possible_entry.split('-')
-            for entr in entry:
-                entries.append(entr)
-
-        try:
-            take_profits_index = splitted_info.index(goals_label)
-        except ValueError as e:
-            return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                              leverage, entries, profits, stop_loss, message_id))
-        possible_take_profits = splitted_info[take_profits_index + 1:take_profits_index + 6]
-        for possible_take in possible_take_profits:
-            take_profit = possible_take.split(' ')
-            profits.append(take_profit[1].replace('-', ''))
-
-        try:
-            stop_index = splitted_info.index(stop_label)
-        except ValueError as e:
-            return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                              leverage, entries, profits, stop_loss, message_id))
-        possible_stop = splitted_info[stop_index + 1:stop_index + 2]
-        stop_loss = possible_stop[0].split(' ')
-        stop_loss = stop_loss[1].replace('-', '')
-
-        """ Take only first 4 take profits: """
-        if profits: profits = profits[:4]
-        signals.append(SignalModel(pair, current_price, is_margin, position,
-                                   leverage, entries, profits, stop_loss, message_id))
         return signals
 
     async def parse_lucrative_trend_channel(self):
@@ -666,135 +439,14 @@ class Telegram(BaseTelegram):
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
 
-    async def parse_bull_exclusive_channel(self):
-        channel_id = int(conf_obj.bull_exclusive)
-        channel_abbr = 'bull_excl'
-        async for message in self.client.iter_messages(channel_id, limit=10):
-            exists = await self.is_signal_handled(message.id, channel_abbr)
-            should_handle_msg = not exists
-            if message.text and should_handle_msg:
-                signal = self.parse_bull_exclusive_message(message.text, message.id)
-                last_chars = signal[0].pair[-3:]
-                is_btc_pair = last_chars == 'BTC'
-                if signal[0].entry_points and signal[0].pair and not is_btc_pair:
-                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
-                    if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{channel_abbr}' algorithm: "
-                                                            f"{inserted_to_db}")
-                    else:
-                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
-                                                            message.date, channel_abbr, message.id)
-                # TODO: CONSIDER TO BUILD LEVELS ON USDT PAIR ACCORDING TO THE BTC PAIR:
-                # elif signal[0].entry_points and signal[0].pair and is_btc_pair:
-                #     signal[0].position = 'Buy'
-                #     await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                #                                         message.date, channel_abbr, message.id)
-                #     await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                #                                         message.date, channel_abbr, message.id)
-                #     await self.send_message_to_yourself(f"Good signal for '{signal[0].pair}'\n"
-                #                                         f"Consider to process it to USDT manually")
-
-    def parse_bull_exclusive_message(self, message_text, message_id):
-        signals = []
-        splitted_info = message_text.splitlines()
-        buy_label = 'ENTRY'
-        goals_label = 'TARGETS'
-        stop_label = 'STOP LOSS'
-        pair = ''
-        current_price = ''
-        is_margin = False
-        position = 'Long'
-        leverage = 5
-        entries = ''
-        profits = ''
-        stop_loss = ''
-        if '/USDT' in splitted_info[0] or '/BTC' in splitted_info[0]:
-            pair_info = splitted_info[0].split(' ')
-            pair = ''.join(filter(str.isalpha, pair_info[0]))
-        for line in splitted_info:
-            line = line.strip()
-            if line.startswith(buy_label):
-                fake_entries = line[5:]
-                possible_entries = fake_entries.split('-')
-                entries = left_numbers(possible_entries)
-            if line.startswith(goals_label):
-                fake_profits = line[7:]
-                possible_take_profits = fake_profits.split(' - ')
-                profits = left_numbers(possible_take_profits)
-            if line.startswith(stop_label):
-                possible_stop_losses = line[9:]
-                possible_stop = possible_stop_losses.split(' ')
-                stop_loss = find_number_in_list(possible_stop)
-
-        """ Take only first 4 take profits: """
-        profits = profits[:4]
-        signals.append(SignalModel(pair, current_price, is_margin, position,
-                                   leverage, entries, profits, stop_loss, message_id))
-        return signals
-
-    async def parse_crypto_zone_channel(self):
-        channel_id = int(conf_obj.crypto_zone)
-        channel_abbr = 'crop_zone'
-        async for message in self.client.iter_messages(channel_id, limit=10):
-            exists = await self.is_signal_handled(message.id, channel_abbr)
-            should_handle_msg = not exists
-            if message.text and should_handle_msg:
-                signal = self.parse_crypto_zone_message(message.text, message.id)
-                if signal[0].entry_points and signal[0].pair:
-                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
-                    if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{channel_abbr}' algorithm: "
-                                                            f"{inserted_to_db}")
-                    else:
-                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
-                                                            message.date, channel_abbr, message.id)
-
-    def parse_crypto_zone_message(self, message_text, message_id):
-        signals = []
-        splitted_info = message_text.splitlines()
-        is_futures_label = '💠#Binance Futures Signals'
-        buy_label = ['Long/Buy', 'Buy', 'Sell']
-        goals_label = 'Targets'
-        stop_label = 'Stop Loss'
-        pair = ''
-        current_price = ''
-        is_margin = False
-        position = None
-        leverage = random.randint(5, 10)
-        entries = ''
-        profits = ''
-        stop_loss = ''
-        if is_futures_label in splitted_info[0]:
-            pair_info = splitted_info[1].split(' ')
-            pair = ''.join(filter(str.isalpha, pair_info[1]))
-            entries = [pair_info[2]]
-            if buy_label[0] in splitted_info[1] or buy_label[1] in splitted_info[1]:
-                position = 'LONG'
-            elif buy_label[2] in splitted_info[1]:
-                position = 'SHORT'
-        for line in splitted_info:
-            if line.startswith(goals_label):
-                fake_profits = line[7:]
-                possible_take_profits = fake_profits.split('-')
-                profits = left_numbers(possible_take_profits)
-            if line.startswith(stop_label):
-                stop_loss = line[9:]
-
-        """ Take only first 4 take profits: """
-        profits = profits[:4]
-        signals.append(SignalModel(pair, current_price, is_margin, position,
-                                   leverage, entries, profits, stop_loss, message_id))
-        return signals
-
     async def parse_klondike_channel(self, name=None):
         channel_id = None
-        if name:
+        if name == 'scalp':
             channel_id = int(conf_obj.klondike_scalp)
             channel_abbr = 'kl_sc'
+        elif name == 'altcoin':
+            channel_id = int(conf_obj.klondike_altcoin)
+            channel_abbr = 'kl_al'
         else:
             channel_id = int(conf_obj.klondike_margin)
             channel_abbr = 'kl_mg'
@@ -823,7 +475,7 @@ class Telegram(BaseTelegram):
         signals = []
         splitted_info = message_text.splitlines()
         is_new_signal = '#SIGNAL'
-        price_between_label = 'the price between'
+        price_between_label = 'price between'
         long_label = 'LONG'
         sell_label = 'SHORT'
         goals_label = 'Targets:'
@@ -853,12 +505,16 @@ class Telegram(BaseTelegram):
                 position = 'LONG'
             if sell_label in splitted_info[price_index]:
                 position = 'SHORT'
+            if sell_label and long_label not in splitted_info[price_index]:
+                position = 'LONG'
             if cross_leverage_label in splitted_info[price_index]:
                 leverage = 25
-            else:
+            if 'X' in splitted_info[price_index]:
                 possible_leverage = splitted_info[price_index].split('X')
                 leverage = possible_leverage[1].split(' ')
                 leverage = leverage[0]
+            else:
+                leverage = 3
 
             possible_entries = splitted_info[price_index].split(' - ')
             possible_entry1 = possible_entries[0].split(' ')
@@ -868,11 +524,10 @@ class Telegram(BaseTelegram):
 
             try:
                 goals_index = [i for i, s in enumerate(splitted_info) if goals_label in s]
-                # goals_index = splitted_info.index(goals_label)
             except ValueError as e:
                 return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                                 leverage, entries, profits, stop_loss, message_id))
-            possible_targets = splitted_info[goals_index[0] + 2 : goals_index[0] + 7]
+                                                  leverage, entries, profits, stop_loss, message_id))
+            possible_targets = splitted_info[goals_index[0] + 2: goals_index[0] + 7]
             for possible_target in possible_targets:
                 target = possible_target.split('$')
                 profits.append(target[1])
@@ -919,7 +574,6 @@ class Telegram(BaseTelegram):
                         'obj buy by market'
                     if urgent_action == 'cancel':
                         'obj sell by market'
-
 
     def parse_wcse_message(self, message_text, message_id):
         signals = []
@@ -1276,7 +930,6 @@ class Telegram(BaseTelegram):
                   f"ID: '{message_id}'"
         await self.client.send_message(channel_name, message)
 
-
 #     # @client.on(events.NewMessage)
 #     # async def my_event_handler(event):
 #     #     if 'hello' in event.raw_text:
@@ -1287,251 +940,3 @@ class Telegram(BaseTelegram):
 #     #     sender = await event.get_sender()
 #     #     chat_id = event.chat_id
 #     #     sender_id = event.sender_id
-
-
-class ChinaImageToSignal:
-
-    def read_image(self, image):
-        self.wait_for_file(image)
-        buffered_image = Image.open(image)
-        text_in_image = image_to_string(buffered_image)
-        splitted_info = text_in_image.splitlines()
-        return splitted_info
-
-    def find_pair(self, array):
-        pair = ''
-        matches = ["USDT", "USD", "BTC", "U20", "Z20"]
-
-        for item in array:
-            if any(x in item for x in matches):
-                usdt_position = item.rfind('USDT')
-                usd_position = item.rfind('USD')
-                btc_position = item.rfind('BTC')
-                utwenty_position = item.rfind('U20')
-                ztwenty_position = item.rfind('Z20')
-                if usd_position > 0:
-                    pair = item[0:usd_position + 3]
-                    pair = pair.replace('USD', 'USDT')
-                if usdt_position > 0:
-                    pair = item[0:usdt_position + 4]
-                if btc_position > 0:
-                    pair = item[0:btc_position + 3]
-                if utwenty_position > 0:
-                    pair_utwenty = item[0:utwenty_position + 3]
-                    pair = pair_utwenty.replace("U20", "BTC")
-                if ztwenty_position > 0:
-                    pair_ztwenty = item[0:ztwenty_position + 3]
-                    pair = pair_ztwenty.replace("Z20", "BTC")
-        return ''.join(filter(str.isalpha, pair))
-
-    def get_action(self, array):
-        action = None
-        for item in array:
-            if item.rfind('Buy') > 0:
-                action = 'Buy'
-                return action
-            if item.rfind('Sell') > 0:
-                action = 'Sell'
-                return action
-            if item.rfind('LONG') > 0:
-                action = 'LONG'
-                return action
-            if item.rfind('SHORT') > 0:
-                action = 'SHORT'
-                return action
-            else:
-                action = 'Buy'
-        return action
-
-    def get_leverage(self, array):
-        leverage = None
-        for item in array:
-            if any(x in item for x in leverage_matches):
-                if item.rfind(': ') > 0:
-                    leverage = item.split(': ', 1)[-1]
-                if item.rfind('= ') > 0:
-                    leverage = item.split('= ', 1)[-1]
-                leverage = leverage.strip()
-        return leverage
-
-    def find_entry_points(self, array, action, leverage):
-        for item in array:
-            result = regex.findall(regexp_numbers, item)
-            is_leverage = any(x in item for x in leverage_matches)
-            if len(result) >= 1 and not is_leverage:
-                if not action:
-                    action = 'Buy'
-                if not leverage:
-                    action = '{}: '.format(action, leverage)
-                else:
-                    action = '{} {}: '.format(action, leverage)
-                # print(action, " - ".join(str(x) for x in result))
-                return result
-
-    def find_profits(self, array, entry_points):
-        for item in array:
-            result = regex.findall(regexp_numbers, item)
-            array_equal = np.array_equal(result, entry_points)
-            if len(result) >= 3 and not array_equal:
-                return result
-
-    def find_stop(self, array):
-        for item in reversed(array):
-            result = regex.findall(regexp_stop, item)
-            if len(result) > 0:
-                # print('Stop loss: ', result[0])
-                return result[0]
-
-    def get_parsed(self, image_name, message_id):
-        array = self.read_image(image_name)
-        position = self.get_action(array)
-        leverage = self.get_leverage(array)
-
-        pair = self.find_pair(array)
-        entry_points = self.find_entry_points(array, position, leverage)
-        profits = self.find_profits(array, entry_points)
-        stop_loss = self.find_stop(array)
-        return SignalModel(pair, None, None, position, leverage, entry_points, profits, stop_loss, message_id)
-
-    def iterate_files(self, message_id):
-        pairs = []
-        directory = settings.BASE_DIR
-        for filename in os.listdir(directory):
-            if filename.endswith(".jpg"):
-                pair_info = self.get_parsed(filename, message_id)
-                pairs.append(pair_info)
-                now = str(datetime.now())[:19]
-                now = now.replace(":", "_")
-                shutil.move(f"{directory}/{filename}",
-                            f"{settings.PARSED_IMAGES_STORAGE}/" + str(now) + ".jpg")
-        return pairs
-
-    def is_locked(self, filepath):
-        locked = None
-        file_object = None
-        if os.path.exists(filepath):
-            try:
-                buffer_size = 8
-                # Opening file in append mode and read the first 8 characters.
-                file_object = open(filepath, 'a', buffer_size)
-                if file_object:
-                    locked = False
-            except IOError as message:
-                locked = True
-            finally:
-                if file_object:
-                    file_object.close()
-        return locked
-
-    def wait_for_file(self, filepath):
-        wait_time = 1
-        while self.is_locked(filepath):
-            time.sleep(wait_time)
-
-
-class SignalVerification:
-    client = BiClient
-
-    def get_active_pairs_info(self, pairs):
-        pairs_info = []
-        signals = []
-        for pair_object in pairs:
-            if pair_object.entry_points is None or pair_object.take_profits is None:
-                return False
-            price_json = ''
-            pair_info_object = ''
-            try:
-                # pair_info_object = self.client.get_symbol_info(pair_object.pair)
-                # pair_info_object = self.client.get_avg_price(symbol=pair_object.pair)
-                price_json = urllib.request.urlopen(
-                    'https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_object.pair))
-            except:
-                usdt_position = pair_object.pair.rfind('USDT')
-                btc_position = pair_object.pair.rfind('BTC')
-                if btc_position > 0:
-                    pair_corrected = pair_object.pair[0: btc_position - 1:] + pair_object.pair[btc_position::]
-                    price_json = urllib.request.urlopen(
-                        'https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_corrected))
-
-                    # pair_info_object = self.client.get_symbol_info(pair_corrected)
-                if usdt_position > 0:
-                    pair_corrected = pair_object.pair[0: usdt_position:] + pair_object.pair[usdt_position::]
-                    if pair_corrected == 'COTVUSDT':
-                        pair_corrected = 'COTIUSDT'
-                    if pair_corrected == 'lOSTUSDT':
-                        pair_corrected = 'IOSTUSDT'
-                    if pair_corrected == 'ZILIUSDT':
-                        pair_corrected = 'ZILUSDT'
-                    price_json = urllib.request.urlopen(
-                        'https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_corrected))
-                    # pair_info_object = self.client.get_symbol_info(pair_corrected)
-
-            current_pair = json.load(price_json)
-            pairs_info.append(current_pair)
-
-            entries = self.verify_entry(pair_object, current_pair)
-            profits = self.verify_profits(pair_object, current_pair)
-            stop_loss = self.verify_stop(pair_object, current_pair)
-
-            logger.debug(f"Pair: {current_pair['symbol']}")
-            # logger.debug(f"Margin allowed: {pair_info_object['isMarginTradingAllowed']}")
-            logger.debug(f"Current price: {current_pair['price']}")
-            logger.debug(f"Position: {pair_object.position}")
-            if pair_object.leverage:
-                pair_object.leverage = pair_object.leverage.split('.')
-                pair_object.leverage = ''.join(filter(str.isdigit, pair_object.leverage[0]))
-                logger.debug(f"Leverage: {pair_object.leverage}")
-            logger.debug(f"Entries: {entries}")
-            logger.debug(f"Take profits: {profits}")
-            logger.debug(f"Stop-loss: {stop_loss}")
-            logger.debug('==========================================')
-            signals.append(
-                SignalModel(current_pair['symbol'], current_pair['price'], '',
-                            pair_object.position, pair_object.leverage, entries, profits, stop_loss,
-                            pair_object.msg_id))
-        return signals
-
-    def verify_entry(self, pair_object, current_pair_info):
-
-        verified_entries = []
-        dot_position = current_pair_info['price'].index('.')
-        if dot_position:
-            for price in pair_object.entry_points:
-                # frac, whole = math.modf(int(price))
-                # if price.startswith('0') and price.find('.') != dot_position:
-                if price.find('.') != dot_position:
-                    if current_pair_info['price'].startswith('0') and not price.startswith('0'):
-                        price = '0' + price
-                    price = price[:dot_position] + "." + price[dot_position:]
-                    verified_entries.append(price)
-                else:
-                    verified_entries.append(price)
-        return verified_entries
-
-    def verify_profits(self, pair_object, current_pair_info):
-        verified_profits = []
-        pair_object.take_profits = [price for price in pair_object.take_profits if price != '00']
-        dot_position = current_pair_info['price'].index('.')
-        if dot_position:
-            for price in pair_object.take_profits:
-                # if price.find('.') > 0 and price.find('.') != dot_position:
-                if price.find('.') != dot_position and '.' not in price:
-                    if current_pair_info['price'].startswith('0') and not price.startswith('0'):
-                        price = '0' + price
-                    price = price[:dot_position] + "." + price[dot_position:]
-                    verified_profits.append(price)
-                else:
-                    verified_profits.append(price)
-        return verified_profits
-
-    def verify_stop(self, pair_object, current_pair_info):
-        dot_position = current_pair_info['price'].index('.')
-        stop_loss = ''
-        if pair_object.stop_loss.find('.') > 0:
-            return pair_object.stop_loss
-        if dot_position:
-            if pair_object.stop_loss.find('.') != dot_position:
-                stop_loss = pair_object.stop_loss[:dot_position] + "." + pair_object.stop_loss[dot_position:]
-            else:
-                stop_loss = pair_object.stop_loss
-        return stop_loss
