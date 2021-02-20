@@ -17,12 +17,12 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 from dotenv import load_dotenv
 
-
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path, override=True)
+logging.getLogger('telethon').setLevel(level=logging.WARNING)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
@@ -309,19 +309,15 @@ class Config:
         self.tca_altcoin = telegram.get('TCA_Altcoin', None)
         self.tca_leverage = telegram.get('TCA_Leverage', None)
         self.CFTrader = telegram.get('CFTrader', None)
-        self.margin_whales = telegram.get('Margin_Whales', None)
         self.white_bull = telegram.get('white_bull', None)
         self.lucrative_channel = telegram.get('Lucrative_Recommendations', None)
         self.Luck8414 = telegram.get('Luck8414', None)
-        self.simple_future = telegram.get('simple_future', None)
         self.lucrative_trend = telegram.get('Lucrative_Trend', None)
-        self.raticoin = telegram.get('Raticoin', None)
-        self.bull_exclusive = telegram.get('TheBullExclusive', None)
-        self.crypto_zone = telegram.get('CryptoZone', None)
         self.wcse = telegram.get('wcse', None)
         self.lucrative = telegram.get('Lucrative', None)
         self.klondike_margin = telegram.get('klondike_margin', None)
         self.klondike_scalp = telegram.get('klondike_scalp', None)
+        self.klondike_altcoin = telegram.get('klondike_altcoin', None)
         self.server = telegram.get('Server', None)
 
 
