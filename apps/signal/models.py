@@ -2224,12 +2224,12 @@ class Signal(BaseSignal):
             return self._push_spot_orders()
 
     @refuse_if_busy
-    def update_orders_info_by_one_signal(self):
+    def update_orders_info_by_one_signal(self, force: bool = False):
         """
         Get info for all Signals (except NEW) from Real Market by SENT orders
         """
         from apps.order.utils import ORDER_STATUSES_FOR_PULL_JOB
-        if self._status not in PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS:
+        if self._status not in PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS and not force:
             return
 
         params = {
