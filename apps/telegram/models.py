@@ -1,40 +1,27 @@
-import json
 import logging
-import random
-import os
-import shutil
-import time
-import urllib.request
-from datetime import datetime, timedelta
-from sys import platform
 
-import numpy as np
+from datetime import timedelta
+from sys import platform
 import pytesseract
-import regex
-from PIL import Image
+
 from asgiref.sync import sync_to_async
-from django.conf import settings
-from pytesseract import image_to_string
-from telethon.tl.types import User, PeerUser, PeerChannel
+from telethon.tl.types import User
 
 from apps.signal.models import SignalOrig, Signal, EntryPoint, TakeProfit
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
 from tools.tools import countdown
-from utils.parse_channels.str_parser import left_numbers, check_pair, find_number_in_list
+from utils.parse_channels.str_parser import left_numbers, check_pair
 from .base_model import BaseTelegram
-from .init_client import ShtClient
-from ..market.models import BiClient
+from .image_parser import ChinaImageToSignal
+
+from .verify_signal import SignalVerification
 from ..signal.utils import MarginType
 
 logger = logging.getLogger(__name__)
 
 if platform == "win32":
     pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
-leverage_matches = ["LATHFFA", "EFA", "FFA", "EEA", "LETHEFA", "LATHEFA", "LETHFFA", "#LAT", "#LET", "HFFA"]
-regexp_numbers = '\d+\.?\d+'
-regexp_stop = '\d+\.?\d+$'
 
 
 class SignalModel:
@@ -937,7 +924,6 @@ class Telegram(BaseTelegram):
                   f"ID: '{message_id}'"
         await self.client.send_message(channel_name, message)
 
-
 #     # @client.on(events.NewMessage)
 #     # async def my_event_handler(event):
 #     #     if 'hello' in event.raw_text:
@@ -948,251 +934,3 @@ class Telegram(BaseTelegram):
 #     #     sender = await event.get_sender()
 #     #     chat_id = event.chat_id
 #     #     sender_id = event.sender_id
-
-
-class ChinaImageToSignal:
-
-    def read_image(self, image):
-        self.wait_for_file(image)
-        buffered_image = Image.open(image)
-        text_in_image = image_to_string(buffered_image)
-        splitted_info = text_in_image.splitlines()
-        return splitted_info
-
-    def find_pair(self, array):
-        pair = ''
-        matches = ["USDT", "USD", "BTC", "U20", "Z20"]
-
-        for item in array:
-            if any(x in item for x in matches):
-                usdt_position = item.rfind('USDT')
-                usd_position = item.rfind('USD')
-                btc_position = item.rfind('BTC')
-                utwenty_position = item.rfind('U20')
-                ztwenty_position = item.rfind('Z20')
-                if usd_position > 0:
-                    pair = item[0:usd_position + 3]
-                    pair = pair.replace('USD', 'USDT')
-                if usdt_position > 0:
-                    pair = item[0:usdt_position + 4]
-                if btc_position > 0:
-                    pair = item[0:btc_position + 3]
-                if utwenty_position > 0:
-                    pair_utwenty = item[0:utwenty_position + 3]
-                    pair = pair_utwenty.replace("U20", "BTC")
-                if ztwenty_position > 0:
-                    pair_ztwenty = item[0:ztwenty_position + 3]
-                    pair = pair_ztwenty.replace("Z20", "BTC")
-        return ''.join(filter(str.isalpha, pair))
-
-    def get_action(self, array):
-        action = None
-        for item in array:
-            if item.rfind('Buy') > 0:
-                action = 'Buy'
-                return action
-            if item.rfind('Sell') > 0:
-                action = 'Sell'
-                return action
-            if item.rfind('LONG') > 0:
-                action = 'LONG'
-                return action
-            if item.rfind('SHORT') > 0:
-                action = 'SHORT'
-                return action
-            else:
-                action = 'Buy'
-        return action
-
-    def get_leverage(self, array):
-        leverage = None
-        for item in array:
-            if any(x in item for x in leverage_matches):
-                if item.rfind(': ') > 0:
-                    leverage = item.split(': ', 1)[-1]
-                if item.rfind('= ') > 0:
-                    leverage = item.split('= ', 1)[-1]
-                leverage = leverage.strip()
-        return leverage
-
-    def find_entry_points(self, array, action, leverage):
-        for item in array:
-            result = regex.findall(regexp_numbers, item)
-            is_leverage = any(x in item for x in leverage_matches)
-            if len(result) >= 1 and not is_leverage:
-                if not action:
-                    action = 'Buy'
-                if not leverage:
-                    action = '{}: '.format(action, leverage)
-                else:
-                    action = '{} {}: '.format(action, leverage)
-                # print(action, " - ".join(str(x) for x in result))
-                return result
-
-    def find_profits(self, array, entry_points):
-        for item in array:
-            result = regex.findall(regexp_numbers, item)
-            array_equal = np.array_equal(result, entry_points)
-            if len(result) >= 3 and not array_equal:
-                return result
-
-    def find_stop(self, array):
-        for item in reversed(array):
-            result = regex.findall(regexp_stop, item)
-            if len(result) > 0:
-                # print('Stop loss: ', result[0])
-                return result[0]
-
-    def get_parsed(self, image_name, message_id):
-        array = self.read_image(image_name)
-        position = self.get_action(array)
-        leverage = self.get_leverage(array)
-
-        pair = self.find_pair(array)
-        entry_points = self.find_entry_points(array, position, leverage)
-        profits = self.find_profits(array, entry_points)
-        stop_loss = self.find_stop(array)
-        return SignalModel(pair, None, None, position, leverage, entry_points, profits, stop_loss, message_id)
-
-    def iterate_files(self, message_id):
-        pairs = []
-        directory = settings.BASE_DIR
-        for filename in os.listdir(directory):
-            if filename.endswith(".jpg"):
-                pair_info = self.get_parsed(filename, message_id)
-                pairs.append(pair_info)
-                now = str(datetime.now())[:19]
-                now = now.replace(":", "_")
-                shutil.move(f"{directory}/{filename}",
-                            f"{settings.PARSED_IMAGES_STORAGE}/" + str(now) + ".jpg")
-        return pairs
-
-    def is_locked(self, filepath):
-        locked = None
-        file_object = None
-        if os.path.exists(filepath):
-            try:
-                buffer_size = 8
-                # Opening file in append mode and read the first 8 characters.
-                file_object = open(filepath, 'a', buffer_size)
-                if file_object:
-                    locked = False
-            except IOError as message:
-                locked = True
-            finally:
-                if file_object:
-                    file_object.close()
-        return locked
-
-    def wait_for_file(self, filepath):
-        wait_time = 1
-        while self.is_locked(filepath):
-            time.sleep(wait_time)
-
-
-class SignalVerification:
-    client = BiClient
-
-    def get_active_pairs_info(self, pairs):
-        pairs_info = []
-        signals = []
-        for pair_object in pairs:
-            if pair_object.entry_points is None or pair_object.take_profits is None:
-                return False
-            price_json = ''
-            pair_info_object = ''
-            try:
-                # pair_info_object = self.client.get_symbol_info(pair_object.pair)
-                # pair_info_object = self.client.get_avg_price(symbol=pair_object.pair)
-                price_json = urllib.request.urlopen(
-                    'https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_object.pair))
-            except:
-                usdt_position = pair_object.pair.rfind('USDT')
-                btc_position = pair_object.pair.rfind('BTC')
-                if btc_position > 0:
-                    pair_corrected = pair_object.pair[0: btc_position - 1:] + pair_object.pair[btc_position::]
-                    price_json = urllib.request.urlopen(
-                        'https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_corrected))
-
-                    # pair_info_object = self.client.get_symbol_info(pair_corrected)
-                if usdt_position > 0:
-                    pair_corrected = pair_object.pair[0: usdt_position:] + pair_object.pair[usdt_position::]
-                    if pair_corrected == 'COTVUSDT':
-                        pair_corrected = 'COTIUSDT'
-                    if pair_corrected == 'lOSTUSDT':
-                        pair_corrected = 'IOSTUSDT'
-                    if pair_corrected == 'ZILIUSDT':
-                        pair_corrected = 'ZILUSDT'
-                    price_json = urllib.request.urlopen(
-                        'https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_corrected))
-                    # pair_info_object = self.client.get_symbol_info(pair_corrected)
-
-            current_pair = json.load(price_json)
-            pairs_info.append(current_pair)
-
-            entries = self.verify_entry(pair_object, current_pair)
-            profits = self.verify_profits(pair_object, current_pair)
-            stop_loss = self.verify_stop(pair_object, current_pair)
-
-            logger.debug(f"Pair: {current_pair['symbol']}")
-            # logger.debug(f"Margin allowed: {pair_info_object['isMarginTradingAllowed']}")
-            logger.debug(f"Current price: {current_pair['price']}")
-            logger.debug(f"Position: {pair_object.position}")
-            if pair_object.leverage:
-                pair_object.leverage = pair_object.leverage.split('.')
-                pair_object.leverage = ''.join(filter(str.isdigit, pair_object.leverage[0]))
-                logger.debug(f"Leverage: {pair_object.leverage}")
-            logger.debug(f"Entries: {entries}")
-            logger.debug(f"Take profits: {profits}")
-            logger.debug(f"Stop-loss: {stop_loss}")
-            logger.debug('==========================================')
-            signals.append(
-                SignalModel(current_pair['symbol'], current_pair['price'], '',
-                            pair_object.position, pair_object.leverage, entries, profits, stop_loss,
-                            pair_object.msg_id))
-        return signals
-
-    def verify_entry(self, pair_object, current_pair_info):
-
-        verified_entries = []
-        dot_position = current_pair_info['price'].index('.')
-        if dot_position:
-            for price in pair_object.entry_points:
-                # frac, whole = math.modf(int(price))
-                # if price.startswith('0') and price.find('.') != dot_position:
-                if price.find('.') != dot_position:
-                    if current_pair_info['price'].startswith('0') and not price.startswith('0'):
-                        price = '0' + price
-                    price = price[:dot_position] + "." + price[dot_position:]
-                    verified_entries.append(price)
-                else:
-                    verified_entries.append(price)
-        return verified_entries
-
-    def verify_profits(self, pair_object, current_pair_info):
-        verified_profits = []
-        pair_object.take_profits = [price for price in pair_object.take_profits if price != '00']
-        dot_position = current_pair_info['price'].index('.')
-        if dot_position:
-            for price in pair_object.take_profits:
-                # if price.find('.') > 0 and price.find('.') != dot_position:
-                if price.find('.') != dot_position and '.' not in price:
-                    if current_pair_info['price'].startswith('0') and not price.startswith('0'):
-                        price = '0' + price
-                    price = price[:dot_position] + "." + price[dot_position:]
-                    verified_profits.append(price)
-                else:
-                    verified_profits.append(price)
-        return verified_profits
-
-    def verify_stop(self, pair_object, current_pair_info):
-        dot_position = current_pair_info['price'].index('.')
-        stop_loss = ''
-        if pair_object.stop_loss.find('.') > 0:
-            return pair_object.stop_loss
-        if dot_position:
-            if pair_object.stop_loss.find('.') != dot_position:
-                stop_loss = pair_object.stop_loss[:dot_position] + "." + pair_object.stop_loss[dot_position:]
-            else:
-                stop_loss = pair_object.stop_loss
-        return stop_loss
