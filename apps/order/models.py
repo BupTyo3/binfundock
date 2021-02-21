@@ -238,6 +238,7 @@ class BuyOrder(BaseBuyOrder):
 class SellOrder(BaseSellOrder):
     SL_APPEND_INDEX = 500  # Stop_loss_Limit order
     MARKET_INDEX = 300  # For Spoiling signal or Sell residual quantity for futures
+    SPECIAL_APPEND_INDEX = 10  # If price of TakeProfit was lower than current_price
     TAKE_PROFIT_INDEX = 700  # TAKE_PROFIT order
     GL_SM_INDEX = 600  # Global STOP_MARKET order (for Futures)
 
@@ -305,8 +306,11 @@ class SellOrder(BaseSellOrder):
                                 signal: Signal,
                                 quantity: float,
                                 price: float,
-                                custom_order_id: Optional[str]):
+                                custom_order_id: Optional[str] = None,
+                                additional_index: Optional[int] = None):
         """Form Take Profit order"""
+        index = cls.MARKET_INDEX + cls.SPECIAL_APPEND_INDEX + additional_index if \
+            additional_index else cls.MARKET_INDEX
         order = cls.objects.create(
             market=market,
             symbol=signal.symbol,
@@ -315,7 +319,7 @@ class SellOrder(BaseSellOrder):
             signal=signal,
             custom_order_id=custom_order_id,
             type=OrderType.MARKET.value,
-            index=cls.MARKET_INDEX)
+            index=index)
         return order
 
     @classmethod
@@ -395,12 +399,13 @@ class SellOrder(BaseSellOrder):
                                signal: Signal,
                                quantity: float,
                                price: float,
-                               custom_order_id: Optional[str] = None):
+                               custom_order_id: Optional[str] = None,
+                               additional_index: Optional[int] = None):
         """Form Market SELL order:
         """
         order = cls._form_sell_market_order(
             market=market, signal=signal, quantity=quantity, price=price,
-            custom_order_id=custom_order_id)
+            custom_order_id=custom_order_id, additional_index=additional_index)
         return order
 
     @classmethod
