@@ -215,10 +215,39 @@ class Command(SystemCommand):
             self._client.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
+    def collect_info_from_margin_whales_channel(self):
+        session_name = 'MarginWhales'
+        self.init_telegram(session_name)
+        logger.debug(f'Session {session_name} initialized')
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_margin_whale_channel())
+        except Exception as e:
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
+        finally:
+            self._client.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
+
+    def collect_info_from_crypto_futures_channel(self):
+        session_name = 'CryptoFutures'
+        self.init_telegram(session_name)
+        logger.debug(f'Session {session_name} initialized')
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_crypto_futures_channel())
+        except Exception as e:
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
+        finally:
+            self._client.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
+
     def handle(self, *args, **options):
         channel = options['channel']
         china_matches = ["China", "china"]
         angel_matches = ["angel", "Angel", 'cryptoangel', 'crypto_angel', 'CryptoAngel']
+        crypto_futures_matches = ["crypto_futures"]
         tca_altcoin_matches = ["tca_altcoin", "altcoin", "altcoins"]
         tca_leverage_matches = ["tca_leverage", "leverage"]
         tca_origin_matches = ["tca_origin", "origin"]
@@ -229,6 +258,7 @@ class Command(SystemCommand):
         klondike_margin_matches = ["klondike_margin"]
         klondike_scalp_matches = ["klondike_scalp"]
         klondike_altcoin_matches = ["klondike_altcoin"]
+        margin_whale_matches = ["marginwhale"]
         server_matches = ["server"]
 
         if not get_or_create_crontask().server:
@@ -295,3 +325,13 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in klondike_altcoin_matches):
             self.collect_info_from_klondike_altcoin_channel()
+
+        if not get_or_create_crontask().margin_whale:
+            pass
+        elif any(x in channel for x in margin_whale_matches):
+            self.collect_info_from_margin_whales_channel()
+
+        if not get_or_create_crontask().crypto_futures:
+            pass
+        elif any(x in channel for x in crypto_futures_matches):
+            self.collect_info_from_crypto_futures_channel()
