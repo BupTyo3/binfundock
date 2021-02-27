@@ -236,7 +236,7 @@ class SignalAdmin(admin.ModelAdmin):
 
     @notifications_handling('')
     def _update_by_api_one(self, request, signal):
-        signal.update_orders_info_by_one_signal()
+        signal.update_orders_info_by_one_signal(force=True)
 
     @notifications_handling('')
     def _run_bought_worker_one(self, request, signal):

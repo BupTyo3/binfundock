@@ -698,7 +698,10 @@ class Signal(BaseSignal):
         return order
 
     @debug_input_and_returned
-    def __form_sell_market_order(self, quantity: float, price: float) -> 'SellOrder':
+    def __form_sell_market_order(self,
+                                 quantity: float,
+                                 price: float,
+                                 additional_index: Optional[int] = None) -> 'SellOrder':
         """
         Form sell market order for the signal
         """
@@ -709,6 +712,7 @@ class Signal(BaseSignal):
             signal=self,
             quantity=quantity,
             price=price,
+            additional_index=additional_index,
         )
         return order
 
@@ -859,9 +863,16 @@ class Signal(BaseSignal):
         """
         distributed_quantity = self._get_distributed_quantity_by_take_profits(sell_quantity)
         for index, take_profit in enumerate(self.take_profits.all()):
-            self.__form_oco_sell_order(
-                distributed_quantity=distributed_quantity,
-                take_profit=take_profit.value, index=index)
+            if take_profit.value > self._get_current_price():
+                self.__form_oco_sell_order(
+                    distributed_quantity=distributed_quantity,
+                    take_profit=take_profit.value, index=index)
+            else:
+                self.__form_sell_market_order(
+                    quantity=distributed_quantity,
+                    price=take_profit.value,
+                    additional_index=index,
+                )
 
     def _second_formation_buy_orders_futures_short(self, buy_quantity: float) -> None:
         """
@@ -2224,12 +2235,12 @@ class Signal(BaseSignal):
             return self._push_spot_orders()
 
     @refuse_if_busy
-    def update_orders_info_by_one_signal(self):
+    def update_orders_info_by_one_signal(self, force: bool = False):
         """
         Get info for all Signals (except NEW) from Real Market by SENT orders
         """
         from apps.order.utils import ORDER_STATUSES_FOR_PULL_JOB
-        if self._status not in PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS:
+        if self._status not in PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS and not force:
             return
 
         params = {
