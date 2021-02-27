@@ -1522,6 +1522,49 @@ class Signal(BaseSignal):
             return False
         return True
 
+    @debug_input_and_returned
+    def _handle_catching_api_exceptions(self, ex: BaseExternalAPIException, order: 'BaseOrder') -> bool:
+        """
+        If we catch the following exception for Futures and GL_SL order
+        we cancel the order and create another with stop_loss price or lower (LONG) or upper (SHORT)
+        by delta multiplied the coefficient extremal_sl_price_shift_coef
+        """
+        from apps.order.base_model import BaseOrder
+        if ex.code != self.market_exception_class.api_errors.ORDER_WOULD_IMMEDIATELY_TRIGGER.value.code:
+            return False
+        if not self._is_market_type_futures():
+            return False
+        if not order.index == BaseOrder.GL_SM_INDEX:
+            return False
+        # LONG
+        current_price = self._get_current_price()
+        if not self.is_position_short():
+            if current_price > self.stop_loss:
+                order.cancel()
+                # form gl_sl order with base parameters (stop_loss)
+                self.__form_gl_sl_order(price=self.stop_loss, quantity=order.quantity, original_order_id=order.id)
+            else:
+                order.cancel()
+                # form gl_sl order with price less than current_price by 5*deltas; 5 - parameter from conf file
+                shift_perc = get_or_create_crontask().slip_delta_sl_perc * conf_obj.extremal_sl_price_shift_coef
+                new_price = subtract_fee(current_price, shift_perc)
+                new_price = self.get_not_fractional_price(new_price)
+                self.__form_gl_sl_order(price=new_price, quantity=order.quantity, original_order_id=order.id)
+        # SHORT
+        else:
+            if current_price < self.stop_loss:
+                order.cancel()
+                # form gl_sl order with base parameters (stop_loss)
+                self.__form_gl_sl_order(price=self.stop_loss, quantity=order.quantity, original_order_id=order.id)
+            else:
+                order.cancel()
+                # form gl_sl order with price less than current_price by 5*deltas; 5 - parameter from conf file
+                shift_perc = get_or_create_crontask().slip_delta_sl_perc * conf_obj.extremal_sl_price_shift_coef
+                new_price = subtract_fee(current_price, shift_perc, reverse=True)
+                new_price = self.get_not_fractional_price(new_price)
+                self.__form_gl_sl_order(price=new_price, quantity=order.quantity, original_order_id=order.id)
+        return True
+
     # POINT PUSH JOB
 
     @debug_input_and_returned
@@ -1583,15 +1626,20 @@ class Signal(BaseSignal):
             except self.market_exception_class.api_exception as ex:
                 # We don't set error if there is minor api exception, e.g. Timestamp error
                 # We hope the order will be pushed successfully the next time
-                if not self.__check_if_exists_any_objection_to_set_the_failing_flag(ex):
-                    error_status_flag = True
                 logger.warning(f"Push order Error: Signal:'{self}' Order: '{sell_order}': Ex: '{ex}'")
+                check_1 = self.__check_if_exists_any_objection_to_set_the_failing_flag(ex)
+                check_2 = self._handle_catching_api_exceptions(ex, sell_order)
+                if not check_1 and not check_2:
+                    error_status_flag = True
+
         # push NOT_SENT BUY orders
         for buy_order in self.buy_orders.filter(**orders_params_for_pushing):
             try:
                 buy_order.push_to_market()
             except self.market_exception_class.api_exception as ex:
-                if not self.__check_if_exists_any_objection_to_set_the_failing_flag(ex):
+                check_1 = self.__check_if_exists_any_objection_to_set_the_failing_flag(ex)
+                check_2 = self._handle_catching_api_exceptions(ex, buy_order)
+                if not check_1 and not check_2:
                     error_status_flag = True
                 logger.warning(f"Push order Error: Signal:'{self}' Order: '{buy_order}': Ex: '{ex}'")
             # set status if at least one order has created

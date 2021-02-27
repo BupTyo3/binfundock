@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 
 class BaseOrder(SystemBaseModel):
+    MARKET_INDEX = 300  # For Spoiling signal or Sell/Buy residual quantity for futures
+    GL_SM_INDEX = 600  # Global STOP_MARKET order (for Futures)
+
     short_position_separator: str = 'sh'
     long_position_separator: str = 'lo'
     stop_loss_separator: str = 'sl'
@@ -34,6 +37,7 @@ class BaseOrder(SystemBaseModel):
     signal: "BaseSignal"
     market: "BaseMarket"
     market_id: int
+    id: int
 
     symbol = models.CharField(max_length=16)
     quantity = models.FloatField()
@@ -147,6 +151,13 @@ class BaseOrder(SystemBaseModel):
     def _set_updated_by_api_without_saving(self):
         """Update last_updated_by_api field by current time"""
         self.last_updated_by_api = timezone.now()
+
+    def cancel(self):
+        logger.debug(f"LOCAL CANCEL ORDER: '{self}'")
+        now_ = timezone.now()
+        self.local_canceled = True
+        self.local_canceled_time = now_
+        self.save()
 
 
 class BaseBuyOrder(BaseOrder):
