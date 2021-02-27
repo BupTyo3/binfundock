@@ -120,11 +120,11 @@ class BuyOrder(BaseBuyOrder):
         return order
 
     @classmethod
-    def _form_buy_gl_sl_order(cls, market: 'BaseMarket',
-                              signal: Signal,
-                              quantity: float,
-                              price: float,
-                              custom_order_id: Optional[str]):
+    def _form_gl_sl_order(cls, market: 'BaseMarket',
+                          signal: Signal,
+                          quantity: float,
+                          price: float,
+                          custom_order_id: Optional[str]):
         """Form BUY Global Stop_loss order"""
         order = cls.objects.create(
             market=market,
@@ -153,14 +153,14 @@ class BuyOrder(BaseBuyOrder):
         return order
 
     @classmethod
-    def form_buy_gl_sl_order(cls, market: 'BaseMarket',
-                             signal: Signal,
-                             quantity: float,
-                             price: float,
-                             custom_order_id: Optional[str] = None):
+    def form_gl_sl_order(cls, market: 'BaseMarket',
+                         signal: Signal,
+                         quantity: float,
+                         price: float,
+                         custom_order_id: Optional[str] = None):
         """Form GL SL BUY order:
         """
-        order = cls._form_buy_gl_sl_order(
+        order = cls._form_gl_sl_order(
             market=market, signal=signal, quantity=quantity, price=price,
             custom_order_id=custom_order_id)
         return order
@@ -364,11 +364,11 @@ class SellOrder(BaseSellOrder):
         return order
 
     @classmethod
-    def _form_sell_gl_sl_order(cls, market: 'BaseMarket',
-                               signal: Signal,
-                               quantity: float,
-                               price: float,
-                               custom_order_id: Optional[str]):
+    def _form_gl_sl_order(cls, market: 'BaseMarket',
+                          signal: Signal,
+                          quantity: float,
+                          price: float,
+                          custom_order_id: Optional[str]):
         """Form SELL Global Stop_loss order"""
         order = cls.objects.create(
             market=market,
@@ -438,14 +438,14 @@ class SellOrder(BaseSellOrder):
         return order
 
     @classmethod
-    def form_sell_gl_sl_order(cls, market: 'BaseMarket',
-                              signal: Signal,
-                              quantity: float,
-                              price: float,
-                              custom_order_id: Optional[str] = None):
+    def form_gl_sl_order(cls, market: 'BaseMarket',
+                         signal: Signal,
+                         quantity: float,
+                         price: float,
+                         custom_order_id: Optional[str] = None):
         """Form GL SL SELL order:
         """
-        order = cls._form_sell_gl_sl_order(
+        order = cls._form_gl_sl_order(
             market=market, signal=signal, quantity=quantity, price=price,
             custom_order_id=custom_order_id)
         return order
