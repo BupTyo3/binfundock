@@ -306,6 +306,7 @@ class Config:
         self.api_hash_luck = telegram.get('api_hash_luck', None)
         self.chat_china_id = telegram.get('chat_china_id', None)
         self.crypto_angel_id = telegram.get('crypto_angel_id', None)
+        self.crypto_futures = telegram.get('crypto_futures', None)
         self.tca_altcoin = telegram.get('TCA_Altcoin', None)
         self.tca_leverage = telegram.get('TCA_Leverage', None)
         self.CFTrader = telegram.get('CFTrader', None)
@@ -318,6 +319,7 @@ class Config:
         self.klondike_margin = telegram.get('klondike_margin', None)
         self.klondike_scalp = telegram.get('klondike_scalp', None)
         self.klondike_altcoin = telegram.get('klondike_altcoin', None)
+        self.margin_whales = telegram.get('Margin_Whales', None)
         self.server = telegram.get('Server', None)
 
 
