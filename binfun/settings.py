@@ -193,6 +193,7 @@ CELERY_TASK_SERIALIZER = 'json'
 
 # Project
 DEFAULT_INVIOLABLE_BALANCE_PERC = '15.0'
+DEFAULT_EXTREMAL_SL_PRICE_SHIFT_COEF = '8.0'
 
 # CRON TASKS
 DEFAULT_COMMON_PERIOD_OF_CRON_CELERY_TASKS_SECS = '7.0'
@@ -296,6 +297,8 @@ class Config:
             'common_period_of_cron_celery_tasks_secs', DEFAULT_COMMON_PERIOD_OF_CRON_CELERY_TASKS_SECS))
         self.period_of_prices_update_tasks_secs: float = float(logic.get(
             'period_of_prices_update_tasks_secs', DEFAULT_PERIOD_OF_PRICES_UPDATE_TASKS_SECS))
+        self.extremal_sl_price_shift_coef: float = float(logic.get(
+            'extremal_sl_price_shift_coef', DEFAULT_EXTREMAL_SL_PRICE_SHIFT_COEF))
         signal = config['Signal']
         self.accessible_main_coins: List[str] = signal['accessible_main_coins'].split(',')
         self.all_accessible_main_coins: List[str] = signal['all_accessible_main_coins'].split(',')

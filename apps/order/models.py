@@ -23,8 +23,6 @@ logger = logging.getLogger(__name__)
 
 class BuyOrder(BaseBuyOrder):
     EP_LIMIT_INDEX = 200  # Spot Entry_point (LIMIT) order
-    MARKET_INDEX = 300  # For Spoiling signal or Buy residual quantity for futures SHORT
-    GL_SM_INDEX = 600  # Global STOP_MARKET order (for Futures)
 
     market = models.ForeignKey(to=Market,
                                related_name='buy_orders',
@@ -237,10 +235,8 @@ class BuyOrder(BaseBuyOrder):
 
 class SellOrder(BaseSellOrder):
     SL_APPEND_INDEX = 500  # Stop_loss_Limit order
-    MARKET_INDEX = 300  # For Spoiling signal or Sell residual quantity for futures
     SPECIAL_APPEND_INDEX = 10  # If price of TakeProfit was lower than current_price
     TAKE_PROFIT_INDEX = 700  # TAKE_PROFIT order
-    GL_SM_INDEX = 600  # Global STOP_MARKET order (for Futures)
 
     market = models.ForeignKey(to=Market,
                                related_name='sell_orders',
