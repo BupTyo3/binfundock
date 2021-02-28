@@ -23,7 +23,7 @@ from .utils import (
     calculate_position,
     refuse_if_busy,
     SIG_STATS_FOR_SPOIL_WORKER,
-    SOLD__SIG_STATS, FORMED__SIG_STATS,
+    SOLD__SIG_STATS, FORMED__SIG_STATS, NEW_FORMED_PUSHED__SIG_STATS,
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
     PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, BOUGHT_SOLD__SIG_STATS, BOUGHT__SIG_STATS,
     ERROR__SIG_STATS,
@@ -32,6 +32,7 @@ from .exceptions import (
     MainCoinNotServicedError,
     ShortSpotCombinationError,
     IncorrectSignalPositionError,
+    DuplicateSignalError,
 )
 from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket, BaseMarketException, BaseExternalAPIException
@@ -106,6 +107,14 @@ class SignalOrig(BaseSignalOrig):
         if self.pk is None:
             self.main_coin = self._get_main_coin(self.symbol)
         super().save(*args, **kwargs)
+
+    def _check_existing_duplicates(self) -> None:
+        duplicates = Signal.objects.filter(techannel=self.techannel,
+                                           symbol=self.symbol,
+                                           _status__in=NEW_FORMED_PUSHED__SIG_STATS,
+                                           stop_loss=self.stop_loss)
+        if duplicates.exists():
+            raise DuplicateSignalError(signal=self)
 
     def _check_if_pair_does_not_exist_in_market(self, market: BaseMarket) -> None:
         pair = Pair.get_pair(self.symbol, market)
@@ -213,6 +222,7 @@ class SignalOrig(BaseSignalOrig):
         # ValueError if SPOT & SHORT
         self._check_inappropriate_position_to_market_type(market)
         self._check_correct_position()
+        self._check_existing_duplicates()
         # Set leverage = 1 for Spot Market
         leverage = self._default_leverage if market.is_spot_market() else self.leverage
         # Trim leverage
@@ -1379,7 +1389,7 @@ class Signal(BaseSignal):
         """
         Check Signal if it has no opened Buy orders and no opened Sell orders
         """
-        from apps.order.models import SellOrder
+        from apps.order.base_model import BaseOrder
         from apps.order.utils import NOT_FINISHED_ORDERS_STATUSES, COMPLETED_ORDER_STATUSES
         not_finished_orders_params = {
             '_status__in': NOT_FINISHED_ORDERS_STATUSES,
@@ -1394,11 +1404,17 @@ class Signal(BaseSignal):
         if self.sell_orders.filter(**not_finished_orders_params).exists():
             logger.debug(f"2/4:Signal '{self}' has Opened SELL orders")
             return False
-        if self.buy_orders.filter(**completed_not_handled_params).exists():
+        if self.buy_orders.filter(**completed_not_handled_params).\
+                exclude(index=BaseOrder.MARKET_INDEX).\
+                exclude(no_need_push=True).\
+                exists():
             logger.debug(f"3/4:Signal '{self}' has Completed not handled BUY orders")
             return False
         # TODO: change this and the filters above with get_order_exclude... but pay attention local_canceled
-        if self.sell_orders.filter(**completed_not_handled_params).exclude(index=SellOrder.MARKET_INDEX).exists():
+        if self.sell_orders.filter(**completed_not_handled_params).\
+                exclude(index=BaseOrder.MARKET_INDEX). \
+                exclude(no_need_push=True).\
+                exists():
             logger.debug(f"4/4:Signal '{self}' has Completed not handled SELL orders")
             return False
         return True
