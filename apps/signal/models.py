@@ -2025,6 +2025,9 @@ class Signal(BaseSignal):
         logger.warning(f"GL_SL order does not exist for Signal '{self}'."
                        f" We will create a new one with base parameters")
         residual_quantity = self._get_residual_quantity(ignore_fee=True)
+        if residual_quantity <= 0:
+            logger.warning(f"Wrong Residual Quantity '{residual_quantity}' for trailing_stop: '{self}'")
+            return False
         any_gl_sl_order = self.__get_gl_sl_orders(any_existing=True).last()
         self.__form_gl_sl_order(price=self.stop_loss,
                                 quantity=residual_quantity,
@@ -2041,8 +2044,12 @@ class Signal(BaseSignal):
           it's a half value subtracted the current price and zero value.
           The zero value is a value of the nearest Entry Point
         """
-        from apps.order.utils import OPENED_ORDER_STATUSES
+        from apps.order.utils import OPENED_ORDER_STATUSES, COMPLETED_ORDER_STATUSES
 
+        completed_gl_sl_orders = self.__get_gl_sl_orders(statuses=COMPLETED_ORDER_STATUSES, any_existing=True)
+        if completed_gl_sl_orders.exists():
+            logger.debug(f"GL_SL order completed, but trail_stop is running! '{self}'")
+            return False
         opened_gl_sl_orders = self.__get_gl_sl_orders(statuses=OPENED_ORDER_STATUSES)
         gl_sl_order = opened_gl_sl_orders.first()
         if not gl_sl_order:
@@ -2180,8 +2187,12 @@ class Signal(BaseSignal):
           it's a half value subtracted the current price and zero value.
           The zero value is a value of the nearest Entry Point
         """
-        from apps.order.utils import OPENED_ORDER_STATUSES
+        from apps.order.utils import OPENED_ORDER_STATUSES, COMPLETED_ORDER_STATUSES
 
+        completed_gl_sl_orders = self.__get_gl_sl_orders(statuses=COMPLETED_ORDER_STATUSES, any_existing=True)
+        if completed_gl_sl_orders.exists():
+            logger.debug(f"GL_SL order completed, but trail_stop is running! '{self}'")
+            return False
         opened_gl_sl_orders = self.__get_gl_sl_orders(statuses=OPENED_ORDER_STATUSES)
         gl_sl_order = opened_gl_sl_orders.last()
         if not gl_sl_order:
