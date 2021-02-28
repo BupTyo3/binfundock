@@ -23,7 +23,7 @@ from .utils import (
     calculate_position,
     refuse_if_busy,
     SIG_STATS_FOR_SPOIL_WORKER,
-    SOLD__SIG_STATS, FORMED__SIG_STATS,
+    SOLD__SIG_STATS, FORMED__SIG_STATS, NEW_FORMED_PUSHED__SIG_STATS,
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
     PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, BOUGHT_SOLD__SIG_STATS, BOUGHT__SIG_STATS,
     ERROR__SIG_STATS,
@@ -32,6 +32,7 @@ from .exceptions import (
     MainCoinNotServicedError,
     ShortSpotCombinationError,
     IncorrectSignalPositionError,
+    DuplicateSignalError,
 )
 from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket, BaseMarketException, BaseExternalAPIException
@@ -106,6 +107,14 @@ class SignalOrig(BaseSignalOrig):
         if self.pk is None:
             self.main_coin = self._get_main_coin(self.symbol)
         super().save(*args, **kwargs)
+
+    def _check_existing_duplicates(self) -> None:
+        duplicates = Signal.objects.filter(techannel=self.techannel,
+                                           symbol=self.symbol,
+                                           _status__in=NEW_FORMED_PUSHED__SIG_STATS,
+                                           stop_loss=self.stop_loss)
+        if duplicates.exists():
+            raise DuplicateSignalError(signal=self)
 
     def _check_if_pair_does_not_exist_in_market(self, market: BaseMarket) -> None:
         pair = Pair.get_pair(self.symbol, market)
@@ -213,6 +222,7 @@ class SignalOrig(BaseSignalOrig):
         # ValueError if SPOT & SHORT
         self._check_inappropriate_position_to_market_type(market)
         self._check_correct_position()
+        self._check_existing_duplicates()
         # Set leverage = 1 for Spot Market
         leverage = self._default_leverage if market.is_spot_market() else self.leverage
         # Trim leverage
