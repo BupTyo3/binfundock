@@ -65,6 +65,10 @@ mkdir parsed-images
 ```bash
 docker-compose build
 ```
+- If problem with build
+```bash
+sudo chown <user>:<user> pgdata
+```
 
 - Build containers for separate AGGREGATOR service (SignalOrig)
 ```bash
