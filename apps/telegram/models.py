@@ -87,33 +87,27 @@ class Telegram(BaseTelegram):
 
     async def parse_cf_trader_channel(self):
         channel_abbr = 'cf_tr'
-        from telethon import errors
-        try:
-            tca = int(conf_obj.CFTrader)
-
-            async for message in self.client.iter_messages(tca, limit=8):
-                exists = await self.is_signal_handled(message.id, channel_abbr)
-                should_handle_msg = not exists
-                if message.text and should_handle_msg:
-                    signal = self.parse_cf_trader_message(message.text, message.id)
-                    if signal[0].pair:
-                        inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
-                        if inserted_to_db != 'success':
-                            await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                                f"please check logs for '{signal[0].pair}' "
-                                                                f"related to the '{channel_abbr}' algorithm: "
-                                                                f"{inserted_to_db}")
-                        else:
-                            await self.send_message_by_template('Eugene_Povetkin', signal[0],
-                                                                message.date, channel_abbr, message.id)
+        tca = int(conf_obj.CFTrader)
+        async for message in self.client.iter_messages(tca, limit=8):
+            exists = await self.is_signal_handled(message.id, channel_abbr)
+            should_handle_msg = not exists
+            if message.text and should_handle_msg:
+                signal = self.parse_cf_trader_message(message.text, message.id)
+                if signal[0].pair:
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                    if inserted_to_db != 'success':
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                            f"please check logs for '{signal[0].pair}' "
+                                                            f"related to the '{channel_abbr}' algorithm: "
+                                                            f"{inserted_to_db}")
                     else:
-                        attention_to_close = self.is_urgent_close_position(message.text, channel_abbr)
-                        correct_position = self.is_urgent_correct_position(message.text, channel_abbr)
-                        if attention_to_close or correct_position:
-                            logger.error('A SIGNAL REQUIRES ATTENTION!')
-        except errors.FloodWaitError as e:
-            logger.debug(f'Have to sleep {e.seconds} seconds')
-            countdown(e.seconds)
+                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
+                                                            message.date, channel_abbr, message.id)
+                else:
+                    attention_to_close = self.is_urgent_close_position(message.text, channel_abbr)
+                    correct_position = self.is_urgent_correct_position(message.text, channel_abbr)
+                    if attention_to_close or correct_position:
+                        logger.error('A SIGNAL REQUIRES ATTENTION!')
 
     def parse_cf_trader_message(self, message_text, message_id):
         signals = []
@@ -142,7 +136,7 @@ class Telegram(BaseTelegram):
                 position_info = list(filter(None, possible_position_info))
                 pair = ''.join(filter(str.isalpha, position_info[1]))
             if line.startswith(position_label):
-                possible_position_info = line.split(' ')
+                possible_position_info = line.split('#')
                 position = ''.join(filter(str.isalpha, possible_position_info[1]))
             if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1]) \
                     or line.startswith(possible_entry_label[2]) or line.startswith(possible_entry_label[3]) \
