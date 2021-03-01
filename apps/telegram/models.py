@@ -574,16 +574,15 @@ class Telegram(BaseTelegram):
                 position = 'LONG'
             if sell_label in splitted_info[price_index]:
                 position = 'SHORT'
-            if sell_label and long_label not in splitted_info[price_index]:
+            if sell_label or long_label not in splitted_info[price_index]:
                 position = 'LONG'
+                leverage = 3
             if cross_leverage_label in splitted_info[price_index]:
-                leverage = 25
+                leverage = 20
             if 'X' in splitted_info[price_index]:
                 possible_leverage = splitted_info[price_index].split('X')
                 leverage = possible_leverage[1].split(' ')
                 leverage = leverage[0]
-            else:
-                leverage = 3
 
             possible_entries = splitted_info[price_index].split(' - ')
             possible_entry1 = possible_entries[0].split(' ')
