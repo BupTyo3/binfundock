@@ -23,8 +23,6 @@ logger = logging.getLogger(__name__)
 
 class BuyOrder(BaseBuyOrder):
     EP_LIMIT_INDEX = 200  # Spot Entry_point (LIMIT) order
-    MARKET_INDEX = 300  # For Spoiling signal or Buy residual quantity for futures SHORT
-    GL_SM_INDEX = 600  # Global STOP_MARKET order (for Futures)
 
     market = models.ForeignKey(to=Market,
                                related_name='buy_orders',
@@ -120,11 +118,11 @@ class BuyOrder(BaseBuyOrder):
         return order
 
     @classmethod
-    def _form_buy_gl_sl_order(cls, market: 'BaseMarket',
-                              signal: Signal,
-                              quantity: float,
-                              price: float,
-                              custom_order_id: Optional[str]):
+    def _form_gl_sl_order(cls, market: 'BaseMarket',
+                          signal: Signal,
+                          quantity: float,
+                          price: float,
+                          custom_order_id: Optional[str]):
         """Form BUY Global Stop_loss order"""
         order = cls.objects.create(
             market=market,
@@ -153,14 +151,14 @@ class BuyOrder(BaseBuyOrder):
         return order
 
     @classmethod
-    def form_buy_gl_sl_order(cls, market: 'BaseMarket',
-                             signal: Signal,
-                             quantity: float,
-                             price: float,
-                             custom_order_id: Optional[str] = None):
+    def form_gl_sl_order(cls, market: 'BaseMarket',
+                         signal: Signal,
+                         quantity: float,
+                         price: float,
+                         custom_order_id: Optional[str] = None):
         """Form GL SL BUY order:
         """
-        order = cls._form_buy_gl_sl_order(
+        order = cls._form_gl_sl_order(
             market=market, signal=signal, quantity=quantity, price=price,
             custom_order_id=custom_order_id)
         return order
@@ -237,10 +235,8 @@ class BuyOrder(BaseBuyOrder):
 
 class SellOrder(BaseSellOrder):
     SL_APPEND_INDEX = 500  # Stop_loss_Limit order
-    MARKET_INDEX = 300  # For Spoiling signal or Sell residual quantity for futures
     SPECIAL_APPEND_INDEX = 10  # If price of TakeProfit was lower than current_price
     TAKE_PROFIT_INDEX = 700  # TAKE_PROFIT order
-    GL_SM_INDEX = 600  # Global STOP_MARKET order (for Futures)
 
     market = models.ForeignKey(to=Market,
                                related_name='sell_orders',
@@ -364,11 +360,11 @@ class SellOrder(BaseSellOrder):
         return order
 
     @classmethod
-    def _form_sell_gl_sl_order(cls, market: 'BaseMarket',
-                               signal: Signal,
-                               quantity: float,
-                               price: float,
-                               custom_order_id: Optional[str]):
+    def _form_gl_sl_order(cls, market: 'BaseMarket',
+                          signal: Signal,
+                          quantity: float,
+                          price: float,
+                          custom_order_id: Optional[str]):
         """Form SELL Global Stop_loss order"""
         order = cls.objects.create(
             market=market,
@@ -438,14 +434,14 @@ class SellOrder(BaseSellOrder):
         return order
 
     @classmethod
-    def form_sell_gl_sl_order(cls, market: 'BaseMarket',
-                              signal: Signal,
-                              quantity: float,
-                              price: float,
-                              custom_order_id: Optional[str] = None):
+    def form_gl_sl_order(cls, market: 'BaseMarket',
+                         signal: Signal,
+                         quantity: float,
+                         price: float,
+                         custom_order_id: Optional[str] = None):
         """Form GL SL SELL order:
         """
-        order = cls._form_sell_gl_sl_order(
+        order = cls._form_gl_sl_order(
             market=market, signal=signal, quantity=quantity, price=price,
             custom_order_id=custom_order_id)
         return order

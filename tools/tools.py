@@ -147,8 +147,11 @@ def get_percent(value: float, percentage) -> float:
 
 
 @rounded_result
-def subtract_fee(quantity: float, fee: float) -> float:
-    return quantity - get_percent(quantity, fee)
+def subtract_fee(quantity: float, fee: float, reverse: bool = False) -> float:
+    if not reverse:
+        return quantity - get_percent(quantity, fee)
+    else:
+        return quantity + get_percent(quantity, fee)
 
 
 def price_to_str(price: float) -> str:

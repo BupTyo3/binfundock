@@ -22,6 +22,8 @@ TELETHON_LOG_LEVEL=30
 [Logic]
 common_period_of_cron_celery_tasks_secs=7.0
 period_of_prices_update_tasks_secs=50.0
+;for the lost sl orders below the current_price multiple delta param
+extremal_sl_price_shift_coef=5.0
 [Market]
 market_api_key=xxx
 market_api_secret=xxx
@@ -62,6 +64,10 @@ mkdir parsed-images
 - Build containers
 ```bash
 docker-compose build
+```
+- If problem with build
+```bash
+sudo chown <user>:<user> pgdata
 ```
 
 - Build containers for separate AGGREGATOR service (SignalOrig)

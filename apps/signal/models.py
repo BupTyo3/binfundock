@@ -23,7 +23,7 @@ from .utils import (
     calculate_position,
     refuse_if_busy,
     SIG_STATS_FOR_SPOIL_WORKER,
-    SOLD__SIG_STATS, FORMED__SIG_STATS,
+    SOLD__SIG_STATS, FORMED__SIG_STATS, NEW_FORMED_PUSHED__SIG_STATS,
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
     PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, BOUGHT_SOLD__SIG_STATS, BOUGHT__SIG_STATS,
     ERROR__SIG_STATS,
@@ -32,6 +32,7 @@ from .exceptions import (
     MainCoinNotServicedError,
     ShortSpotCombinationError,
     IncorrectSignalPositionError,
+    DuplicateSignalError,
 )
 from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket, BaseMarketException, BaseExternalAPIException
@@ -106,6 +107,14 @@ class SignalOrig(BaseSignalOrig):
         if self.pk is None:
             self.main_coin = self._get_main_coin(self.symbol)
         super().save(*args, **kwargs)
+
+    def _check_existing_duplicates(self) -> None:
+        duplicates = Signal.objects.filter(techannel=self.techannel,
+                                           symbol=self.symbol,
+                                           _status__in=NEW_FORMED_PUSHED__SIG_STATS,
+                                           stop_loss=self.stop_loss)
+        if duplicates.exists():
+            raise DuplicateSignalError(signal=self)
 
     def _check_if_pair_does_not_exist_in_market(self, market: BaseMarket) -> None:
         pair = Pair.get_pair(self.symbol, market)
@@ -213,6 +222,7 @@ class SignalOrig(BaseSignalOrig):
         # ValueError if SPOT & SHORT
         self._check_inappropriate_position_to_market_type(market)
         self._check_correct_position()
+        self._check_existing_duplicates()
         # Set leverage = 1 for Spot Market
         leverage = self._default_leverage if market.is_spot_market() else self.leverage
         # Trim leverage
@@ -564,20 +574,20 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @rounded_result
-    def _get_residual_quantity(self, ignore_fee: bool = False) -> float:
+    def _get_residual_quantity(self, ignore_fee: bool = False, with_planned: bool = False) -> float:
         """
         Get residual quantity.
         return: (bought_quantity - sold_quantity)
         Fraction by step
         """
         if self.is_position_short():
-            return self._get_residual_quantity_short(ignore_fee=ignore_fee)
+            return self._get_residual_quantity_short(ignore_fee=ignore_fee, with_planned=with_planned)
         else:
-            return self._get_residual_quantity_long(ignore_fee=ignore_fee)
+            return self._get_residual_quantity_long(ignore_fee=ignore_fee, with_planned=with_planned)
 
     @debug_input_and_returned
     @rounded_result
-    def _get_residual_quantity_long(self, ignore_fee: bool = False) -> float:
+    def _get_residual_quantity_long(self, ignore_fee: bool = False, with_planned: bool = False) -> float:
         """
         Get residual quantity.
         return: (bought_quantity - sold_quantity)
@@ -590,13 +600,17 @@ class Signal(BaseSignal):
         completed_sell_orders = self.__get_completed_sell_orders()
         sold_quantity = self.__get_sold_quantity(completed_sell_orders)
         residual_quantity = bought_quantity - sold_quantity if sold_quantity else bought_quantity
+        if with_planned:
+            opened_ep_orders = self.__get_opened_ep_orders()
+            residual_quantity = residual_quantity + self.__get_planned_executed_quantity(opened_ep_orders) if \
+                opened_ep_orders else residual_quantity
         pair = self._get_pair()
         step_quantity = pair.step_quantity
         return self.__find_not_fractional_by_step(residual_quantity, step_quantity)
 
     @debug_input_and_returned
     @rounded_result
-    def _get_residual_quantity_short(self, ignore_fee: bool = False) -> float:
+    def _get_residual_quantity_short(self, ignore_fee: bool = False, with_planned: bool = False) -> float:
         """
         Get residual quantity.
         return: (sold_quantity - bought_quantity)
@@ -609,6 +623,10 @@ class Signal(BaseSignal):
         sold_quantity = self.__get_sold_quantity(completed_sell_orders)
         bought_quantity = self.__get_bought_quantity(worked_orders=completed_buy_orders, ignore_fee=ignore_fee)
         residual_quantity = sold_quantity - bought_quantity if bought_quantity else sold_quantity
+        if with_planned:
+            opened_ep_orders = self.__get_opened_ep_orders()
+            residual_quantity = residual_quantity + self.__get_planned_executed_quantity(opened_ep_orders) if\
+                opened_ep_orders else residual_quantity
         pair = self._get_pair()
         step_quantity = pair.step_quantity
         return self.__find_not_fractional_by_step(residual_quantity, step_quantity)
@@ -755,46 +773,25 @@ class Signal(BaseSignal):
         return order
 
     @debug_input_and_returned
-    def __form_sell_gl_sl_order(self, quantity: float, price: float,
-                                original_order_id: Optional[int] = None) -> 'SellOrder':
+    def __form_gl_sl_order(self, quantity: float, price: float,
+                           original_order_id: Optional[int] = None) -> 'BaseOrder':
         """
-        Form Global Sell Stop_loss order for the signal
+        Form Global Stop_loss order for the signal
         """
-        from apps.order.models import SellOrder
-        logger.debug(f"Form SELL GL SL ORDER for signal {self}")
+        from apps.order.models import BuyOrder, SellOrder
+        order_model = BuyOrder if self.is_position_short() else SellOrder
+        logger.debug(f"Form GL SL ORDER for signal {self}")
         custom_order_id = None
         if original_order_id:
-            original_order = SellOrder.objects.filter(id=original_order_id).first()
+            original_order = order_model.objects.filter(id=original_order_id).first()
             custom_order_id = get_increased_leading_number(original_order.custom_order_id)
-        order = SellOrder.form_sell_gl_sl_order(
+        return order_model.form_gl_sl_order(
             market=self.market,
             signal=self,
             quantity=quantity,
             price=price,
             custom_order_id=custom_order_id,
         )
-        return order
-
-    @debug_input_and_returned
-    def __form_buy_gl_sl_order(self, quantity: float, price: float,
-                               original_order_id: Optional[int] = None) -> 'BuyOrder':
-        """
-        Form Global BUY Stop_loss order for the signal
-        """
-        from apps.order.models import BuyOrder
-        logger.debug(f"Form BUY GL SL ORDER for signal {self}")
-        custom_order_id = None
-        if original_order_id:
-            original_order = BuyOrder.objects.filter(id=original_order_id).first()
-            custom_order_id = get_increased_leading_number(original_order.custom_order_id)
-        order = BuyOrder.form_buy_gl_sl_order(
-            market=self.market,
-            signal=self,
-            quantity=quantity,
-            price=price,
-            custom_order_id=custom_order_id,
-        )
-        return order
 
     @debug_input_and_returned
     @rounded_result
@@ -1152,8 +1149,6 @@ class Signal(BaseSignal):
         """
         Function to get sent Sell orders
         """
-        # TODO: maybe move to orders
-        # TODO: maybe _status__in: [SENT, NOT_SENT]
         from apps.order.utils import OPENED_ORDER_STATUSES
         from apps.order.models import SellOrder
         statuses = OPENED_ORDER_STATUSES if not statuses else statuses
@@ -1170,29 +1165,27 @@ class Signal(BaseSignal):
             qs = qs.exclude(index=index)
         return qs
 
-    def __get_gl_sl_sell_orders(self, statuses: Optional[List] = None) -> QSSellO:
-        from apps.order.models import SellOrder
-        params = {
-            'signal': self,
-            'local_canceled': False,
-            'handled_worked': False,
-            'index': SellOrder.GL_SM_INDEX,
-        }
-        if statuses:
-            params.update({'_status__in': statuses})
-        return SellOrder.objects.filter(**params)
+    def __get_opened_ep_orders(self):
+        return self.__get_opened_sell_orders() if self.is_position_short()\
+            else self.__get_opened_buy_orders()
 
-    def __get_gl_sl_buy_orders(self, statuses: Optional[List] = None):
-        from apps.order.models import BuyOrder
+    def __get_gl_sl_orders(self, statuses: Optional[List] = None, any_existing: bool = False) -> QSBaseO:
+        from apps.order.models import BuyOrder, SellOrder
         params = {
             'signal': self,
-            'local_canceled': False,
-            'handled_worked': False,
             'index': BuyOrder.GL_SM_INDEX,
         }
+        if not any_existing:
+            params.update({
+                'local_canceled': False,
+                'handled_worked': False,
+            })
         if statuses:
             params.update({'_status__in': statuses})
-        return BuyOrder.objects.filter(**params)
+        if self.is_position_short():
+            return BuyOrder.objects.filter(**params)
+        else:
+            return SellOrder.objects.filter(**params)
 
     @debug_input_and_returned
     def __get_sell_orders_exclude_indexes(self, excluded_indexes: Optional[List[int]] = None):
@@ -1406,7 +1399,7 @@ class Signal(BaseSignal):
         """
         Check Signal if it has no opened Buy orders and no opened Sell orders
         """
-        from apps.order.models import SellOrder
+        from apps.order.base_model import BaseOrder
         from apps.order.utils import NOT_FINISHED_ORDERS_STATUSES, COMPLETED_ORDER_STATUSES
         not_finished_orders_params = {
             '_status__in': NOT_FINISHED_ORDERS_STATUSES,
@@ -1421,11 +1414,17 @@ class Signal(BaseSignal):
         if self.sell_orders.filter(**not_finished_orders_params).exists():
             logger.debug(f"2/4:Signal '{self}' has Opened SELL orders")
             return False
-        if self.buy_orders.filter(**completed_not_handled_params).exists():
+        if self.buy_orders.filter(**completed_not_handled_params).\
+                exclude(index=BaseOrder.MARKET_INDEX).\
+                exclude(no_need_push=True).\
+                exists():
             logger.debug(f"3/4:Signal '{self}' has Completed not handled BUY orders")
             return False
         # TODO: change this and the filters above with get_order_exclude... but pay attention local_canceled
-        if self.sell_orders.filter(**completed_not_handled_params).exclude(index=SellOrder.MARKET_INDEX).exists():
+        if self.sell_orders.filter(**completed_not_handled_params).\
+                exclude(index=BaseOrder.MARKET_INDEX). \
+                exclude(no_need_push=True).\
+                exists():
             logger.debug(f"4/4:Signal '{self}' has Completed not handled SELL orders")
             return False
         return True
@@ -1481,7 +1480,7 @@ class Signal(BaseSignal):
         # self.__form_futures_sl_order()
         # Create Global Stop_loss Order
         planned_executed_quantity = self.__get_planned_executed_quantity(self.buy_orders.all())
-        self.__form_sell_gl_sl_order(quantity=planned_executed_quantity, price=self.stop_loss)
+        self.__form_gl_sl_order(quantity=planned_executed_quantity, price=self.stop_loss)
         return True
 
     def _first_formation_futures_short_orders(self, fake_balance: Optional[float] = None) -> bool:
@@ -1495,7 +1494,7 @@ class Signal(BaseSignal):
             # TODO: Form TP sell orders
             self.__form_sell_limit_order(quantity=coin_quantity, price=entry_point.value, index=index)
         planned_executed_quantity = self.__get_planned_executed_quantity(self.sell_orders.all())
-        self.__form_buy_gl_sl_order(quantity=planned_executed_quantity, price=self.stop_loss)
+        self.__form_gl_sl_order(quantity=planned_executed_quantity, price=self.stop_loss)
         return True
 
     def _first_formation_futures_orders(self, fake_balance: Optional[float] = None):
@@ -1547,6 +1546,49 @@ class Signal(BaseSignal):
         minor_codes_list = [self.market_exception_class.api_errors.INVALID_TIMESTAMP.value.code, ]
         if ex.code not in minor_codes_list:
             return False
+        return True
+
+    @debug_input_and_returned
+    def _handle_catching_api_exceptions(self, ex: BaseExternalAPIException, order: 'BaseOrder') -> bool:
+        """
+        If we catch the following exception for Futures and GL_SL order
+        we cancel the order and create another with stop_loss price or lower (LONG) or upper (SHORT)
+        by delta multiplied the coefficient extremal_sl_price_shift_coef
+        """
+        from apps.order.base_model import BaseOrder
+        if ex.code != self.market_exception_class.api_errors.ORDER_WOULD_IMMEDIATELY_TRIGGER.value.code:
+            return False
+        if not self._is_market_type_futures():
+            return False
+        if not order.index == BaseOrder.GL_SM_INDEX:
+            return False
+        # LONG
+        current_price = self._get_current_price()
+        if not self.is_position_short():
+            if current_price > self.stop_loss:
+                order.cancel()
+                # form gl_sl order with base parameters (stop_loss)
+                self.__form_gl_sl_order(price=self.stop_loss, quantity=order.quantity, original_order_id=order.id)
+            else:
+                order.cancel()
+                # form gl_sl order with price less than current_price by 5*deltas; 5 - parameter from conf file
+                shift_perc = get_or_create_crontask().slip_delta_sl_perc * conf_obj.extremal_sl_price_shift_coef
+                new_price = subtract_fee(current_price, shift_perc)
+                new_price = self.get_not_fractional_price(new_price)
+                self.__form_gl_sl_order(price=new_price, quantity=order.quantity, original_order_id=order.id)
+        # SHORT
+        else:
+            if current_price < self.stop_loss:
+                order.cancel()
+                # form gl_sl order with base parameters (stop_loss)
+                self.__form_gl_sl_order(price=self.stop_loss, quantity=order.quantity, original_order_id=order.id)
+            else:
+                order.cancel()
+                # form gl_sl order with price less than current_price by 5*deltas; 5 - parameter from conf file
+                shift_perc = get_or_create_crontask().slip_delta_sl_perc * conf_obj.extremal_sl_price_shift_coef
+                new_price = subtract_fee(current_price, shift_perc, reverse=True)
+                new_price = self.get_not_fractional_price(new_price)
+                self.__form_gl_sl_order(price=new_price, quantity=order.quantity, original_order_id=order.id)
         return True
 
     # POINT PUSH JOB
@@ -1610,15 +1652,20 @@ class Signal(BaseSignal):
             except self.market_exception_class.api_exception as ex:
                 # We don't set error if there is minor api exception, e.g. Timestamp error
                 # We hope the order will be pushed successfully the next time
-                if not self.__check_if_exists_any_objection_to_set_the_failing_flag(ex):
-                    error_status_flag = True
                 logger.warning(f"Push order Error: Signal:'{self}' Order: '{sell_order}': Ex: '{ex}'")
+                check_1 = self.__check_if_exists_any_objection_to_set_the_failing_flag(ex)
+                check_2 = self._handle_catching_api_exceptions(ex, sell_order)
+                if not check_1 and not check_2:
+                    error_status_flag = True
+
         # push NOT_SENT BUY orders
         for buy_order in self.buy_orders.filter(**orders_params_for_pushing):
             try:
                 buy_order.push_to_market()
             except self.market_exception_class.api_exception as ex:
-                if not self.__check_if_exists_any_objection_to_set_the_failing_flag(ex):
+                check_1 = self.__check_if_exists_any_objection_to_set_the_failing_flag(ex)
+                check_2 = self._handle_catching_api_exceptions(ex, buy_order)
+                if not check_1 and not check_2:
                     error_status_flag = True
                 logger.warning(f"Push order Error: Signal:'{self}' Order: '{buy_order}': Ex: '{ex}'")
             # set status if at least one order has created
@@ -1773,15 +1820,15 @@ class Signal(BaseSignal):
         self._cancel_opened_orders(sell=True)
         opened_buy_orders = self.__get_opened_buy_orders(excluded_indexes=[BuyOrder.GL_SM_INDEX, ])
         # Recreating opened sent buy orders with new stop_loss
-        opened_gl_sl_orders = self.__get_gl_sl_buy_orders(statuses=OPENED_ORDER_STATUSES)
+        opened_gl_sl_orders = self.__get_gl_sl_orders(statuses=OPENED_ORDER_STATUSES)
         if opened_gl_sl_orders.exists():
             opened_gl_sl_orders_id = opened_gl_sl_orders.first().id
             self.__cancel_sent_buy_orders(opened_gl_sl_orders)
             if opened_buy_orders.exists():
                 new_stop_loss = self._get_new_stop_loss_futures_short(worked_tp_orders)
                 residual_quantity = self._get_residual_quantity(ignore_fee=True)
-                self.__form_buy_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
-                                            original_order_id=opened_gl_sl_orders_id)
+                self.__form_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
+                                        original_order_id=opened_gl_sl_orders_id)
             else:
                 logger.debug(f"[SHORT] There are no opened BUY orders for the signal '{self}'")
         # Change status
@@ -1902,15 +1949,15 @@ class Signal(BaseSignal):
         self._cancel_opened_orders(buy=True)
         opened_sell_orders = self.__get_opened_sell_orders(excluded_indexes=[SellOrder.GL_SM_INDEX, ])
         # Recreating opened sent sell orders with new stop_loss
-        opened_gl_sl_orders = self.__get_gl_sl_sell_orders(statuses=OPENED_ORDER_STATUSES)
+        opened_gl_sl_orders = self.__get_gl_sl_orders(statuses=OPENED_ORDER_STATUSES)
         if opened_gl_sl_orders.exists():
             opened_gl_sl_orders_id = opened_gl_sl_orders.first().id
             self.__cancel_sent_sell_orders(opened_gl_sl_orders)
             if opened_sell_orders.exists():
                 new_stop_loss = self._get_new_stop_loss_long_or_spot(worked_tp_orders)
                 residual_quantity = self._get_residual_quantity(ignore_fee=True)
-                self.__form_sell_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
-                                             original_order_id=opened_gl_sl_orders_id)
+                self.__form_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
+                                        original_order_id=opened_gl_sl_orders_id)
             else:
                 logger.debug(f"There are no opened SELL orders for the signal '{self}'")
         # Change status
@@ -1934,7 +1981,7 @@ class Signal(BaseSignal):
 
     def __try_cancel_opened_orders_if_gl_sl_sell_order_has_been_worked(self):
         from apps.order.utils import COMPLETED_ORDER_STATUSES
-        not_handled_completed_gl_sl_sell_orders = self.__get_gl_sl_sell_orders(
+        not_handled_completed_gl_sl_sell_orders = self.__get_gl_sl_orders(
             statuses=COMPLETED_ORDER_STATUSES)
         if not_handled_completed_gl_sl_sell_orders:
             logger.debug(f"We have opened orders, but GL SL ORDER is completed. "
@@ -1944,7 +1991,7 @@ class Signal(BaseSignal):
 
     def __try_cancel_opened_orders_if_gl_sl_buy_order_has_been_worked(self):
         from apps.order.utils import COMPLETED_ORDER_STATUSES
-        not_handled_completed_gl_sl_buy_orders = self.__get_gl_sl_buy_orders(
+        not_handled_completed_gl_sl_buy_orders = self.__get_gl_sl_orders(
             statuses=COMPLETED_ORDER_STATUSES)
         if not_handled_completed_gl_sl_buy_orders:
             logger.debug(f"[SHORT] We have opened orders, but GL SL BUY ORDER is completed. "
@@ -1983,6 +2030,20 @@ class Signal(BaseSignal):
                          f" Signal: '{self}'")
 
     @debug_input_and_returned
+    def __form_gl_sl_order_if_it_lost(self):
+        # Specific case
+        logger.warning(f"GL_SL order does not exist for Signal '{self}'."
+                       f" We will create a new one with base parameters")
+        residual_with_planned_quantity = self._get_residual_quantity(ignore_fee=True, with_planned=True)
+        if residual_with_planned_quantity <= 0:
+            logger.warning(f"Wrong Residual Quantity '{residual_with_planned_quantity}' for trailing_stop: '{self}'")
+            return False
+        any_gl_sl_order = self.__get_gl_sl_orders(any_existing=True).last()
+        self.__form_gl_sl_order(price=self.stop_loss,
+                                quantity=residual_with_planned_quantity,
+                                original_order_id=any_gl_sl_order.id if any_gl_sl_order else None)
+
+    @debug_input_and_returned
     def __trail_stop_futures_short(self, fake_price: Optional[float] = None) -> bool:
         """
 
@@ -1993,10 +2054,17 @@ class Signal(BaseSignal):
           it's a half value subtracted the current price and zero value.
           The zero value is a value of the nearest Entry Point
         """
-        from apps.order.utils import OPENED_ORDER_STATUSES
+        from apps.order.utils import OPENED_ORDER_STATUSES, COMPLETED_ORDER_STATUSES
 
-        opened_gl_sl_orders = self.__get_gl_sl_buy_orders(statuses=OPENED_ORDER_STATUSES)
+        completed_gl_sl_orders = self.__get_gl_sl_orders(statuses=COMPLETED_ORDER_STATUSES, any_existing=True)
+        if completed_gl_sl_orders.exists():
+            logger.debug(f"GL_SL order completed, but trail_stop is running! '{self}'")
+            return False
+        opened_gl_sl_orders = self.__get_gl_sl_orders(statuses=OPENED_ORDER_STATUSES)
         gl_sl_order = opened_gl_sl_orders.first()
+        if not gl_sl_order:
+            self.__form_gl_sl_order_if_it_lost()
+            return False
         sl_value = gl_sl_order.price
         zero_value = self._get_avg_executed_price()
         if not zero_value:
@@ -2009,7 +2077,7 @@ class Signal(BaseSignal):
             current_price = self._get_current_price()
 
         # Check
-        if not self.__check_if_needs_to_move_sl_as_trailing_stop_short(
+        if not self.__check_if_needs_to_move_sl_as_trailing_stop_futures(
                 zero_value=zero_value, sl_value=sl_value, current_price=current_price):
             return False
 
@@ -2032,8 +2100,8 @@ class Signal(BaseSignal):
         # Cancel opened Buy orders if exist
         self._cancel_opened_orders(sell=True)
         self.__cancel_sent_buy_orders(opened_gl_sl_orders)
-        self.__form_buy_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
-                                    original_order_id=opened_gl_sl_order.id)
+        self.__form_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
+                                original_order_id=opened_gl_sl_order.id)
         return True
 
     @debug_input_and_returned
@@ -2098,6 +2166,20 @@ class Signal(BaseSignal):
             logger.debug(msg + ': No')
             return False
 
+    def __check_if_needs_to_move_sl_as_trailing_stop_futures(self,
+                                                             zero_value: float,
+                                                             sl_value: float,
+                                                             current_price: float) -> bool:
+        """
+        FUTURES Market
+        """
+        if self.is_position_short():
+            return self.__check_if_needs_to_move_sl_as_trailing_stop_short(
+                zero_value=zero_value, sl_value=sl_value, current_price=current_price)
+        else:
+            return self.__check_if_needs_to_move_sl_as_trailing_stop_long(
+                zero_value=zero_value, sl_value=sl_value, current_price=current_price)
+
     @debug_input_and_returned
     @rounded_result
     def __get_new_sl_value_for_trailing_stop(self, zero_value: float, current_price: float):
@@ -2115,10 +2197,17 @@ class Signal(BaseSignal):
           it's a half value subtracted the current price and zero value.
           The zero value is a value of the nearest Entry Point
         """
-        from apps.order.utils import OPENED_ORDER_STATUSES
+        from apps.order.utils import OPENED_ORDER_STATUSES, COMPLETED_ORDER_STATUSES
 
-        opened_gl_sl_orders = self.__get_gl_sl_sell_orders(statuses=OPENED_ORDER_STATUSES)
+        completed_gl_sl_orders = self.__get_gl_sl_orders(statuses=COMPLETED_ORDER_STATUSES, any_existing=True)
+        if completed_gl_sl_orders.exists():
+            logger.debug(f"GL_SL order completed, but trail_stop is running! '{self}'")
+            return False
+        opened_gl_sl_orders = self.__get_gl_sl_orders(statuses=OPENED_ORDER_STATUSES)
         gl_sl_order = opened_gl_sl_orders.last()
+        if not gl_sl_order:
+            self.__form_gl_sl_order_if_it_lost()
+            return False
         sl_value = gl_sl_order.price
         zero_value = self._get_avg_executed_price()
         if not zero_value:
@@ -2131,7 +2220,7 @@ class Signal(BaseSignal):
             current_price = self._get_current_price()
 
         # Check
-        if not self.__check_if_needs_to_move_sl_as_trailing_stop_long(
+        if not self.__check_if_needs_to_move_sl_as_trailing_stop_futures(
                 zero_value=zero_value, sl_value=sl_value, current_price=current_price):
             return False
 
@@ -2153,8 +2242,8 @@ class Signal(BaseSignal):
         # Cancel opened Buy orders if exist
         self._cancel_opened_orders(buy=True)
         self.__cancel_sent_sell_orders(opened_gl_sl_orders)
-        self.__form_sell_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
-                                     original_order_id=opened_gl_sl_order.id)
+        self.__form_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
+                                original_order_id=opened_gl_sl_order.id)
         return True
 
     @debug_input_and_returned
