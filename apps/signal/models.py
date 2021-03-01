@@ -574,20 +574,20 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     @rounded_result
-    def _get_residual_quantity(self, ignore_fee: bool = False) -> float:
+    def _get_residual_quantity(self, ignore_fee: bool = False, with_planned: bool = False) -> float:
         """
         Get residual quantity.
         return: (bought_quantity - sold_quantity)
         Fraction by step
         """
         if self.is_position_short():
-            return self._get_residual_quantity_short(ignore_fee=ignore_fee)
+            return self._get_residual_quantity_short(ignore_fee=ignore_fee, with_planned=with_planned)
         else:
-            return self._get_residual_quantity_long(ignore_fee=ignore_fee)
+            return self._get_residual_quantity_long(ignore_fee=ignore_fee, with_planned=with_planned)
 
     @debug_input_and_returned
     @rounded_result
-    def _get_residual_quantity_long(self, ignore_fee: bool = False) -> float:
+    def _get_residual_quantity_long(self, ignore_fee: bool = False, with_planned: bool = False) -> float:
         """
         Get residual quantity.
         return: (bought_quantity - sold_quantity)
@@ -600,13 +600,17 @@ class Signal(BaseSignal):
         completed_sell_orders = self.__get_completed_sell_orders()
         sold_quantity = self.__get_sold_quantity(completed_sell_orders)
         residual_quantity = bought_quantity - sold_quantity if sold_quantity else bought_quantity
+        if with_planned:
+            opened_ep_orders = self.__get_opened_ep_orders()
+            residual_quantity = residual_quantity + self.__get_planned_executed_quantity(opened_ep_orders) if \
+                opened_ep_orders else residual_quantity
         pair = self._get_pair()
         step_quantity = pair.step_quantity
         return self.__find_not_fractional_by_step(residual_quantity, step_quantity)
 
     @debug_input_and_returned
     @rounded_result
-    def _get_residual_quantity_short(self, ignore_fee: bool = False) -> float:
+    def _get_residual_quantity_short(self, ignore_fee: bool = False, with_planned: bool = False) -> float:
         """
         Get residual quantity.
         return: (sold_quantity - bought_quantity)
@@ -619,6 +623,10 @@ class Signal(BaseSignal):
         sold_quantity = self.__get_sold_quantity(completed_sell_orders)
         bought_quantity = self.__get_bought_quantity(worked_orders=completed_buy_orders, ignore_fee=ignore_fee)
         residual_quantity = sold_quantity - bought_quantity if bought_quantity else sold_quantity
+        if with_planned:
+            opened_ep_orders = self.__get_opened_ep_orders()
+            residual_quantity = residual_quantity + self.__get_planned_executed_quantity(opened_ep_orders) if\
+                opened_ep_orders else residual_quantity
         pair = self._get_pair()
         step_quantity = pair.step_quantity
         return self.__find_not_fractional_by_step(residual_quantity, step_quantity)
@@ -1141,8 +1149,6 @@ class Signal(BaseSignal):
         """
         Function to get sent Sell orders
         """
-        # TODO: maybe move to orders
-        # TODO: maybe _status__in: [SENT, NOT_SENT]
         from apps.order.utils import OPENED_ORDER_STATUSES
         from apps.order.models import SellOrder
         statuses = OPENED_ORDER_STATUSES if not statuses else statuses
@@ -1158,6 +1164,10 @@ class Signal(BaseSignal):
         for index in excluded_indexes:
             qs = qs.exclude(index=index)
         return qs
+
+    def __get_opened_ep_orders(self):
+        return self.__get_opened_sell_orders() if self.is_position_short()\
+            else self.__get_opened_buy_orders()
 
     def __get_gl_sl_orders(self, statuses: Optional[List] = None, any_existing: bool = False) -> QSBaseO:
         from apps.order.models import BuyOrder, SellOrder
@@ -2024,13 +2034,13 @@ class Signal(BaseSignal):
         # Specific case
         logger.warning(f"GL_SL order does not exist for Signal '{self}'."
                        f" We will create a new one with base parameters")
-        residual_quantity = self._get_residual_quantity(ignore_fee=True)
-        if residual_quantity <= 0:
-            logger.warning(f"Wrong Residual Quantity '{residual_quantity}' for trailing_stop: '{self}'")
+        residual_with_planned_quantity = self._get_residual_quantity(ignore_fee=True, with_planned=True)
+        if residual_with_planned_quantity <= 0:
+            logger.warning(f"Wrong Residual Quantity '{residual_with_planned_quantity}' for trailing_stop: '{self}'")
             return False
         any_gl_sl_order = self.__get_gl_sl_orders(any_existing=True).last()
         self.__form_gl_sl_order(price=self.stop_loss,
-                                quantity=residual_quantity,
+                                quantity=residual_with_planned_quantity,
                                 original_order_id=any_gl_sl_order.id if any_gl_sl_order else None)
 
     @debug_input_and_returned
