@@ -113,5 +113,12 @@ app.conf.beat_schedule = {
         "options": {"expires": _COMMON_EXPIRES_OF_CRON_TASK_SECS},
         "schedule": conf_obj.period_of_prices_update_tasks_secs,
     },
+
+    # UPDATE PAIRS INFO WORKER
+    "update_pairs_info_api_task": {
+        "task": "apps.market.tasks.update_pairs_info_api_task",
+        "schedule": 24*60*60,  # every 24h
+    },
+
 }
 

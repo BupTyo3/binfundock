@@ -340,6 +340,7 @@ class BiMarketLogic(BaseMarketLogic,
         """Cancel order"""
         self._cancel_order(order.symbol, order.custom_order_id)
 
+    @debug_input_and_returned
     def update_pairs_info_api(self):
         """
         Create pairs rules info by info from the Market
@@ -737,6 +738,7 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         """Send request to get Pairs rules info"""
         return self.my_client.futures_exchange_info()
 
+    @debug_input_and_returned
     def update_pairs_info_api(self) -> None:
         """
         Create pairs rules info by info from the Market
