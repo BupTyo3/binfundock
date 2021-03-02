@@ -532,12 +532,12 @@ class SignalOrigAdmin(admin.ModelAdmin):
     @notifications_handling('')
     def _bim_spot_create_one(self, request, signal):
         market = get_or_create_market()
-        signal.create_market_signal(market=market)
+        signal.create_market_signal(market=market, force=True)
 
     @notifications_handling('')
     def _bim_futures_create_one(self, request, signal):
         market = get_or_create_futures_market()
-        signal.create_market_signal(market=market)
+        signal.create_market_signal(market=market, force=True)
 
 
 
