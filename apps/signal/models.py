@@ -8,7 +8,7 @@ from django.db.models import QuerySet, Sum, F, Case, When, Avg
 from django.utils import timezone
 
 from utils.framework.models import (
-    SystemBaseModel,
+    BinfunError,
     get_increased_leading_number,
 )
 from .base_model import (
@@ -26,13 +26,14 @@ from .utils import (
     SOLD__SIG_STATS, FORMED__SIG_STATS, NEW_FORMED_PUSHED__SIG_STATS,
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
     PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, BOUGHT_SOLD__SIG_STATS, BOUGHT__SIG_STATS,
-    ERROR__SIG_STATS,
+    ERROR__SIG_STATS, STARTED__SIG_STATS,
 )
 from .exceptions import (
     MainCoinNotServicedError,
     ShortSpotCombinationError,
     IncorrectSignalPositionError,
     DuplicateSignalError,
+    SymbolAlreadyStartedError,
 )
 from apps.crontask.utils import get_or_create_crontask
 from apps.market.base_model import BaseMarket, BaseMarketException, BaseExternalAPIException
@@ -108,13 +109,21 @@ class SignalOrig(BaseSignalOrig):
             self.main_coin = self._get_main_coin(self.symbol)
         super().save(*args, **kwargs)
 
-    def _check_existing_duplicates(self) -> None:
+    def _check_existing_duplicates(self, market: BaseMarket) -> None:
         duplicates = Signal.objects.filter(techannel=self.techannel,
                                            symbol=self.symbol,
                                            _status__in=NEW_FORMED_PUSHED__SIG_STATS,
+                                           market=market,
                                            stop_loss=self.stop_loss)
         if duplicates.exists():
-            raise DuplicateSignalError(signal=self)
+            raise DuplicateSignalError(signal=self, market=market)
+
+    def _check_existing_started_pairs(self, market: BaseMarket) -> None:
+        started_signals = Signal.objects.filter(symbol=self.symbol,
+                                                _status__in=STARTED__SIG_STATS,
+                                                market=market)
+        if started_signals.exists():
+            raise SymbolAlreadyStartedError(signal=self, market=market)
 
     def _check_if_pair_does_not_exist_in_market(self, market: BaseMarket) -> None:
         pair = Pair.get_pair(self.symbol, market)
@@ -138,9 +147,8 @@ class SignalOrig(BaseSignalOrig):
             market = market_method()
             if market:
                 try:
-                    res.append(self.create_market_signal(
-                        market=market, trail_stop=self.techannel.auto_trailing_stop))
-                except PairNotExistsError as err:
+                    res.append(self.create_market_signal(market=market))
+                except BinfunError as err:
                     logger.warning(f"Signal '{self}' was not created: '{err}'")
         return res
 
@@ -217,12 +225,15 @@ class SignalOrig(BaseSignalOrig):
         return sm_obj
 
     @transaction.atomic
-    def create_market_signal(self, market: BaseMarket, trail_stop: bool = False) -> 'Signal':
+    def create_market_signal(self, market: BaseMarket, force: bool = False) -> 'Signal':
+        trail_stop = self.techannel.auto_trailing_stop
         self._check_if_pair_does_not_exist_in_market(market)
         # ValueError if SPOT & SHORT
         self._check_inappropriate_position_to_market_type(market)
         self._check_correct_position()
-        self._check_existing_duplicates()
+        self._check_existing_duplicates(market)
+        if not force and get_or_create_crontask().do_not_create_if_symbol_already_started:
+            self._check_existing_started_pairs(market)
         # Set leverage = 1 for Spot Market
         leverage = self._default_leverage if market.is_spot_market() else self.leverage
         # Trim leverage
@@ -594,7 +605,7 @@ class Signal(BaseSignal):
         Fraction by step
         """
         completed_buy_orders = self.__get_completed_buy_orders()
-        if not completed_buy_orders:
+        if not completed_buy_orders and not with_planned:
             return 0
         bought_quantity = self.__get_bought_quantity(worked_orders=completed_buy_orders, ignore_fee=ignore_fee)
         completed_sell_orders = self.__get_completed_sell_orders()
@@ -617,7 +628,7 @@ class Signal(BaseSignal):
         Fraction by step
         """
         completed_sell_orders = self.__get_completed_sell_orders()
-        if not completed_sell_orders:
+        if not completed_sell_orders and not with_planned:
             return 0
         completed_buy_orders = self.__get_completed_buy_orders()
         sold_quantity = self.__get_sold_quantity(completed_sell_orders)
@@ -2068,7 +2079,7 @@ class Signal(BaseSignal):
         sl_value = gl_sl_order.price
         zero_value = self._get_avg_executed_price()
         if not zero_value:
-            logger.warning(f"No zero_value for Signal '{self}'")
+            logger.debug(f"No zero_value for Signal '{self}'")
             return False
         if fake_price:
             current_price = fake_price
@@ -2211,7 +2222,7 @@ class Signal(BaseSignal):
         sl_value = gl_sl_order.price
         zero_value = self._get_avg_executed_price()
         if not zero_value:
-            logger.warning(f"No zero_value for Signal '{self}'")
+            logger.debug(f"No zero_value for Signal '{self}'")
             return False
         if fake_price:
             current_price = fake_price
@@ -2460,7 +2471,8 @@ class Signal(BaseSignal):
     def trail_stop_by_one_signal(self, fake_price: Optional[float] = None):
         """
         """
-        if self._status not in BOUGHT_SOLD__SIG_STATS:
+        # TODO: it's an experiment. Can change it to BOUGHT_SOLD__SIG_STATS
+        if self._status not in PUSHED_BOUGHT_SOLD__SIG_STATS:
             return False
         if self._is_market_type_futures():
             return self._trail_stop_futures(fake_price=fake_price)
@@ -2592,8 +2604,9 @@ class Signal(BaseSignal):
                              techannel_abbr: Optional[str] = None,
                              fake_price: Optional[float] = None):
         """Handle all signals. Trailing stop feature"""
+        # TODO: it's an experiment. Can change it to BOUGHT_SOLD__SIG_STATS
         params = {
-            '_status__in': BOUGHT_SOLD__SIG_STATS,
+            '_status__in': PUSHED_BOUGHT_SOLD__SIG_STATS,
             'trailing_stop_enabled': True,
         }
         if outer_signal_id:
