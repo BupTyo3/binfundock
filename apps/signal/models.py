@@ -605,7 +605,7 @@ class Signal(BaseSignal):
         Fraction by step
         """
         completed_buy_orders = self.__get_completed_buy_orders()
-        if not completed_buy_orders:
+        if not completed_buy_orders and not with_planned:
             return 0
         bought_quantity = self.__get_bought_quantity(worked_orders=completed_buy_orders, ignore_fee=ignore_fee)
         completed_sell_orders = self.__get_completed_sell_orders()
@@ -628,7 +628,7 @@ class Signal(BaseSignal):
         Fraction by step
         """
         completed_sell_orders = self.__get_completed_sell_orders()
-        if not completed_sell_orders:
+        if not completed_sell_orders and not with_planned:
             return 0
         completed_buy_orders = self.__get_completed_buy_orders()
         sold_quantity = self.__get_sold_quantity(completed_sell_orders)
@@ -2079,7 +2079,7 @@ class Signal(BaseSignal):
         sl_value = gl_sl_order.price
         zero_value = self._get_avg_executed_price()
         if not zero_value:
-            logger.warning(f"No zero_value for Signal '{self}'")
+            logger.debug(f"No zero_value for Signal '{self}'")
             return False
         if fake_price:
             current_price = fake_price
@@ -2222,7 +2222,7 @@ class Signal(BaseSignal):
         sl_value = gl_sl_order.price
         zero_value = self._get_avg_executed_price()
         if not zero_value:
-            logger.warning(f"No zero_value for Signal '{self}'")
+            logger.debug(f"No zero_value for Signal '{self}'")
             return False
         if fake_price:
             current_price = fake_price
@@ -2471,7 +2471,8 @@ class Signal(BaseSignal):
     def trail_stop_by_one_signal(self, fake_price: Optional[float] = None):
         """
         """
-        if self._status not in BOUGHT_SOLD__SIG_STATS:
+        # TODO: it's an experiment. Can change it to BOUGHT_SOLD__SIG_STATS
+        if self._status not in PUSHED_BOUGHT_SOLD__SIG_STATS:
             return False
         if self._is_market_type_futures():
             return self._trail_stop_futures(fake_price=fake_price)
@@ -2603,8 +2604,9 @@ class Signal(BaseSignal):
                              techannel_abbr: Optional[str] = None,
                              fake_price: Optional[float] = None):
         """Handle all signals. Trailing stop feature"""
+        # TODO: it's an experiment. Can change it to BOUGHT_SOLD__SIG_STATS
         params = {
-            '_status__in': BOUGHT_SOLD__SIG_STATS,
+            '_status__in': PUSHED_BOUGHT_SOLD__SIG_STATS,
             'trailing_stop_enabled': True,
         }
         if outer_signal_id:
