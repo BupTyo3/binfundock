@@ -31,6 +31,10 @@ class SystemCommand(BaseCommand, ABC):
         self.stdout.write(self.style.ERROR(message))
 
 
+class BinfunError(ValueError):
+    pass
+
+
 class SingletonModel(models.Model):
 
     class Meta:
