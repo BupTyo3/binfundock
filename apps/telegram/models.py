@@ -502,15 +502,14 @@ class Telegram(BaseTelegram):
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
 
-    async def parse_klondike_channel(self, name=None):
-        channel_id = None
+    async def parse_klondike_channel(self, name):
         if name == 'scalp':
             channel_id = int(conf_obj.klondike_scalp)
             channel_abbr = 'kl_sc'
-        elif name == 'altcoin':
+        if name == 'altcoin':
             channel_id = int(conf_obj.klondike_altcoin)
             channel_abbr = 'kl_al'
-        else:
+        if name == 'margin':
             channel_id = int(conf_obj.klondike_margin)
             channel_abbr = 'kl_mg'
 
@@ -549,6 +548,7 @@ class Telegram(BaseTelegram):
         position = None
         leverage = ''
         cross_leverage_label = 'cross leverage'
+        alt_leverage_label = 'x leverage'
         entries = []
         profits = []
         stop_loss = ''
@@ -570,13 +570,16 @@ class Telegram(BaseTelegram):
                 position = 'SHORT'
             if sell_label or long_label not in splitted_info[price_index]:
                 position = 'LONG'
-                leverage = 3
             if cross_leverage_label in splitted_info[price_index]:
                 leverage = 20
             if 'X' in splitted_info[price_index]:
                 possible_leverage = splitted_info[price_index].split('X')
                 leverage = possible_leverage[1].split(' ')
                 leverage = leverage[0]
+            if alt_leverage_label in splitted_info[price_index]:
+                possible_leverage = splitted_info[price_index].split(alt_leverage_label)
+                leverage = possible_leverage[0].split(' ')
+                leverage = leverage[-1]
 
             possible_entries = splitted_info[price_index].split(' - ')
             possible_entry1 = possible_entries[0].split(' ')
