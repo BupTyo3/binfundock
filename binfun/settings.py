@@ -209,6 +209,9 @@ PARSED_IMAGES_STORAGE = f'{BASE_DIR}/parsed-images'
 logging.getLogger('telethon').setLevel(
     level=int(os.getenv('TELETHON_LOG_LEVEL', logging.WARNING)))
 
+logging.getLogger('celery').setLevel(
+    level=int(os.getenv('CELERY_LOG_LEVEL', logging.INFO)))
+
 # Main logger settings
 
 LOGGING = {

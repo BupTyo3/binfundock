@@ -165,7 +165,7 @@ class Command(SystemCommand):
         logger.debug(f'Session {session_name} initialized')
         try:
             with self._client_luck:
-                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_klondike_channel())
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_klondike_channel('margin'))
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()

@@ -14,6 +14,7 @@ Optional
 ```dotenv
 DEBUG=False
 TELETHON_LOG_LEVEL=30
+CELERY_LOG_LEVEL=20
 ```
 
 ### Sample `config.ini` File
