@@ -1,10 +1,7 @@
 import logging
-from random import random
-import asyncio
 from telethon import TelegramClient
 import traceback
 
-from apps.signal.models import Signal
 from apps.telegram.models import Telegram
 from binfun.settings import conf_obj
 from utils.framework.models import SystemCommand
@@ -19,6 +16,8 @@ class Command(SystemCommand):
         self._telegram = None
         self._client_luck = None
         self._telegram_luck = None
+        self._client_xy = None
+        self._telegram_xy = None
         super().__init__()
 
     def init_telegram(self, session_name):
@@ -30,6 +29,11 @@ class Command(SystemCommand):
         self._client_luck = TelegramClient(session_name, conf_obj.api_id_luck, conf_obj.api_hash_luck)
         self._client_luck.start()
         self._telegram_luck = Telegram(self._client_luck)
+
+    def init_telegram_xy(self, session_name):
+        self._client_xy = TelegramClient(session_name, conf_obj.api_id_xy, conf_obj.api_hash_xy)
+        self._client_xy.start()
+        self._telegram_xy = Telegram(self._client_xy)
 
     def add_arguments(self, parser):
         pass
@@ -78,16 +82,16 @@ class Command(SystemCommand):
 
     def collect_info_from_tca_leverage_channel(self):
         session_name = 'TCA_Leverage'
-        self.init_telegram_luck(session_name)
+        self.init_telegram_xy(session_name)
         logger.debug(f'Session {session_name} initialized')
         try:
-            with self._client_luck:
-                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_tca_channel('leverage'))
+            with self._client_xy:
+                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_tca_channel('leverage'))
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client_luck.disconnect()
+            self._client_xy.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
     def collect_info_from_cf_trader_channel(self):
