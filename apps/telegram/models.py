@@ -844,7 +844,7 @@ class Telegram(BaseTelegram):
         stop_label = 'Stop Loss: '
         pair = 'Coin: '
         current_price = ''
-        is_margin = False
+        margin_type = MarginType.CROSSED.value
         position = None
         leverage = 100
         entries = ''
@@ -873,7 +873,7 @@ class Telegram(BaseTelegram):
                 stop_loss = line[11:]
         """ Take only first 6 take profits: """
         profits = profits[:6]
-        signals.append(SignalModel(pair, current_price, is_margin, position,
+        signals.append(SignalModel(pair, current_price, margin_type, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
 
