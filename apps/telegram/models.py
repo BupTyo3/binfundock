@@ -846,7 +846,7 @@ class Telegram(BaseTelegram):
         current_price = ''
         is_margin = False
         position = None
-        leverage = 10
+        leverage = 100
         entries = ''
         profits = ''
         stop_loss = ''
