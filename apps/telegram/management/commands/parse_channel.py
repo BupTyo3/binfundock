@@ -81,7 +81,7 @@ class Command(SystemCommand):
             self._client_luck.disconnect()
 
     def collect_info_from_tca_leverage_channel(self):
-        session_name = 'TCALeverage'
+        session_name = 'TCA'
         self.init_telegram_xy(session_name)
         logger.debug(f'Session {session_name} initialized')
         try:
