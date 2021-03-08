@@ -1252,9 +1252,8 @@ class Signal(BaseSignal):
         }
         return BuyOrder.objects.filter(**params)
 
-    @staticmethod
     @debug_input_and_returned
-    def _update_flag_handled_worked(worked_orders: QSBaseO, unset: bool = False):
+    def _update_flag_handled_worked(self, worked_orders: QSBaseO, unset: bool = False):
         """
         Set flag handled_worked
         """
@@ -1262,9 +1261,8 @@ class Signal(BaseSignal):
             order.handled_worked = True if not unset else False
             order.save()
 
-    @staticmethod
     @debug_input_and_returned
-    def __cancel_orders(sent_orders: QSBaseO):
+    def __cancel_orders(self, sent_orders: QSBaseO):
         """
         Set flag local_cancelled for orders.
         The orders are ready to cancel
@@ -1275,17 +1273,12 @@ class Signal(BaseSignal):
             order.local_canceled_time = now_
             order.save()
 
+    @debug_input_and_returned
     def _cancel_opened_orders(self, buy: bool = False, sell: bool = False):
         if buy:
-            opened_buy_orders = self.__get_opened_buy_orders()
-            # Cancel all buy_orders
-            if opened_buy_orders:
-                self.__cancel_orders(opened_buy_orders)
+            self.__cancel_orders(self.__get_opened_buy_orders())
         if sell:
-            opened_sell_orders = self.__get_opened_sell_orders()
-            if opened_sell_orders:
-                # Cancel opened sell_orders and form sell_market order
-                self.__cancel_orders(opened_sell_orders)
+            self.__cancel_orders(self.__get_opened_sell_orders())
 
     @debug_input_and_returned
     @rounded_result
@@ -1546,10 +1539,10 @@ class Signal(BaseSignal):
             return False
         if self.__get_opened_sell_orders(statuses=SENT_ORDERS_STATUSES).exists():
             return False
-        if not self.__try_to_reduce_tps_count():
-            return False
         self._cancel_opened_orders(sell=True)
         self._update_flag_handled_worked(self.__get_completed_buy_orders(), unset=True)
+        if not self.__try_to_reduce_tps_count():
+            return False
         return True
 
     @debug_input_and_returned
@@ -1711,7 +1704,6 @@ class Signal(BaseSignal):
         Remove some TPs if the Signal has them more than 1
         return True if it works
         """
-        logger.warning(f"'{self}: There is insufficient quantity to form take_profits")
         tp_count = self.__get_distribution_by_take_profits()
         tp_count_enough_to_be_distributed = 1
         if tp_count > tp_count_enough_to_be_distributed:
