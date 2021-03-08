@@ -1664,15 +1664,17 @@ class Signal(BaseSignal):
                 logger.warning(f"Push order Error: Signal:'{self}' Order: '{sell_order}': Ex: '{ex}'")
                 if not self._handle_catching_api_exceptions(ex, sell_order):
                     error_status_flag = True
+                break
 
         # push NOT_SENT BUY orders
         for buy_order in self.buy_orders.filter(**orders_params_for_pushing):
             try:
                 buy_order.push_to_market()
             except self.market_exception_class.api_exception as ex:
+                logger.warning(f"Push order Error: Signal:'{self}' Order: '{buy_order}': Ex: '{ex}'")
                 if not self._handle_catching_api_exceptions(ex, buy_order):
                     error_status_flag = True
-                logger.warning(f"Push order Error: Signal:'{self}' Order: '{buy_order}': Ex: '{ex}'")
+                break
             # set status if at least one order has created
             if not error_status_flag and self.status not in PUSHED_BOUGHT_SOLD__SIG_STATS:
                 self.status = SignalStatus.PUSHED.value
