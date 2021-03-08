@@ -1376,6 +1376,7 @@ class Signal(BaseSignal):
         from apps.order.utils import NOT_FINISHED_ORDERS_STATUSES, COMPLETED_ORDER_STATUSES
         not_finished_orders_params = {
             '_status__in': NOT_FINISHED_ORDERS_STATUSES,
+            'no_need_push': False,
         }
         completed_not_handled_params = {
             '_status__in': COMPLETED_ORDER_STATUSES,
