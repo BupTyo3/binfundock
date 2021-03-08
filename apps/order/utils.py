@@ -26,6 +26,9 @@ COMPLETED_ORDER_STATUSES = [
 NOT_EXISTS_ORDER_STATUSES = [
     OrderStatus.NOT_EXISTS.value,
 ]
+NOT_SENT_ORDERS_STATUSES = [
+    OrderStatus.NOT_SENT.value,
+]
 
 ORDER_STATUSES_FOR_PUSH_JOB = [
     OrderStatus.NOT_SENT.value,
@@ -44,9 +47,6 @@ SENT_ORDERS_STATUSES = [
     OrderStatus.SENT.value,
     OrderStatus.PARTIAL.value,
     OrderStatus.NOT_EXISTS.value,
-]
-NOT_SENT_ORDERS_STATUSES = [
-    OrderStatus.NOT_SENT.value,
 ]
 
 
