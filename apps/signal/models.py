@@ -1602,7 +1602,7 @@ class Signal(BaseSignal):
         """
         True if we managed to fix or this is a minor exception or this is a minor exception
         """
-        return (self.__catch_minor_api_exc() or
+        return (self.__catch_minor_api_exc(ex=ex) or
                 self.__catch_api_exc_immediately_trigger_sl_order_futures(ex=ex, order=order) or
                 self.__catch_api_exc_min_notional_tp_order_spot(ex=ex, order=order) or
                 False)
