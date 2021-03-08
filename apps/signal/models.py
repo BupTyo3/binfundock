@@ -829,7 +829,7 @@ class Signal(BaseSignal):
         entry_point_price = self.entry_points.last().value
         coin_quantity = convert_to_coin_quantity(amount_quantity, entry_point_price)
         logger.debug(f"'{self}':coin_quantity={coin_quantity}")
-        if coin_quantity > pair.min_quantity:
+        if coin_quantity >= pair.min_quantity:
             return True
         logger.debug(f"Bad Check: coin_quantity < min_quantity: {coin_quantity} < {pair.min_quantity}!")
         return False
@@ -852,7 +852,7 @@ class Signal(BaseSignal):
             logger.debug(f"Bad Check: amount_quantity < min_amount: {amount_quantity} < {pair.min_amount}!")
             return False
         logger.debug(f"'{self}':coin_quantity={quantity}")
-        if quantity > pair.min_quantity:
+        if quantity >= pair.min_quantity:
             return True
         logger.debug(f"Bad Check: coin_quantity < min_quantity: {quantity} < {pair.min_quantity}!")
         return False
@@ -1776,11 +1776,13 @@ class Signal(BaseSignal):
         else:
             calculated_distributed_quantity = self.__get_distributed_quantity_to_form_tp_orders(bought_quantity)
             if not self._check_if_quantity_enough_to_form_tp_order(calculated_distributed_quantity):
-                if not self.__try_to_reduce_tps_count():
+                reducing_res = self.__try_to_reduce_tps_count()
+                if reducing_res:
+                    # The next time we will try again after removing some TPs
+                    return
+                if not futures:
                     self.status = SignalStatus.ERROR.value
                     self.save()
-                # The next time we will try again after removing some TPs
-                return
             self._second_formation_sell_orders(sell_quantity=bought_quantity, futures=futures)
         self._update_flag_handled_worked(worked_orders)
         # Change status
@@ -1927,11 +1929,9 @@ class Signal(BaseSignal):
         else:
             calculated_distributed_quantity = self.__get_distributed_quantity_to_form_tp_orders(sold_quantity)
             if not self._check_if_quantity_enough_to_form_tp_order(calculated_distributed_quantity):
-                if not self.__try_to_reduce_tps_count():
-                    self.status = SignalStatus.ERROR.value
-                    self.save()
-                # The next time we will try again after removing some TPs
-                return
+                if self.__try_to_reduce_tps_count():
+                    # The next time we will try again after removing some TPs
+                    return
             self._second_formation_buy_orders_futures_short(buy_quantity=sold_quantity)
         self._update_flag_handled_worked(worked_orders)
         # Change status
