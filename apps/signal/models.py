@@ -1863,7 +1863,7 @@ class Signal(BaseSignal):
         If TP(oco) order has worked, corresponding SL order becomes expired automatically into Market
         """
         # TODO: Check
-        worked_tp_orders = self.__get_not_handled_worked_sell_orders(tp_orders=True)
+        worked_tp_orders = self.__get_not_handled_worked_sell_orders(tp_orders=True, sl_orders=True)
         if not worked_tp_orders:
             return
         self._cancel_opened_orders(buy=True)
