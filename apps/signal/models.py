@@ -10,6 +10,7 @@ from django.utils import timezone
 from utils.framework.models import (
     BinfunError,
     get_increased_leading_number,
+    get_increased_trailing_number,
 )
 from .base_model import (
     BaseSignal, BaseHistorySignal,
@@ -871,11 +872,18 @@ class Signal(BaseSignal):
         """
         Function for creating Sell orders
         """
+        # Case if there were sell_orders to generate a new custom_order_id
         last_sell_order = self.sell_orders.filter(no_need_push=False).last()
         custom_order_id = get_increased_leading_number(last_sell_order.custom_order_id) if\
             last_sell_order else None
+
         distributed_quantity = self._get_distributed_quantity_by_take_profits(sell_quantity)
         for index, take_profit in enumerate(self.take_profits.all()):
+
+            # if there were sell_orders (1imlossch_7868_1) we replaced it by (1imlossch_7868_0) if index==0
+            if custom_order_id:
+                custom_order_id = get_increased_trailing_number(string=custom_order_id, default=index)
+
             if take_profit.value > self._get_current_price():
                 self.__form_oco_sell_order(
                     distributed_quantity=distributed_quantity,
