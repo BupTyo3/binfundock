@@ -1,6 +1,6 @@
 import re
 from abc import ABC
-from typing import Optional
+from typing import Optional, Union
 
 from django.core.cache import cache
 from django.core.management.base import BaseCommand
@@ -151,18 +151,19 @@ def get_increased_leading_number(string: str) -> str:
     return f"{new_leading_number}{new_main_part}"
 
 
-def get_increased_trailing_number(string: str) -> str:
+def get_increased_trailing_number(string: str, default: Union[None, int, str]) -> str:
     """
     Convert:
     "hello45" -> "hello46"
     "hello" -> "hello0"
     "hello0" -> "hello1"
     """
-    leading_number = get_leading_number(string)
+    trailing_number = get_trailing_number(string)
     new_main_part = string
-    if leading_number is not None:
-        new_leading_number = leading_number + 1
-        new_main_part = string.lstrip(str(leading_number))
+    if trailing_number is not None:
+        new_trailing_number = trailing_number + 1
+        new_main_part = string.rstrip(str(trailing_number))
     else:
-        new_leading_number = 0
-    return f"{new_leading_number}{new_main_part}"
+        new_trailing_number = 0
+    new_trailing_number = default if default or default == 0 else new_trailing_number
+    return f"{new_main_part}{new_trailing_number}"
