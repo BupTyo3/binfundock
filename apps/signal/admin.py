@@ -189,11 +189,15 @@ class SignalAdmin(admin.ModelAdmin):
 
     @staticmethod
     def take_profits(signal):
-        return ' - '.join([str(i.value) for i in signal.take_profits.all()])
+        link = '/admin/signal/takeprofit/{}/change/'
+        return format_html(' - '.join(['<a href="{}" target="_blank">{}</a>'.format(
+            link.format(str(i.id)), str(i.value)) for i in signal.take_profits.all()]))
 
     @staticmethod
     def entry_points(signal):
-        return ' - '.join([str(i.value) for i in signal.entry_points.all()])
+        link = '/admin/signal/entrypoint/{}/change/'
+        return format_html(' - '.join(['<a href="{}" target="_blank">{}</a>'.format(
+            link.format(str(i.id)), str(i.value)) for i in signal.entry_points.all()]))
 
     def first_forming(self, request, queryset):
         for signal in queryset:
@@ -527,11 +531,15 @@ class SignalOrigAdmin(admin.ModelAdmin):
 
     @staticmethod
     def take_profits(signal):
-        return ' - '.join([str(i.value) for i in signal.take_profits.all()])
+        link = '/admin/signal/takeprofitorig/{}/change/'
+        return format_html(' - '.join(['<a href="{}" target="_blank">{}</a>'.format(
+            link.format(str(i.id)), str(i.value)) for i in signal.take_profits.all()]))
 
     @staticmethod
     def entry_points(signal):
-        return ' - '.join([str(i.value) for i in signal.entry_points.all()])
+        link = '/admin/signal/entrypointorig/{}/change/'
+        return format_html(' - '.join(['<a href="{}" target="_blank">{}</a>'.format(
+            link.format(str(i.id)), str(i.value)) for i in signal.entry_points.all()]))
 
     def bim_spot_create(self, request, queryset):
         for signal in queryset:
