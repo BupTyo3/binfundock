@@ -25,6 +25,8 @@ common_period_of_cron_celery_tasks_secs=7.0
 period_of_prices_update_tasks_secs=50.0
 ;for the lost sl orders below the current_price multiple delta param
 extremal_sl_price_shift_coef=5.0
+;unset busy_setting_time field after this time if this field was stuck
+allowable_duration_of_task_secs=60
 [Market]
 market_api_key=xxx
 market_api_secret=xxx
