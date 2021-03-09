@@ -1,6 +1,7 @@
 from decimal import Decimal, Inexact, Context
 
 from django.contrib import admin, messages
+from django.utils.html import format_html
 from django.utils.translation import ugettext_lazy as _
 from django.db.models import (
     F, Case, When, ExpressionWrapper,
@@ -13,6 +14,7 @@ from django.contrib.postgres.aggregates.general import StringAgg
 from apps.market.models import get_or_create_market, get_or_create_futures_market
 from utils.admin import InputFilter
 from tools.tools import subtract_fee
+from binfun.settings import conf_obj
 
 from .models import (
     Signal,
@@ -54,7 +56,8 @@ class TechannelFilter(InputFilter):
 @admin.register(Signal)
 class SignalAdmin(admin.ModelAdmin):
     list_display = ['id',
-                    'symbol',
+                    # 'symbol',
+                    'sym',
                     'market',
                     'position',
                     'leverage',
@@ -163,6 +166,10 @@ class SignalAdmin(admin.ModelAdmin):
     # def e_points(self, obj):
     #     return obj.e_points
 
+    def sym(self, obj):
+        return format_html('<a href="{}" target="_blank">{}</a>'.format(
+            obj.market.logic.raw_url.format(obj.symbol), obj.symbol))
+
     def perc_inc(self, obj):
         return round(obj.perc_inc, 2)
 
@@ -182,11 +189,15 @@ class SignalAdmin(admin.ModelAdmin):
 
     @staticmethod
     def take_profits(signal):
-        return ' - '.join([str(i.value) for i in signal.take_profits.all()])
+        link = '/admin/signal/takeprofit/{}/change/'
+        return format_html(' - '.join(['<a href="{}" target="_blank">{}</a>'.format(
+            link.format(str(i.id)), str(i.value)) for i in signal.take_profits.all()]))
 
     @staticmethod
     def entry_points(signal):
-        return ' - '.join([str(i.value) for i in signal.entry_points.all()])
+        link = '/admin/signal/entrypoint/{}/change/'
+        return format_html(' - '.join(['<a href="{}" target="_blank">{}</a>'.format(
+            link.format(str(i.id)), str(i.value)) for i in signal.entry_points.all()]))
 
     def first_forming(self, request, queryset):
         for signal in queryset:
@@ -416,7 +427,8 @@ class TakeProfitOrigAdmin(admin.ModelAdmin):
 @admin.register(SignalOrig)
 class SignalOrigAdmin(admin.ModelAdmin):
     list_display = ['id',
-                    'symbol',
+                    # 'symbol',
+                    'sym',
                     'position',
                     'leverage',
                     'entry_points',
@@ -446,6 +458,10 @@ class SignalOrigAdmin(admin.ModelAdmin):
         'remove_near_tp',
         'remove_near_ep',
     ]
+
+    def sym(self, obj):
+        return format_html('<a href="{}" target="_blank">{}</a>'.format(
+            conf_obj.market_spot_raw_url.format(obj.symbol), obj.symbol))
 
     def notifications_handling(value):
         def decorate(f):
@@ -515,11 +531,15 @@ class SignalOrigAdmin(admin.ModelAdmin):
 
     @staticmethod
     def take_profits(signal):
-        return ' - '.join([str(i.value) for i in signal.take_profits.all()])
+        link = '/admin/signal/takeprofitorig/{}/change/'
+        return format_html(' - '.join(['<a href="{}" target="_blank">{}</a>'.format(
+            link.format(str(i.id)), str(i.value)) for i in signal.take_profits.all()]))
 
     @staticmethod
     def entry_points(signal):
-        return ' - '.join([str(i.value) for i in signal.entry_points.all()])
+        link = '/admin/signal/entrypointorig/{}/change/'
+        return format_html(' - '.join(['<a href="{}" target="_blank">{}</a>'.format(
+            link.format(str(i.id)), str(i.value)) for i in signal.entry_points.all()]))
 
     def bim_spot_create(self, request, queryset):
         for signal in queryset:

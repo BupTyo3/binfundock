@@ -195,6 +195,9 @@ CELERY_TASK_SERIALIZER = 'json'
 DEFAULT_INVIOLABLE_BALANCE_PERC = '15.0'
 DEFAULT_EXTREMAL_SL_PRICE_SHIFT_COEF = '8.0'
 
+DEFAULT_MARKET_SPOT_RAW_URL = 'https://www.binance.com/en/trade/{}?theme=dark'
+DEFAULT_MARKET_FUTURES_RAW_URL = 'https://www.binance.com/en/futures/{}?theme=dark'
+
 # CRON TASKS
 DEFAULT_COMMON_PERIOD_OF_CRON_CELERY_TASKS_SECS = '7.0'
 DEFAULT_PERIOD_OF_PRICES_UPDATE_TASKS_SECS = '50.0'
@@ -295,6 +298,9 @@ class Config:
         self.futures_market_fee: float = market.getfloat('futures_market_fee')
         self.inviolable_balance_perc: float = float(market.get(
             'inviolable_balance_perc', DEFAULT_INVIOLABLE_BALANCE_PERC))
+        self.market_spot_raw_url = market.get('market_spot_raw_url', DEFAULT_MARKET_SPOT_RAW_URL)
+        self.market_futures_raw_url = market.get('market_futures_raw_url', DEFAULT_MARKET_FUTURES_RAW_URL)
+        self.market_futures_raw_url = market.get('market_futures_raw_url', DEFAULT_MARKET_FUTURES_RAW_URL)
         logic = config['Logic']
         self.common_period_of_cron_celery_tasks_secs: float = float(logic.get(
             'common_period_of_cron_celery_tasks_secs', DEFAULT_COMMON_PERIOD_OF_CRON_CELERY_TASKS_SECS))

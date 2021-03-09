@@ -161,6 +161,7 @@ class BiMarketException(BaseMarketException):
 class BiMarketLogic(BaseMarketLogic,
                     BinanceDataMixin):
     type = MarketType.SPOT.value
+    raw_url = conf_obj.market_spot_raw_url
     name = 'Binance'
     market_fee = conf_obj.market_fee
     limit_history = 500
@@ -377,6 +378,7 @@ class BiFuturesMarketLogic(BaseMarketLogic,
                            BinanceDataMixin,
                            BinanceFuturesDataMixin):
     name = 'BiFutures'
+    raw_url = conf_obj.market_futures_raw_url
     order_id_separator = 'bifu'
     market_fee = conf_obj.futures_market_fee
     type = MarketType.FUTURES.value
