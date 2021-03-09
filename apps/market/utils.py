@@ -30,6 +30,7 @@ class MarketAPIExceptionError(Enum):
     It can be overridden to assign specific errors' responses of the other Market
     """
     MARGIN_NOT_SUFFICIEN = APIError(-2019, 'Margin is insufficient.')
+    MIN_NOTIONAL_FILTER = APIError(-1013, 'Filter failure: MIN_NOTIONAL')
     INVALID_TIMESTAMP = APIError(-1021, 'Timestamp for this request is outside of the recvWindow.')
     QTY_LESS_THAN_ZERO = APIError(-4003, 'Quantity less than zero.')
     ORDER_WOULD_IMMEDIATELY_TRIGGER = APIError(-2021, 'Order would immediately trigger.')

@@ -33,6 +33,8 @@ futures_market_api_secret=xxx
 market_fee=0.1
 futures_market_fee=0.03
 inviolable_balance_perc=15.0
+market_futures_raw_url=https://www.binance.com/en/futures/{}?theme=dark
+market_spot_raw_url=https://www.binance.com/en/trade/{}?theme=dark
 [Signal]
 # for table Signal
 accessible_main_coins=USDT,
