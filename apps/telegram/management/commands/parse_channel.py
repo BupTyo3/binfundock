@@ -308,8 +308,9 @@ class Command(SystemCommand):
         if not get_or_create_crontask().luck8414:
             pass
         elif any(x in channel for x in luck_matches):
-            self.collect_info_from_luck_channel()
-
+            # self.collect_info_from_luck_channel()
+            pass
+        
         if not get_or_create_crontask().wcse:
             pass
         elif any(x in channel for x in wcse_matches):

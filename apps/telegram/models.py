@@ -101,7 +101,7 @@ class Telegram(BaseTelegram):
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
                     else:
-                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                             message.date, channel_abbr, message.id)
                 else:
                     attention_to_close = self.is_urgent_close_position(message.text, channel_abbr)
@@ -320,7 +320,7 @@ class Telegram(BaseTelegram):
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
                     else:
-                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                             message.date, channel_abbr, message.id)
 
     async def parse_crypto_futures_channel(self):
@@ -339,7 +339,7 @@ class Telegram(BaseTelegram):
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
                     else:
-                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                              message.date, channel_abbr, message.id)
 
     def parse_angel_message(self, message_text, message_id):
@@ -449,7 +449,7 @@ class Telegram(BaseTelegram):
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
                     else:
-                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_white_bull_message(self, message_text, message_id):
@@ -530,7 +530,7 @@ class Telegram(BaseTelegram):
                                                                 f"related to the '{channel_abbr}' algorithm: "
                                                                 f"{inserted_to_db}")
                         else:
-                            await self.send_message_by_template('Eugene_Povetkin', signal[0],
+                            await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                                 message.date, channel_abbr, message.id)
 
     def parse_klondike_message(self, message_text, message_id):
@@ -836,7 +836,7 @@ class Telegram(BaseTelegram):
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
                     else:
-                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_tca_message(self, message_text, message_id):
@@ -896,7 +896,7 @@ class Telegram(BaseTelegram):
                                                             f"related to the '{channel_abbr}' algorithm: "
                                                             f"{inserted_to_db}")
                     else:
-                        await self.send_message_by_template('Eugene_Povetkin', signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                             message.date, channel_abbr, message.id)
 
     def parse_margin_whale_message(self, message_text, message_id):
