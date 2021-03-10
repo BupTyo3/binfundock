@@ -235,7 +235,8 @@ class Telegram(BaseTelegram):
         stop_label = 'Stop Loss: '
         pair = ''
         current_price = ''
-        is_margin = False
+        margin_type_label = 'Margin type:'
+        margin_type = ''
         position_label = 'Position: '
         position = None
         leverage = 'Leverage: '
@@ -251,6 +252,9 @@ class Telegram(BaseTelegram):
                 possible_pair = line.split(' ')
                 pair = ''.join(filter(str.isalpha, possible_pair[1]))
             if line.startswith(position_label):
+                margin_type = line[12:]
+                margin_type = position.replace('\'', '')
+            if line.startswith(margin_type_label):
                 position = line[10:]
                 position = position.replace('\'', '')
             if line.startswith(leverage):
@@ -271,7 +275,7 @@ class Telegram(BaseTelegram):
                 algorithm = line[len(algorithm):].replace('\'', '')
             if line.startswith(outer_id_label):
                 message_id = line[4:].replace('\'', '')
-        signals.append(SignalModel(pair, current_price, is_margin, position,
+        signals.append(SignalModel(pair, current_price, margin_type, position,
                                    leverage, entries, profits, stop_loss, message_id, algorithm=algorithm))
         return signals
 
@@ -882,7 +886,7 @@ class Telegram(BaseTelegram):
     async def parse_margin_whale_channel(self):
         chat_id = int(conf_obj.margin_whales)
         channel_abbr = 'margin_whale'
-        async for message in self.client.iter_messages(chat_id, limit=5):
+        async for message in self.client.iter_messages(chat_id, limit=8):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg:
@@ -1032,9 +1036,12 @@ class Telegram(BaseTelegram):
     async def send_message_by_template(self, channel_name, signal, message_date, channel_abbr, message_id):
         if not signal.leverage:
             signal.leverage = 1
+        if signal.margin_type != 'CROSSED':
+            signal.margin_type = 'ISOLATED'
         message = f"Pair: '{signal.pair}'\n" \
                   f"Position: '{signal.position}'\n" \
                   f"Leverage: '{signal.leverage}'\n" \
+                  f"Margin type: '{signal.margin_type}'\n" \
                   f"Entry Points: '{signal.entry_points}'\n" \
                   f"Take Profits: '{signal.take_profits}'\n" \
                   f"Stop Loss: '{signal.stop_loss}'\n" \
