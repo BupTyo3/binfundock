@@ -10,8 +10,7 @@ from telethon.tl.types import User
 from apps.signal.models import SignalOrig, Signal, EntryPoint, TakeProfit
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
-from tools.tools import countdown
-from utils.parse_channels.str_parser import left_numbers, check_pair
+from utils.parse_channels.str_parser import left_numbers, check_pair, replace_rus_to_eng
 from .base_model import BaseTelegram
 from .image_parser import ChinaImageToSignal
 
@@ -88,7 +87,7 @@ class Telegram(BaseTelegram):
     async def parse_cf_trader_channel(self):
         channel_abbr = 'cf_tr'
         tca = int(conf_obj.CFTrader)
-        async for message in self.client.iter_messages(tca, limit=7):
+        async for message in self.client.iter_messages(tca, limit=27):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
@@ -111,57 +110,54 @@ class Telegram(BaseTelegram):
 
     def parse_cf_trader_message(self, message_text, message_id):
         signals = []
-        splitted_info = message_text.splitlines()
-        # possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in  ', 'Get in : ', 'Gеt in :',
-        #                         'Get  in : ', 'Entry: ']
-        possible_entry_label = 'Entry:'
-        possible_take_profits_label = ['Sell at', 'Targets', 'Тargets', 'Targеts', 'Tаrgets']
-        possible_take_profits_label2 = ['Take profit', 'Takе profit', 'Tаkе profit', 'Tаke profit']
+        text = replace_rus_to_eng(message_text)
+        splitted_info = text.splitlines()
+        possible_entry_label = ['Entry', 'Get', '**Entry']
+        possible_take_profits_label = ['Sell at', 'Targets']
+        possible_take_profits_label2 = 'Take profit'
         possible_stop_label = ['SL: ', 'SL : ', 'Stop loss:']
-        # pair_label = ['Pair: ', 'Рair: ', 'Аssеt:', 'Asset']
-        pair_label = ['Аssеt:', 'Asset']
+        pair_label = ['Pair: ', 'Asset']
         pair = ''
-        position_label = 'Position:'
+        long_label = 'LONG'
+        short_label = 'SHORT'
+        position_label = '#'
         current_price = ''
         margin_type = MarginType.CROSSED.value
         position = None
-        leverage_label = ['Leverage:', 'Levеrage:', 'Leveragе:', 'Leverаge:', 'Lеverage:']
+        leverage_label = 'Leverage:'
         leverage = ''
         entries = []
         profits = ''
         stop_loss = ['']
-        try:
-            should_entry = [i for i, s in enumerate(splitted_info) if 'Stop loss:' in s]
-        except ValueError as e:
-            return signals.append(SignalModel(pair, current_price, margin_type, position,
-                                              leverage, entries, profits, stop_loss, message_id))
+        signal_identification = 'CF Leverage Trading Signal'
+        should_entry = [i for i, s in enumerate(splitted_info) if 'Stop loss:' in s]
+        if not should_entry:
+            should_entry = [i for i, s in enumerate(splitted_info) if 'SL:' in s]
         if not should_entry:
             return signals.append(SignalModel(pair, current_price, margin_type, position,
                                               leverage, entries, profits, stop_loss, message_id))
         for line in splitted_info:
-            if pair_label[0] or pair_label[1] in line:
+            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]):
                 if not pair:
-                    pair_info = line.split(' ')
-                    # position_info = list(filter(None, possible_position_info))
-                    pair = ''.join(filter(str.isalpha, pair_info[1]))
+                    possible_position_info = line.split(' ')
+                    pair = ''.join(filter(str.isalpha, possible_position_info[1]))
+                    if signal_identification:
+                        position_info = list(filter(None, possible_position_info))
+                        pair = ''.join(filter(str.isalpha, position_info[1]))
             if position_label in line:
-                possible_position_info = line.split('#')
-                position = ''.join(filter(str.isalpha, possible_position_info[1]))
-            if possible_entry_label in line:
+                position_info = line.split(position_label)
+                position = ''.join(filter(str.isalpha, position_info[1]))
+            if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1])\
+                    or line.startswith(possible_entry_label[2]):
                 splitted_entries = line.split(' - ')
                 possible_entries = splitted_entries[0].split(' ')
                 entries.append(possible_entries[-1])
                 entries.append(splitted_entries[1])
-            if line.startswith(possible_take_profits_label[0]) or line.startswith(possible_take_profits_label[1]) \
-                    or line.startswith(possible_take_profits_label[2]) or line.startswith(
-                possible_take_profits_label[3]) \
-                    or line.startswith(possible_take_profits_label[4]):
+            if line.startswith(possible_take_profits_label[0]) or line.startswith(possible_take_profits_label[1]):
                 fake_profits = line[9:]
                 possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
-            if line.startswith(possible_take_profits_label2[0]) or line.startswith(possible_take_profits_label2[1]) \
-                    or line.startswith(possible_take_profits_label2[2]) or line.startswith(
-                possible_take_profits_label2[3]):
+            if line.startswith(possible_take_profits_label2):
                 fake_profits = line[11:]
                 possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
@@ -176,15 +172,25 @@ class Telegram(BaseTelegram):
             if line.startswith(possible_stop_label[2]):
                 stop_loss = line[10:]
                 stop_loss = left_numbers([stop_loss])
-            if line.startswith(leverage_label[0]) or line.startswith(leverage_label[1]) \
-                    or line.startswith(leverage_label[2]) or line.startswith(leverage_label[3]) \
-                    or line.startswith(leverage_label[4]):
+            if line.startswith(leverage_label):
                 possible_leverage = line.split(' ')
                 possible_leverage = list(filter(None, possible_leverage))
                 try:
                     leverage = ''.join(filter(str.isdigit, possible_leverage[2]))
                 except IndexError:
                     leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
+
+        if position == short_label:
+            min_entry = min(entries)
+            delta_entry = (float(min_entry) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
+            new_entry = float(min_entry) - delta_entry
+            entries = [str(new_entry) if i == min_entry else i for i in entries]
+        if position == long_label:
+            max_entry = max(entries)
+            delta_entry = (float(max_entry) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
+            new_entry = float(max_entry) + delta_entry
+            entries = [str(new_entry) if i == max_entry else i for i in entries]
+
         """ Take only first 4 take profits: """
         profits = profits[:4]
         signals.append(SignalModel(pair, current_price, margin_type, position,
@@ -845,6 +851,8 @@ class Telegram(BaseTelegram):
     def parse_tca_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
+        long_label = 'LONG'
+        short_label = 'SHORT'
         buy_label = 'Entry at: '
         possible_take_profits = ['Sell at: ', 'Targets: ']
         stop_label = 'Stop Loss: '
@@ -861,10 +869,10 @@ class Telegram(BaseTelegram):
         if not is_signal:
             return
         for line in splitted_info:
-            if 'SHORT' in line:
-                position = 'SHORT'
-            if 'LONG' in line:
-                position = 'LONG'
+            if short_label in line:
+                position = short_label
+            if long_label in line:
+                position = long_label
             if line.startswith(pair):
                 pair = ''.join(filter(str.isalpha, line[6:]))
             if line.startswith(buy_label):
@@ -877,6 +885,17 @@ class Telegram(BaseTelegram):
                 profits = left_numbers(possible_profits)
             if line.startswith(stop_label):
                 stop_loss = line[11:]
+
+        if position == short_label:
+            min_entry = min(entries)
+            delta_entry = (float(min_entry) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
+            new_entry = float(min_entry) - delta_entry
+            entries = [str(new_entry) if i == min_entry else i for i in entries]
+        if position == long_label:
+            max_entry = max(entries)
+            delta_entry = (float(max_entry) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
+            new_entry = float(max_entry) + delta_entry
+            entries = [str(new_entry) if i == max_entry else i for i in entries]
         """ Take only first 6 take profits: """
         profits = profits[:6]
         signals.append(SignalModel(pair, current_price, margin_type, position,

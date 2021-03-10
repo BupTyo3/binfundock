@@ -196,6 +196,7 @@ DEFAULT_INVIOLABLE_BALANCE_PERC = '15.0'
 DEFAULT_EXTREMAL_SL_PRICE_SHIFT_COEF = '8.0'
 DEFAULT_ALLOWABLE_DURATION_OF_TASK_SECS = '60'  # For unsetting busy_setting_time field
 DEFAULT_TRAIL_ONCOMING_PERCENT = '1.3'  # Oncoming percent for trailing-stop from EP to current price: 1.3 means 76.92%
+DEFAULT_MARKET_ENTRY_DEVIATION_PERC = '0.15'  # Changes closest EP by this amount % to initiate market entry
 
 DEFAULT_MARKET_SPOT_RAW_URL = 'https://www.binance.com/en/trade/{}?theme=dark'
 DEFAULT_MARKET_FUTURES_RAW_URL = 'https://www.binance.com/en/futures/{}?theme=dark'
@@ -314,6 +315,8 @@ class Config:
             'allowable_duration_of_task_secs', DEFAULT_ALLOWABLE_DURATION_OF_TASK_SECS))
         self.trail_oncoming_percent: float = float(logic.get(
             'trail_oncoming_percent', DEFAULT_TRAIL_ONCOMING_PERCENT))
+        self.market_entry_deviation_perc: float = float(logic.get(
+            'market_entry_deviation_perc', DEFAULT_MARKET_ENTRY_DEVIATION_PERC))
         signal = config['Signal']
         self.accessible_main_coins: List[str] = signal['accessible_main_coins'].split(',')
         self.all_accessible_main_coins: List[str] = signal['all_accessible_main_coins'].split(',')

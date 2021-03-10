@@ -23,12 +23,14 @@ CELERY_LOG_LEVEL=20
 [Logic]
 common_period_of_cron_celery_tasks_secs=7.0
 period_of_prices_update_tasks_secs=50.0
-;for the lost sl orders below the current_price multiple delta param
+# for the lost sl orders below the current_price multiple delta param
 extremal_sl_price_shift_coef=5.0
-;unset busy_setting_time field after this time if this field was stuck
+# unset busy_setting_time field after this time if this field was stuck
 allowable_duration_of_task_secs=60
 # Oncoming percent for trailing-stop from EP to current price: 1.3 means 76.92%
 trail_oncoming_percent=1.3
+# Changes closest EP by this amount % to initiate market entry
+market_entry_deviation_perc=0.15
 [Market]
 market_api_key=xxx
 market_api_secret=xxx
