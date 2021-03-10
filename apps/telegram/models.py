@@ -251,9 +251,9 @@ class Telegram(BaseTelegram):
             if line.startswith(pair_label):
                 possible_pair = line.split(' ')
                 pair = ''.join(filter(str.isalpha, possible_pair[1]))
-            if line.startswith(position_label):
+            if line.startswith(margin_type_label):
                 margin_type = line[12:]
-                margin_type = position.replace('\'', '')
+                margin_type = margin_type.replace('\'', '')
             if line.startswith(margin_type_label):
                 position = line[10:]
                 position = position.replace('\'', '')
@@ -1005,6 +1005,7 @@ class Telegram(BaseTelegram):
         logger.debug(f"Attempt to write into DB the following signal: "
                      f" Pair: '{signal[0].pair}'\n"
                      f" Leverage: '{signal[0].leverage}'\n"
+                     f" Margin type: '{signal[0].margin_type}'\n"
                      f" Entry Points: '{signal[0].entry_points}'\n"
                      f" Take Profits: '{signal[0].take_profits}'\n"
                      f" Stop Loss: '{signal[0].stop_loss}'\n"
