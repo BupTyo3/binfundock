@@ -88,7 +88,7 @@ class Telegram(BaseTelegram):
     async def parse_cf_trader_channel(self):
         channel_abbr = 'cf_tr'
         tca = int(conf_obj.CFTrader)
-        async for message in self.client.iter_messages(tca, limit=18):
+        async for message in self.client.iter_messages(tca, limit=7):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
