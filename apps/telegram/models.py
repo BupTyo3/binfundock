@@ -16,7 +16,7 @@ from .base_model import BaseTelegram
 from .image_parser import ChinaImageToSignal
 
 from .verify_signal import SignalVerification
-from ..signal.utils import MarginType
+from ..signal.utils import MarginType, calculate_position
 
 logger = logging.getLogger(__name__)
 
@@ -1034,12 +1034,13 @@ class Telegram(BaseTelegram):
         await self.client.send_message(name, message)
 
     async def send_message_by_template(self, channel_name, signal, message_date, channel_abbr, message_id):
+        position = calculate_position(signal.stop_loss, signal.entry_points, signal.take_profits)
         if not signal.leverage:
             signal.leverage = 1
         if signal.margin_type != 'CROSSED':
             signal.margin_type = 'ISOLATED'
         message = f"Pair: '{signal.pair}'\n" \
-                  f"Position: '{signal.position}'\n" \
+                  f"Position: '{position}'\n" \
                   f"Leverage: '{signal.leverage}'\n" \
                   f"Margin type: '{signal.margin_type}'\n" \
                   f"Entry Points: '{signal.entry_points}'\n" \
