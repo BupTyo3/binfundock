@@ -2201,7 +2201,7 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     @rounded_result
     def __get_new_sl_value_for_trailing_stop(self, zero_value: float, current_price: float):
-        res = (zero_value + current_price) / 2
+        res = (zero_value + current_price) / conf_obj.trail_oncoming_percent
         pair = self._get_pair()
         return self.__find_not_fractional_by_step(res, pair.step_price)
 
