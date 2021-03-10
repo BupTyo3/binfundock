@@ -88,12 +88,12 @@ class Telegram(BaseTelegram):
     async def parse_cf_trader_channel(self):
         channel_abbr = 'cf_tr'
         tca = int(conf_obj.CFTrader)
-        async for message in self.client.iter_messages(tca, limit=8):
+        async for message in self.client.iter_messages(tca, limit=18):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_cf_trader_message(message.text, message.id)
-                if signal[0].pair:
+                if signal:
                     inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                     if inserted_to_db != 'success':
                         await self.send_message_to_yourself(f"Error during processing the signal to DB, "
@@ -112,12 +112,14 @@ class Telegram(BaseTelegram):
     def parse_cf_trader_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
-        possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in  ', 'Get in : ', 'Gеt in :',
-                                'Get  in : ', 'Entry: ']
+        # possible_entry_label = ['Entry at: ', 'Entry : ', 'Еntry :', 'Entrу :', 'Get in  ', 'Get in : ', 'Gеt in :',
+        #                         'Get  in : ', 'Entry: ']
+        possible_entry_label = 'Entry:'
         possible_take_profits_label = ['Sell at', 'Targets', 'Тargets', 'Targеts', 'Tаrgets']
         possible_take_profits_label2 = ['Take profit', 'Takе profit', 'Tаkе profit', 'Tаke profit']
         possible_stop_label = ['SL: ', 'SL : ', 'Stop loss:']
-        pair_label = ['Pair: ', 'Рair: ', 'Аssеt:', 'Asset']
+        # pair_label = ['Pair: ', 'Рair: ', 'Аssеt:', 'Asset']
+        pair_label = ['Аssеt:', 'Asset']
         pair = ''
         position_label = 'Position:'
         current_price = ''
@@ -125,34 +127,31 @@ class Telegram(BaseTelegram):
         position = None
         leverage_label = ['Leverage:', 'Levеrage:', 'Leveragе:', 'Leverаge:', 'Lеverage:']
         leverage = ''
-        entries = ''
+        entries = []
         profits = ''
         stop_loss = ['']
-        signal_identification = 'CF Leverage  Trading Signal'
+        try:
+            should_entry = [i for i, s in enumerate(splitted_info) if 'Stop loss:' in s]
+        except ValueError as e:
+            return signals.append(SignalModel(pair, current_price, margin_type, position,
+                                              leverage, entries, profits, stop_loss, message_id))
+        if not should_entry:
+            return signals.append(SignalModel(pair, current_price, margin_type, position,
+                                              leverage, entries, profits, stop_loss, message_id))
         for line in splitted_info:
-            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]) or line.startswith(
-                    pair_label[2]) or line.startswith(pair_label[3]):
-                possible_position_info = line.split(' ')
-                position_info = list(filter(None, possible_position_info))
-                pair = ''.join(filter(str.isalpha, position_info[1]))
-            if line.startswith(position_label):
+            if pair_label[0] or pair_label[1] in line:
+                if not pair:
+                    pair_info = line.split(' ')
+                    # position_info = list(filter(None, possible_position_info))
+                    pair = ''.join(filter(str.isalpha, pair_info[1]))
+            if position_label in line:
                 possible_position_info = line.split('#')
                 position = ''.join(filter(str.isalpha, possible_position_info[1]))
-            if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1]) \
-                    or line.startswith(possible_entry_label[2]) or line.startswith(possible_entry_label[3]) \
-                    or line.startswith(possible_entry_label[4]) or line.startswith(possible_entry_label[5]) \
-                    or line.startswith(possible_entry_label[6]) or line.startswith(possible_entry_label[7]) \
-                    or line.startswith(possible_entry_label[8]):
-                if line.startswith(possible_entry_label[8]):
-                    fake_entries = line[7:]
-                else:
-                    fake_entries = line[8:]
-                possible_entries = fake_entries.split('-')
-                if '(' in line:
-                    last_entry = possible_entries[- 1].split('(')
-                    entries = left_numbers(possible_entries[:-1] + last_entry[:-1])
-                else:
-                    entries = left_numbers(possible_entries)
+            if possible_entry_label in line:
+                splitted_entries = line.split(' - ')
+                possible_entries = splitted_entries[0].split(' ')
+                entries.append(possible_entries[-1])
+                entries.append(splitted_entries[1])
             if line.startswith(possible_take_profits_label[0]) or line.startswith(possible_take_profits_label[1]) \
                     or line.startswith(possible_take_profits_label[2]) or line.startswith(
                 possible_take_profits_label[3]) \

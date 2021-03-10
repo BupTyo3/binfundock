@@ -4,6 +4,10 @@ from enum import Enum
 from functools import partial, wraps
 from typing import List, Union, TYPE_CHECKING, Callable, Optional
 
+from django.utils import timezone
+
+from binfun.settings import conf_obj
+
 if TYPE_CHECKING:
     from .base_model import BaseSignal
 
@@ -150,10 +154,12 @@ def refuse_if_busy(func: Optional[Callable] = None):
 
     @wraps(func)
     def wrapper(self: 'BaseSignal', *args, **kwargs):
-        if self.is_busy:
+        now_ = timezone.now()
+        if self.busy_setting_time and\
+                (now_ - self.busy_setting_time).total_seconds() <= conf_obj.allowable_duration_of_task_secs:
             logger.debug(f"'{self}' - IS_BUSY_NOW")
             return
-        self.is_busy = True
+        self.busy_setting_time = now_
         self.save()
         try:
             result = func(self, *args, **kwargs)
@@ -163,10 +169,10 @@ def refuse_if_busy(func: Optional[Callable] = None):
             # failed to access the variable ex outside the block
             # but anyway we want to raise the exception to understand what happened
             # TODO: Maybe should handle DB lock exception
-            self.is_busy = False
+            self.busy_setting_time = None
             self.save()
             raise ex
-        self.is_busy = False
+        self.busy_setting_time = None
         self.save()
         return result
     return wrapper

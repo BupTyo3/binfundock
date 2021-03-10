@@ -95,9 +95,8 @@ class BaseSignal(BaseBaseSignal):
     market: 'BaseMarket'
 
     # Can be used by the refuse_if_busy decorator
-    is_busy = models.BooleanField(
-        help_text="For transactional tasks",
-        default=False)
+    busy_setting_time = models.DateTimeField(
+        null=True, blank=True, help_text="For transactional tasks")
 
     class Meta:
         abstract = True
