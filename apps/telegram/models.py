@@ -293,7 +293,7 @@ class Telegram(BaseTelegram):
         async for message in self.client.iter_messages(chat_id, limit=6):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
-            if should_handle_msg and message.photo:
+            if should_handle_msg and message.media:
                 await message.download_media()
                 pairs = info_getter.iterate_files(message.id)
                 signal = verify_signal.get_active_pairs_info(pairs)
