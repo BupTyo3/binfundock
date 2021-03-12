@@ -260,7 +260,8 @@ class Telegram(BaseTelegram):
             if line.startswith(margin_type_label):
                 margin_type = line[12:]
                 margin_type = margin_type.replace('\'', '')
-            if line.startswith(margin_type_label):
+                margin_type = margin_type.replace(' ', '')
+            if line.startswith(position_label):
                 position = line[10:]
                 position = position.replace('\'', '')
             if line.startswith(leverage):
