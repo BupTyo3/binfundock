@@ -396,6 +396,8 @@ class Telegram(BaseTelegram):
         splitted_info = message_text.splitlines()
         buy_label = 'Вход'
         cross_label = 'Cross'
+        long_label = SignalModel.long_label
+        short_label = SignalModel.short_label
         goals_label = 'Цели: '
         stop_label = 'Sl: '
         pair = ''
@@ -415,10 +417,10 @@ class Telegram(BaseTelegram):
             return signals.append(SignalModel(pair, current_price, is_margin, position,
                                               leverage, entries, profits, stop_loss, message_id))
         pair = ''.join(filter(str.isalpha, splitted_info[0]))
-        if 'LONG' in splitted_info[1]:
-            position = 'LONG'
-        if 'SHORT' in splitted_info[1]:
-            position = 'SHORT'
+        if long_label in splitted_info[1]:
+            position = long_label
+        if short_label in splitted_info[1]:
+            position = short_label
         for line in splitted_info:
             if line.startswith(buy_label):
                 fake_entries = line.split(buy_label)
@@ -491,9 +493,9 @@ class Telegram(BaseTelegram):
                 possible_entries = fake_entries.split('-')
                 entries = left_numbers(possible_entries)
                 if line.startswith(buy_label[0]) or line.startswith(buy_label[1]):
-                    position = 'Buy'
+                    position = SignalModel.long_label
                 if line.startswith(buy_label[1]) or line.startswith(buy_label[2]):
-                    position = 'Short'
+                    position = SignalModel.short_label
             if line.startswith(goals_label[0]) or line.startswith(goals_label[1]):
                 fake_entries = line[5:]
                 possible_take_profits = fake_entries.split('-')
@@ -574,11 +576,11 @@ class Telegram(BaseTelegram):
         if price_index:
             price_index = price_index[0]
             if long_label in splitted_info[price_index]:
-                position = 'LONG'
+                position = SignalModel.long_label
             if sell_label in splitted_info[price_index]:
-                position = 'SHORT'
+                position = SignalModel.short_label
             if sell_label or long_label not in splitted_info[price_index]:
-                position = 'LONG'
+                position = SignalModel.long_label
             if cross_leverage_label in splitted_info[price_index]:
                 leverage = 20
             if 'X' in splitted_info[price_index]:
