@@ -524,9 +524,6 @@ class Telegram(BaseTelegram):
             channel_id = int(conf_obj.klondike_margin)
             channel_abbr = 'kl_mg'
 
-        # entity = await self.client.get_entity('@WCSEBot')
-        # access_hash = 4349140352664297866
-        # channel_entity = User(id=channel_id, access_hash=access_hash)
         async for message in self.client.iter_messages(channel_id, limit=5):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
