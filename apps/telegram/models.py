@@ -662,8 +662,8 @@ class Telegram(BaseTelegram):
         is_signal_cancelled = 'Signal Cancelled'
         is_futures_label = 'BinanceFutures'
         buy_label = '🔀 Entry Zone 🔀'
-        long_label = 'Long'
-        sell_label = 'Short'
+        long_label = SignalModel.long_label
+        sell_label = SignalModel.short_label
         goals_label = '🔆 Exit Targets:🔆'
         stop_label = '⛔ StopLoss ⛔'
         pair = ''
