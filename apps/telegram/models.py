@@ -116,7 +116,7 @@ class Telegram(BaseTelegram):
         possible_take_profits_label = ['Sell at', 'Targets']
         possible_take_profits_label2 = 'Take profit'
         possible_stop_label = ['SL: ', 'SL : ', 'Stop loss:']
-        pair_label = ['Pair: ', 'Asset']
+        pair_label = ['Pair: ', 'Asset', '**Asset']
         pair = ''
         long_label = 'LONG'
         short_label = 'SHORT'
@@ -137,7 +137,7 @@ class Telegram(BaseTelegram):
             return signals.append(SignalModel(pair, current_price, margin_type, position,
                                               leverage, entries, profits, stop_loss, message_id))
         for line in splitted_info:
-            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]):
+            if line.startswith(pair_label[0]) or line.startswith(pair_label[1])  or line.startswith(pair_label[2]):
                 if not pair:
                     possible_position_info = line.split(' ')
                     pair = ''.join(filter(str.isalpha, possible_position_info[1]))
