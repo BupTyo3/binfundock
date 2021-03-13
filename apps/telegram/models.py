@@ -889,7 +889,6 @@ class Telegram(BaseTelegram):
                 stop_loss = line[11:]
 
         entries = self.extend_nearest_ep(position, entries)
-
         """ Take only first 6 take profits: """
         profits = profits[:6]
         signals.append(SignalModel(pair, current_price, margin_type, position,
