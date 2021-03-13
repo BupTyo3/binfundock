@@ -549,8 +549,8 @@ class Telegram(BaseTelegram):
         splitted_info = message_text.splitlines()
         is_new_signal = '#SIGNAL'
         price_between_label = 'price between'
-        long_label = 'LONG'
-        sell_label = 'SHORT'
+        long_label = SignalModel.long_label
+        sell_label = SignalModel.short_label
         goals_label = 'Targets:'
         stop_label = 'STOP LOSS'
         pair = ''
