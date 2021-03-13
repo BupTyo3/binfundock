@@ -920,6 +920,8 @@ class Telegram(BaseTelegram):
         margin_label = '#MARGIN'
         goals_label = 'Target'
         stop_label = 'STOP LOSS: '
+        long_label = SignalModel.long_label
+        short_label = SignalModel.short_label
         pair = ''
         current_price = ''
         is_margin = False
@@ -932,10 +934,10 @@ class Telegram(BaseTelegram):
             return signals.append(SignalModel(pair, current_price, is_margin, position,
                                               leverage, entries, profits, stop_loss, message_id))
         for line in splitted_info:
-            if 'LONG' in splitted_info[3]:
-                position = 'LONG'
-            if 'SHORT' in splitted_info[3]:
-                position = 'SHORT'
+            if long_label in splitted_info[3]:
+                position = long_label
+            if short_label in splitted_info[3]:
+                position = short_label
             if line.startswith(margin_label):
                 fake_pair = line.split(' ')
                 possible_pair = fake_pair[2]
