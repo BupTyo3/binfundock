@@ -199,7 +199,6 @@ class Telegram(BaseTelegram):
 
     async def parse_lucrative_trend_channel(self):
         chat_id = int(conf_obj.lucrative_channel)
-        # channel_abbr = 'lucrative_trend'
         async for message in self.client.iter_messages(chat_id, limit=7):
             signal = self.parse_lucrative_trend_message(message.text)
             exists = await self.is_signal_handled(signal[0].msg_id, signal[0].algorithm)
