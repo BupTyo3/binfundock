@@ -1096,14 +1096,3 @@ class Telegram(BaseTelegram):
                   f"Algorithm: '{channel_abbr}'\n" \
                   f"ID: '{message_id}'"
         await self.client.send_message(channel_name, message)
-
-#     # @client.on(events.NewMessage)
-#     # async def my_event_handler(event):
-#     #     if 'hello' in event.raw_text:
-#     #         await event.reply('hi!')
-#
-#     # async def handler(event):
-#     #     chat = await event.get_chat()
-#     #     sender = await event.get_sender()
-#     #     chat_id = event.chat_id
-#     #     sender_id = event.sender_id
