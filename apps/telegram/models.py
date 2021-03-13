@@ -24,6 +24,9 @@ if platform == "win32":
 
 
 class SignalModel:
+    _short_label = 'SHORT'
+    _long_label = 'LONG'
+
     def __init__(self, pair, current_price, margin_type, position, leverage, entry_points, take_profits, stop_loss,
                  msg_id, algorithm=None, is_shared=False):
         self.pair = pair
@@ -37,6 +40,14 @@ class SignalModel:
         self.msg_id = msg_id
         self.algorithm = algorithm
         self.is_shared = is_shared
+
+    @property
+    def short_label(self):
+        return self._short_label
+
+    @property
+    def long_label(self):
+        return self._long_label
 
 
 class Telegram(BaseTelegram):
@@ -118,8 +129,6 @@ class Telegram(BaseTelegram):
         possible_stop_label = ['SL: ', 'SL : ', 'Stop loss:']
         pair_label = ['Pair: ', 'Asset', '**Asset']
         pair = ''
-        long_label = 'LONG'
-        short_label = 'SHORT'
         position_label = '#'
         current_price = ''
         margin_type = MarginType.CROSSED.value
@@ -180,16 +189,7 @@ class Telegram(BaseTelegram):
                 except IndexError:
                     leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
 
-        if position == short_label:
-            min_entry = min(entries)
-            delta_entry = (float(min_entry) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
-            new_entry = float(min_entry) - delta_entry
-            entries = [str(new_entry) if i == min_entry else i for i in entries]
-        if position == long_label:
-            max_entry = max(entries)
-            delta_entry = (float(max_entry) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
-            new_entry = float(max_entry) + delta_entry
-            entries = [str(new_entry) if i == max_entry else i for i in entries]
+        entries = self.extend_nearest_ep(position, entries)
 
         """ Take only first 4 take profits: """
         profits = profits[:4]
@@ -851,8 +851,8 @@ class Telegram(BaseTelegram):
     def parse_tca_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
-        long_label = 'LONG'
-        short_label = 'SHORT'
+        long_label = SignalModel.long_label
+        short_label = SignalModel.short_label
         buy_label = 'Entry at: '
         possible_take_profits = ['Sell at: ', 'Targets: ']
         stop_label = 'Stop Loss: '
@@ -886,16 +886,8 @@ class Telegram(BaseTelegram):
             if line.startswith(stop_label):
                 stop_loss = line[11:]
 
-        if position == short_label:
-            min_entry = min(entries)
-            delta_entry = (float(min_entry) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
-            new_entry = float(min_entry) - delta_entry
-            entries = [str(new_entry) if i == min_entry else i for i in entries]
-        if position == long_label:
-            max_entry = max(entries)
-            delta_entry = (float(max_entry) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
-            new_entry = float(max_entry) + delta_entry
-            entries = [str(new_entry) if i == max_entry else i for i in entries]
+        entries = self.extend_nearest_ep(position, entries)
+
         """ Take only first 6 take profits: """
         profits = profits[:6]
         signals.append(SignalModel(pair, current_price, margin_type, position,
@@ -967,6 +959,20 @@ class Telegram(BaseTelegram):
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
 
+
+    def extend_nearest_ep(self, position, entries):
+        if position == SignalModel.short_label:
+            min_entry = min(entries)
+            delta_entry = (float(min_entry) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
+            new_entry = float(min_entry) - delta_entry
+            entries = [str(new_entry) if i == min_entry else i for i in entries]
+        if position == SignalModel.long_label:
+            max_entry = max(entries)
+            delta_entry = (float(max_entry) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
+            new_entry = float(max_entry) + delta_entry
+            entries = [str(new_entry) if i == max_entry else i for i in entries]
+
+        return entries
 
     @sync_to_async
     def is_signal_handled(self, message_id, channel_abbr):
