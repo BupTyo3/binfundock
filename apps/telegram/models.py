@@ -694,9 +694,9 @@ class Telegram(BaseTelegram):
             pair = ''.join(filter(str.isalpha, pair_info[1]))
             if is_futures_label in splitted_info[2]:
                 if long_label in splitted_info[2]:
-                    position = 'Long'
+                    position = SignalModel.long_label
                 elif sell_label in splitted_info[2]:
-                    position = 'Short'
+                    position = SignalModel.short_label
                 possible_leverage = splitted_info[2].split('(')
                 leverage = left_numbers([possible_leverage[1].split(' ')[1]])
                 leverage = leverage[0]
