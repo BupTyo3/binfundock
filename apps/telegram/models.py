@@ -24,8 +24,8 @@ if platform == "win32":
 
 
 class SignalModel:
-    _short_label = 'SHORT'
-    _long_label = 'LONG'
+    short_label = 'SHORT'
+    long_label = 'LONG'
 
     def __init__(self, pair, current_price, margin_type, position, leverage, entry_points, take_profits, stop_loss,
                  msg_id, algorithm=None, is_shared=False):
@@ -40,14 +40,6 @@ class SignalModel:
         self.msg_id = msg_id
         self.algorithm = algorithm
         self.is_shared = is_shared
-
-    @property
-    def short_label(self):
-        return self._short_label
-
-    @property
-    def long_label(self):
-        return self._long_label
 
 
 class Telegram(BaseTelegram):
