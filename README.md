@@ -27,8 +27,8 @@ period_of_prices_update_tasks_secs=50.0
 extremal_sl_price_shift_coef=5.0
 # unset busy_setting_time field after this time if this field was stuck
 allowable_duration_of_task_secs=60
-# Oncoming percent for trailing-stop from EP to current price: 3.7 means 73%
-trail_oncoming_percent=3.7
+# Oncoming percent for trailing-stop from EP to current price: 2 means 50%, 1.3 means 76.92%
+trail_oncoming_percent=2
 # Changes closest EP by this amount % to initiate market entry
 market_entry_deviation_perc=0.15
 [Market]
