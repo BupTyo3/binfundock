@@ -915,7 +915,7 @@ class Telegram(BaseTelegram):
         current_price = ''
         is_margin = False
         position = None
-        leverage = 'Leverage : '
+        leverage = 15
         entries = ''
         profits = []
         stop_loss = ''
@@ -936,9 +936,9 @@ class Telegram(BaseTelegram):
                 fake_entries = line[8:]
                 possible_entries = fake_entries.split('-')
                 entries = left_numbers(possible_entries)
-            if line.startswith(leverage):
-                possible_leverage = line.split(':')
-                leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
+            # if line.startswith(leverage):
+            #     possible_leverage = line.split(':')
+            #     leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
             if line.startswith(goals_label):
                 possible_profits = line.split('-')
                 profits.append(possible_profits[1].replace(' ', ''))
