@@ -913,19 +913,20 @@ class Telegram(BaseTelegram):
         short_label = SignalModel.short_label
         pair = ''
         current_price = ''
-        is_margin = False
+        margin_type = 'ISOLATED'
         position = None
         leverage = 15
         entries = ''
         profits = []
         stop_loss = ''
-        if margin_label not in splitted_info[0]:
-            return signals.append(SignalModel(pair, current_price, is_margin, position,
+        should_entry = [i for i, s in enumerate(splitted_info) if margin_label in s]
+        if not should_entry:
+            return signals.append(SignalModel(pair, current_price, margin_type, position,
                                               leverage, entries, profits, stop_loss, message_id))
         for line in splitted_info:
-            if long_label in splitted_info[3]:
+            if long_label in line:
                 position = long_label
-            if short_label in splitted_info[3]:
+            if short_label in line:
                 position = short_label
             if line.startswith(margin_label):
                 fake_pair = line.split(' ')
@@ -946,7 +947,10 @@ class Telegram(BaseTelegram):
                 stop_loss = line[11:]
         """ Take only first 5 take profits: """
         profits = profits[:5]
-        signals.append(SignalModel(pair, current_price, is_margin, position,
+
+        entries = self.extend_nearest_ep(position, entries)
+
+        signals.append(SignalModel(pair, current_price, margin_type, position,
                                    leverage, entries, profits, stop_loss, message_id))
         return signals
 
