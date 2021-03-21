@@ -2139,7 +2139,7 @@ class Signal(BaseSignal):
         delta_from_zero_value = (zero_value * get_or_create_crontask().slip_delta_sl_perc
                                  ) / self.conf.one_hundred_percent
         # For the next crossing
-        old_value_of_price = conf_obj.trail_oncoming_percent * sl_value - zero_value
+        old_value_of_price = 2 * sl_value - zero_value
         # For the first crossing of the threshold
         old_value_of_price = zero_value - delta_from_zero_value if \
             old_value_of_price > zero_value else old_value_of_price
@@ -2170,7 +2170,7 @@ class Signal(BaseSignal):
         delta_from_zero_value = (zero_value * get_or_create_crontask().slip_delta_sl_perc
                                  ) / self.conf.one_hundred_percent
         # For the next crossing
-        old_value_of_price = conf_obj.trail_oncoming_percent * sl_value - zero_value
+        old_value_of_price = 2 * sl_value - zero_value
         # For the first crossing of the threshold
         old_value_of_price = zero_value + delta_from_zero_value if\
             old_value_of_price < zero_value else old_value_of_price
