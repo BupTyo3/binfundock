@@ -579,7 +579,8 @@ class Telegram(BaseTelegram):
                 possible_leverage = splitted_info[price_index].split(alt_leverage_label)
                 leverage = possible_leverage[0].split(' ')
                 leverage = leverage[-1]
-            if alt_leverage_label and 'X' and cross_leverage_label not in splitted_info[price_index]:
+            if alt_leverage_label not in splitted_info[price_index] and 'X' not in splitted_info[price_index]\
+                    and cross_leverage_label not in splitted_info[price_index]:
                 leverage = 3
 
 
