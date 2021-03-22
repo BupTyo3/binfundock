@@ -195,7 +195,7 @@ CELERY_TASK_SERIALIZER = 'json'
 DEFAULT_INVIOLABLE_BALANCE_PERC = '15.0'
 DEFAULT_EXTREMAL_SL_PRICE_SHIFT_COEF = '8.0'
 DEFAULT_ALLOWABLE_DURATION_OF_TASK_SECS = '60'  # For unsetting busy_setting_time field
-DEFAULT_TRAIL_ONCOMING_PERCENT = '2'  # Oncoming percent for trailing-stop from EP to current price: 2 means 50%, 1.3 means 76.92%
+DEFAULT_TRAIL_ONCOMING_PERCENT = '2'  # Oncoming percent for trailing-stop from EP to current price: 2 means 50%
 DEFAULT_MARKET_ENTRY_DEVIATION_PERC = '0.15'  # Changes closest EP by this amount % to initiate market entry
 
 DEFAULT_MARKET_SPOT_RAW_URL = 'https://www.binance.com/en/trade/{}?theme=dark'
