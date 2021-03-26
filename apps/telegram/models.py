@@ -613,7 +613,7 @@ class Telegram(BaseTelegram):
         channel_id = int(conf_obj.wcse)
         channel_abbr = 'wc_se'
         # entity = await self.client.get_entity('@WCSEBot')
-        access_hash = 4349140352664297866
+        access_hash = 7265387611438966175
         channel_entity = User(id=channel_id, access_hash=access_hash)
         async for message in self.client.iter_messages(entity=channel_entity, limit=6):
             exists = await self.is_signal_handled(message.id, channel_abbr)
@@ -631,17 +631,13 @@ class Telegram(BaseTelegram):
                         else:
                             await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                                 message.date, channel_abbr, message.id)
-                            await self.send_message_by_template(int(conf_obj.lucrative_trend), signal[0],
-                                                                message.date, channel_abbr, message.id)
-                            await self.send_message_by_template(int(conf_obj.lucrative), signal[0],
-                                                                message.date, channel_abbr, message.id)
                     urgent_action = signal[0].current_price
                     obj = SignalOrig.objects.filter(
                         symbol=signal[0].pair, techannel__name=channel_abbr).order_by('id').last()
                     if urgent_action == 'activate':
-                        'obj buy by market'
+                        logger.warning('BUY BY MARKET')
                     if urgent_action == 'cancel':
-                        'obj sell by market'
+                        logger.warning('SELL BY MARKET')
 
     def parse_wcse_message(self, message_text, message_id):
         signals = []
@@ -704,7 +700,7 @@ class Telegram(BaseTelegram):
                 except ValueError as e:
                     return signals.append(SignalModel(pair, current_price, is_margin, position,
                                                       leverage, entries, profits, stop_loss, message_id))
-                possible_targets = splitted_info[goals_index + 1:goals_index + 5]
+                possible_targets = splitted_info[goals_index + 1:goals_index + 9]
                 for possible_target in possible_targets:
                     target = possible_target.split(' ')
                     profits.append(target[1])
@@ -719,7 +715,7 @@ class Telegram(BaseTelegram):
                 stop_loss = stop_loss[1]
 
                 """ Take only first 6 take profits: """
-                profits = profits[:6]
+                # profits = profits[:6]
                 signals.append(SignalModel(pair, current_price, is_margin, position,
                                            leverage, entries, profits, stop_loss, message_id))
         return signals
