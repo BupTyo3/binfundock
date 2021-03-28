@@ -928,7 +928,7 @@ class Telegram(BaseTelegram):
             if line.startswith(margin_label):
                 fake_pair = line.split(' ')
                 possible_pair = fake_pair[2]
-                if 'XBT' in possible_pair:
+                if 'XBT' in possible_pair or 'BTC' in possible_pair:
                     pair = 'BTCUSDT'
             if line.startswith(buy_label[0]) or line.startswith(buy_label[1]):
                 fake_entries = line[8:]
