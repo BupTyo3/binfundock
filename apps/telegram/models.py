@@ -10,9 +10,11 @@ from telethon.tl.types import User
 from apps.signal.models import SignalOrig, Signal, EntryPoint, TakeProfit
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
+from tools.tools import rounded_array, rounded_result
 from utils.parse_channels.str_parser import left_numbers, check_pair, replace_rus_to_eng
 from .base_model import BaseTelegram
 from .image_parser import ChinaImageToSignal
+from apps.market.models import get_or_create_async_futures_market
 
 from .verify_signal import SignalVerification
 from ..signal.utils import MarginType, calculate_position
@@ -583,7 +585,6 @@ class Telegram(BaseTelegram):
                     and cross_leverage_label not in splitted_info[price_index]:
                 leverage = 3
 
-
             possible_entries = splitted_info[price_index].split(' - ')
             possible_entry1 = possible_entries[0].split(' ')
             possible_entry2 = possible_entries[1].split(' ')
@@ -745,6 +746,116 @@ class Telegram(BaseTelegram):
                                                                    outer_signal_id=signal[0].msg_id)
                     if not not_served_signal and type(not_served_signal) is bool:
                         pass
+
+    async def parse_fsvzo_channel(self):
+        channel_id = int(conf_obj.fsvzo)
+        channel_abbr = 'diver_'
+        # entity = await self.client.get_entity('@alertatron_bot')
+        access_hash = 475713384967520097
+        channel_entity = User(id=channel_id, access_hash=access_hash)
+        async for message in self.client.iter_messages(entity=channel_entity, limit=7):
+            if message.text:
+                signal = await self.parse_fsvzo_message(message.text, message.id)
+                exists = await self.is_signal_handled(message.id, signal[0].algorithm)
+                if signal and not exists:
+                    inserted_to_db = await self.write_signal_to_db(signal[0].algorithm, signal, message.id, message.date)
+                    if inserted_to_db != 'success':
+                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
+                                                            f"please check logs for '{signal[0].pair}' "
+                                                            f"related to the '{signal[0].algorithm}' algorithm: "
+                                                            f"{inserted_to_db}")
+                    else:
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                                message.date, signal[0].algorithm, message.id)
+
+    async def parse_fsvzo_message(self, message_text, message_id):
+        algorithm = 'diver_'
+        signals = []
+        position = ''
+        margin_type = 'ISOLATED'
+        leverage = 15
+        if 'Bear' in message_text:
+            position = 'SHORT'
+        if 'Bull' in message_text:
+            position = 'LONG'
+        splitted_text = message_text.split(' ')
+        algorithm = algorithm + splitted_text[-1]
+        pair = splitted_text[-2] + 'USDT'
+
+        futures_market = await get_or_create_async_futures_market()
+        current_price = futures_market.logic.get_current_price(pair)
+
+        entries = self._form_divergence_entries(position, current_price)
+        stop_loss = self._form_divergence_stop(position, current_price)
+        profits = self._form_divergence_profits(position, current_price)
+
+        signals.append(SignalModel(pair, current_price, margin_type, position,
+                                   leverage, entries, profits, stop_loss, message_id, algorithm=algorithm))
+        return signals
+
+    @rounded_array
+    def _form_divergence_entries(self, position, current_price):
+        entries = []
+        first_entry = ''
+        second_entry = ''
+        delta_first_entry = (current_price * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
+        delta_second_entry = (current_price * conf_obj.second_entry_deviation_perc) / conf_obj.one_hundred_percent
+        if position == SignalModel.short_label:
+            first_entry = current_price - delta_first_entry
+            second_entry = current_price + delta_second_entry
+        if position == SignalModel.long_label:
+            first_entry = current_price + delta_first_entry
+            second_entry = current_price - delta_second_entry
+
+        entries.append(first_entry)
+        entries.append(second_entry)
+
+        return entries
+
+    @rounded_array
+    def _form_divergence_profits(self, position, current_price):
+        profits = []
+        first_profit = ''
+        second_profit = ''
+        third_profit = ''
+        fourth_profit = ''
+        fifth_profit = ''
+        delta_first_profit = (current_price * conf_obj.first_profit_deviation_perc) / conf_obj.one_hundred_percent
+        delta_second_profit = (current_price * conf_obj.second_profit_deviation_perc) / conf_obj.one_hundred_percent
+        delta_third_profit = (current_price * conf_obj.third_profit_deviation_perc) / conf_obj.one_hundred_percent
+        delta_fourth_profit = (current_price * conf_obj.fourth_profit_deviation_perc) / conf_obj.one_hundred_percent
+        delta_fifth_profit = (current_price * conf_obj.fifth_profit_deviation_perc) / conf_obj.one_hundred_percent
+        if position == SignalModel.short_label:
+            first_profit = current_price - delta_first_profit
+            second_profit = current_price - delta_second_profit
+            third_profit = current_price - delta_third_profit
+            fourth_profit = current_price - delta_fourth_profit
+            fifth_profit = current_price - delta_fifth_profit
+        if position == SignalModel.long_label:
+            first_profit = current_price + delta_first_profit
+            second_profit = current_price + delta_second_profit
+            third_profit = current_price + delta_third_profit
+            fourth_profit = current_price + delta_fourth_profit
+            fifth_profit = current_price + delta_fifth_profit
+
+        profits.append(first_profit)
+        profits.append(second_profit)
+        profits.append(third_profit)
+        profits.append(fourth_profit)
+        profits.append(fifth_profit)
+
+        return profits
+
+    @rounded_result
+    def _form_divergence_stop(self, position, current_price):
+        stop_loss = ''
+        if position == SignalModel.short_label:
+            delta_stop = (current_price * conf_obj.delta_stop_deviation_perc) / conf_obj.one_hundred_percent
+            stop_loss = current_price + delta_stop
+        if position == SignalModel.long_label:
+            delta_stop = (current_price * conf_obj.delta_stop_deviation_perc) / conf_obj.one_hundred_percent
+            stop_loss = current_price - delta_stop
+        return stop_loss
 
     def parse_server_message(self, message_text):
         signals = []
