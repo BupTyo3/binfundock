@@ -197,6 +197,13 @@ DEFAULT_EXTREMAL_SL_PRICE_SHIFT_COEF = '8.0'
 DEFAULT_ALLOWABLE_DURATION_OF_TASK_SECS = '60'  # For unsetting busy_setting_time field
 DEFAULT_TRAIL_ONCOMING_PERCENT = '2'  # Oncoming percent for trailing-stop from EP to current price: 2 means 50%
 DEFAULT_MARKET_ENTRY_DEVIATION_PERC = '0.15'  # Changes closest EP by this amount % to initiate market entry
+DEFAULT_SECOND_ENTRY_DEVIATION_PERC = '1.0'  # For divergences second EP distance in % from current price
+DEFAULT_FIRST_PROFIT_DEVIATION_PERC = '0.75'  # For divergences first TP distance in % from current price
+DEFAULT_SECOND_PROFIT_DEVIATION_PERC = '1.5'  # For divergences second TP distance in % from current price
+DEFAULT_THIRD_PROFIT_DEVIATION_PERC = '2.75'  # For divergences third TP distance in % from current price
+DEFAULT_FOURTH_PROFIT_DEVIATION_PERC = '4.25'  # For divergences fourth TP distance in % from current price
+DEFAULT_FIFTH_PROFIT_DEVIATION_PERC = '15'  # For divergences fifth TP distance in % from current price
+DEFAULT_STOP_LOSS_DEVIATION_PERC = '1.5'  # For divergences stop loss distance in % from current price
 
 DEFAULT_MARKET_SPOT_RAW_URL = 'https://www.binance.com/en/trade/{}?theme=dark'
 DEFAULT_MARKET_FUTURES_RAW_URL = 'https://www.binance.com/en/futures/{}?theme=dark'
@@ -315,8 +322,25 @@ class Config:
             'allowable_duration_of_task_secs', DEFAULT_ALLOWABLE_DURATION_OF_TASK_SECS))
         self.trail_oncoming_percent: float = float(logic.get(
             'trail_oncoming_percent', DEFAULT_TRAIL_ONCOMING_PERCENT))
+
+        # Parameters for divergence indicator
         self.market_entry_deviation_perc: float = float(logic.get(
             'market_entry_deviation_perc', DEFAULT_MARKET_ENTRY_DEVIATION_PERC))
+        self.second_entry_deviation_perc: float = float(logic.get(
+            'second_entry_deviation_perc', DEFAULT_SECOND_ENTRY_DEVIATION_PERC))
+        self.first_profit_deviation_perc: float = float(logic.get(
+            'first_profit_deviation_perc', DEFAULT_FIRST_PROFIT_DEVIATION_PERC))
+        self.second_profit_deviation_perc: float = float(logic.get(
+            'second_profit_deviation_perc', DEFAULT_SECOND_PROFIT_DEVIATION_PERC))
+        self.third_profit_deviation_perc: float = float(logic.get(
+            'third_profit_deviation_perc', DEFAULT_THIRD_PROFIT_DEVIATION_PERC))
+        self.fourth_profit_deviation_perc: float = float(logic.get(
+            'fourth_profit_deviation_perc', DEFAULT_FOURTH_PROFIT_DEVIATION_PERC))
+        self.fifth_profit_deviation_perc: float = float(logic.get(
+            'fifth_profit_deviation_perc', DEFAULT_FIFTH_PROFIT_DEVIATION_PERC))
+        self.delta_stop_deviation_perc: float = float(logic.get(
+            'delta_stop_deviation_perc', DEFAULT_STOP_LOSS_DEVIATION_PERC))
+
         signal = config['Signal']
         self.accessible_main_coins: List[str] = signal['accessible_main_coins'].split(',')
         self.all_accessible_main_coins: List[str] = signal['all_accessible_main_coins'].split(',')
@@ -344,6 +368,7 @@ class Config:
         self.klondike_altcoin = telegram.get('klondike_altcoin', None)
         self.margin_whales = telegram.get('Margin_Whales', None)
         self.server = telegram.get('Server', None)
+        self.fsvzo = telegram.get('fsvzo', None)
 
 
 conf_obj = Config()

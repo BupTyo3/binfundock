@@ -1,5 +1,6 @@
 import logging
 
+from asgiref.sync import sync_to_async
 from django.db import models
 from django.contrib.auth import get_user_model
 
@@ -48,6 +49,13 @@ def get_or_create_market() -> BaseMarket:
 
 
 def get_or_create_futures_market() -> BaseMarket:
+    market_obj, created = Market.objects.get_or_create(name=BiFuturesMarketLogic.name)
+    if created:
+        logger.debug(f"Market '{market_obj}' has been created")
+    return market_obj
+
+@sync_to_async
+def get_or_create_async_futures_market() -> BaseMarket:
     market_obj, created = Market.objects.get_or_create(name=BiFuturesMarketLogic.name)
     if created:
         logger.debug(f"Market '{market_obj}' has been created")
