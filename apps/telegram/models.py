@@ -780,6 +780,7 @@ class Telegram(BaseTelegram):
             position = 'LONG'
         splitted_text = message_text.split(' ')
         algorithm = algorithm + splitted_text[-1]
+        algorithm = algorithm.lower()
         pair = splitted_text[-2] + 'USDT'
 
         futures_market = await get_or_create_async_futures_market()
