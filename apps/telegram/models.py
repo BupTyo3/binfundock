@@ -846,7 +846,7 @@ class Telegram(BaseTelegram):
 
         return profits
 
-    @rounded_result
+    @rounded_result(digits=5)
     def _form_divergence_stop(self, position, current_price):
         stop_loss = ''
         if position == SignalModel.short_label:
