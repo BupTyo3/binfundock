@@ -635,12 +635,14 @@ class Telegram(BaseTelegram):
                             await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
                                                                 message.date, channel_abbr, message.id)
                     urgent_action = signal[0].current_price
-                    obj = SignalOrig.objects.filter(
+                    signal = SignalOrig.objects.filter(
                         symbol=signal[0].pair, techannel__name=channel_abbr).order_by('id').last()
                     if urgent_action == 'activate':
                         logger.warning('BUY BY MARKET')
                     if urgent_action == 'cancel':
                         logger.warning('SELL BY MARKET')
+                        signal.try_to_spoil_by_one_signal()
+
 
     def parse_wcse_message(self, message_text, message_id):
         signals = []
