@@ -10,13 +10,14 @@ from telethon.tl.types import User
 from apps.signal.models import SignalOrig, Signal, EntryPoint, TakeProfit
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
-from tools.tools import rounded_array, rounded_result
+from tools.tools import rounded_result
 from utils.parse_channels.str_parser import left_numbers, check_pair, replace_rus_to_eng
 from .base_model import BaseTelegram
 from .image_parser import ChinaImageToSignal
 from apps.market.models import get_or_create_async_futures_market
 
 from .verify_signal import SignalVerification
+from ..pair.models import Pair
 from ..signal.utils import MarginType, calculate_position
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ class Telegram(BaseTelegram):
     Model of Telegram entity
     """
     name = 'Telegram'
+    one_satoshi = 0.00000001
 
     def is_urgent_close_position(self, message, channel_abbr):
         should_close_label = ['closing', 'closed', 'close']
@@ -781,21 +783,23 @@ class Telegram(BaseTelegram):
         splitted_text = message_text.split(' ')
         algorithm = algorithm + splitted_text[-1]
         algorithm = algorithm.lower()
-        pair = splitted_text[-2] + 'USDT'
+        symbol = splitted_text[-2] + 'USDT'
 
         futures_market = await get_or_create_async_futures_market()
-        current_price = futures_market.logic.get_current_price(pair)
+        current_price = futures_market.logic.get_current_price(symbol)
 
-        entries = self._form_divergence_entries(position, current_price)
-        stop_loss = self._form_divergence_stop(position, current_price)
-        profits = self._form_divergence_profits(position, current_price)
+        pair = await Pair.get_async_pair(symbol, futures_market)
+        step_quantity = pair.step_price
 
-        signals.append(SignalModel(pair, current_price, margin_type, position,
+        entries = self._form_divergence_entries(position, current_price, step_quantity)
+        stop_loss = self._form_divergence_stop(position, current_price, step_quantity)
+        profits = self._form_divergence_profits(position, current_price, step_quantity)
+
+        signals.append(SignalModel(symbol, current_price, margin_type, position,
                                    leverage, entries, profits, stop_loss, message_id, algorithm=algorithm))
         return signals
 
-    @rounded_array
-    def _form_divergence_entries(self, position, current_price):
+    def _form_divergence_entries(self, position, current_price, step_quantity):
         entries = []
         first_entry = ''
         second_entry = ''
@@ -808,13 +812,17 @@ class Telegram(BaseTelegram):
             first_entry = current_price + delta_first_entry
             second_entry = current_price - delta_second_entry
 
-        entries.append(first_entry)
-        entries.append(second_entry)
+        entries.append(self._round_price(first_entry, step_quantity))
+        entries.append(self._round_price(second_entry, step_quantity))
 
         return entries
 
-    @rounded_array
-    def _form_divergence_profits(self, position, current_price):
+    @rounded_result
+    def _round_price(self, price, step_quantity):
+        price += self.one_satoshi
+        return (price // step_quantity) * step_quantity
+
+    def _form_divergence_profits(self, position, current_price, step_quantity):
         profits = []
         first_profit = ''
         second_profit = ''
@@ -839,16 +847,15 @@ class Telegram(BaseTelegram):
             fourth_profit = current_price + delta_fourth_profit
             fifth_profit = current_price + delta_fifth_profit
 
-        profits.append(first_profit)
-        profits.append(second_profit)
-        profits.append(third_profit)
-        profits.append(fourth_profit)
-        profits.append(fifth_profit)
+        profits.append(self._round_price(first_profit, step_quantity))
+        profits.append(self._round_price(second_profit, step_quantity))
+        profits.append(self._round_price(third_profit, step_quantity))
+        profits.append(self._round_price(fourth_profit, step_quantity))
+        profits.append(self._round_price(fifth_profit, step_quantity))
 
         return profits
 
-    @rounded_result(digits=5)
-    def _form_divergence_stop(self, position, current_price):
+    def _form_divergence_stop(self, position, current_price, step_quantity):
         stop_loss = ''
         if position == SignalModel.short_label:
             delta_stop = (current_price * conf_obj.delta_stop_deviation_perc) / conf_obj.one_hundred_percent
@@ -856,6 +863,7 @@ class Telegram(BaseTelegram):
         if position == SignalModel.long_label:
             delta_stop = (current_price * conf_obj.delta_stop_deviation_perc) / conf_obj.one_hundred_percent
             stop_loss = current_price - delta_stop
+        stop_loss = self._round_price(stop_loss, step_quantity)
         return stop_loss
 
     def parse_server_message(self, message_text):
