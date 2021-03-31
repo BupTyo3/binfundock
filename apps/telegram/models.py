@@ -967,9 +967,9 @@ class Telegram(BaseTelegram):
         stop_label = 'Stop Loss: '
         pair = 'Coin: '
         current_price = ''
-        margin_type = MarginType.CROSSED.value
+        margin_type = MarginType.ISOLATED.value
         position = None
-        leverage = 100
+        leverage = 25
         entries = ''
         profits = ''
         stop_loss = ''
@@ -1186,7 +1186,7 @@ class Telegram(BaseTelegram):
                   f"Entry Points: '{signal.entry_points}'\n" \
                   f"Take Profits: '{signal.take_profits}'\n" \
                   f"Stop Loss: '{signal.stop_loss}'\n" \
-                  f"Time: '{message_date.replace(tzinfo=None) + timedelta(hours=2)}'\n" \
+                  f"Time: '{message_date.replace(tzinfo=None) + timedelta(hours=3)}'\n" \
                   f"Algorithm: '{channel_abbr}'\n" \
                   f"ID: '{message_id}'"
         await self.client.send_message(channel_name, message)

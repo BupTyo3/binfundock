@@ -82,16 +82,16 @@ class Command(SystemCommand):
 
     def collect_info_from_tca_leverage_channel(self):
         session_name = 'TCA'
-        self.init_telegram_xy(session_name)
+        self.init_telegram_luck(session_name)
         logger.debug(f'Session {session_name} initialized')
         try:
-            with self._client_xy:
-                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_tca_channel('leverage'))
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_tca_channel('leverage'))
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client_xy.disconnect()
+            self._client_luck.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
     def collect_info_from_cf_trader_channel(self):
