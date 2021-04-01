@@ -777,7 +777,7 @@ class Telegram(BaseTelegram):
         signals = []
         position = ''
         margin_type = 'ISOLATED'
-        leverage = 15
+        leverage = 10
         if 'Bear' in message_text:
             position = 'SHORT'
         if 'Bull' in message_text:
@@ -1005,7 +1005,7 @@ class Telegram(BaseTelegram):
     async def parse_margin_whale_channel(self):
         chat_id = int(conf_obj.margin_whales)
         channel_abbr = 'margin_whale'
-        async for message in self.client.iter_messages(chat_id, limit=8):
+        async for message in self.client.iter_messages(chat_id, limit=18):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg:
@@ -1024,7 +1024,7 @@ class Telegram(BaseTelegram):
     def parse_margin_whale_message(self, message_text, message_id):
         signals = []
         splitted_info = message_text.splitlines()
-        buy_label = ['ENTRY  : ', 'ENTRY : ']
+        buy_label = 'ENTRY'
         margin_label = '#MARGIN'
         goals_label = 'Target'
         stop_label = 'STOP LOSS: '
@@ -1052,7 +1052,7 @@ class Telegram(BaseTelegram):
                 possible_pair = fake_pair[2]
                 if 'XBT' in possible_pair or 'BTC' in possible_pair:
                     pair = 'BTCUSDT'
-            if line.startswith(buy_label[0]) or line.startswith(buy_label[1]):
+            if line.startswith(buy_label):
                 fake_entries = line[8:]
                 possible_entries = fake_entries.split('-')
                 entries = left_numbers(possible_entries)
