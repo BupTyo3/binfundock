@@ -197,13 +197,13 @@ DEFAULT_EXTREMAL_SL_PRICE_SHIFT_COEF = '8.0'
 DEFAULT_ALLOWABLE_DURATION_OF_TASK_SECS = '60'  # For unsetting busy_setting_time field
 DEFAULT_TRAIL_ONCOMING_PERCENT = '2'  # Oncoming percent for trailing-stop from EP to current price: 2 means 50%
 DEFAULT_MARKET_ENTRY_DEVIATION_PERC = '0.15'  # Changes closest EP by this amount % to initiate market entry
-DEFAULT_SECOND_ENTRY_DEVIATION_PERC = '1.25'  # For divergences second EP distance in % from current price
-DEFAULT_FIRST_PROFIT_DEVIATION_PERC = '1'  # For divergences first TP distance in % from current price
-DEFAULT_SECOND_PROFIT_DEVIATION_PERC = '2.5'  # For divergences second TP distance in % from current price
-DEFAULT_THIRD_PROFIT_DEVIATION_PERC = '4'  # For divergences third TP distance in % from current price
-DEFAULT_FOURTH_PROFIT_DEVIATION_PERC = '6'  # For divergences fourth TP distance in % from current price
-DEFAULT_FIFTH_PROFIT_DEVIATION_PERC = '15'  # For divergences fifth TP distance in % from current price
-DEFAULT_STOP_LOSS_DEVIATION_PERC = '2.25'  # For divergences stop loss distance in % from current price
+DEFAULT_SECOND_ENTRY_DEVIATION_PERC = '1.25'  # Second EP distance in % from current price
+DEFAULT_FIRST_PROFIT_DEVIATION_PERC = '1'  # First TP distance in % from current price
+DEFAULT_SECOND_PROFIT_DEVIATION_PERC = '2.5'  # Second TP distance in % from current price
+DEFAULT_THIRD_PROFIT_DEVIATION_PERC = '4'  # Third TP distance in % from current price
+DEFAULT_FOURTH_PROFIT_DEVIATION_PERC = '6'  # Fourth TP distance in % from current price
+DEFAULT_FIFTH_PROFIT_DEVIATION_PERC = '15'  # Fifth TP distance in % from current price
+DEFAULT_STOP_LOSS_DEVIATION_PERC = '2.25'  # Stop loss distance in % from current price
 
 DEFAULT_MARKET_SPOT_RAW_URL = 'https://www.binance.com/en/trade/{}?theme=dark'
 DEFAULT_MARKET_FUTURES_RAW_URL = 'https://www.binance.com/en/futures/{}?theme=dark'
