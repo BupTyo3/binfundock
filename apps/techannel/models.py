@@ -53,6 +53,11 @@ class Techannel(TechannelBase):
         help_text='percent for one signal from the balance'
     )
 
+    leverage_boost = models.PositiveIntegerField(
+        default=0,
+        help_text='The number to add to the recommended leverage'
+    )
+
     objects = models.Manager()
 
     def __str__(self):

@@ -121,13 +121,13 @@ class Command(SystemCommand):
         finally:
             self._client_luck.disconnect()
 
-    def collect_info_from_lucrative_trend_channel(self):
+    def collect_info_from_lucrative_recommend_channel(self):
         session_name = 'LucrativeRecommendations'
         self.init_telegram(session_name)
         logger.debug(f'Session {session_name} initialized')
         try:
             with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_lucrative_trend_channel())
+                self._client.loop.run_until_complete(self._telegram.parse_lucrative_recommend_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
@@ -318,7 +318,7 @@ class Command(SystemCommand):
         if not get_or_create_crontask().lucrative_recommendations:
             pass
         elif any(x in channel for x in lucrative_recommendation_matches):
-            self.collect_info_from_lucrative_trend_channel()
+            self.collect_info_from_lucrative_recommend_channel()
 
         if not get_or_create_crontask().luck8414:
             pass
