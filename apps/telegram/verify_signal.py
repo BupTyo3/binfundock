@@ -7,8 +7,9 @@ logger = logging.getLogger(__name__)
 
 class SignalVerification:
     def get_active_pairs_info(self, pairs):
+        from apps.telegram.models import SignalModel
         pairs_info = []
-        signals = []
+        signal = SignalModel
         for pair_object in pairs:
             if pair_object.entry_points is None or pair_object.take_profits is None:
                 return False
@@ -53,12 +54,10 @@ class SignalVerification:
             logger.debug(f"Take profits: {profits}")
             logger.debug(f"Stop-loss: {stop_loss}")
             logger.debug('==========================================')
-            from .models import SignalModel
-            signals.append(
-                SignalModel(current_pair['symbol'], current_pair['price'], '',
-                            pair_object.position, pair_object.leverage, entries, profits, stop_loss,
-                            pair_object.msg_id))
-        return signals
+            signal = SignalModel(current_pair['symbol'], current_pair['price'], '',
+                                 pair_object.position, pair_object.leverage, entries, profits, stop_loss,
+                                 pair_object.msg_id)
+        return signal
 
     def verify_entry(self, pair_object, current_pair_info):
         verified_entries = []
