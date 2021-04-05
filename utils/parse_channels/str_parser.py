@@ -23,6 +23,19 @@ def left_numbers(array: List[str]) -> List[str]:
     return list(filter(None, array))
 
 
+def handle_crypto_angel_to_array(message_line):
+    splitted_info = message_line.split('-')
+    last_element = ''.join(filter(str.isdigit, splitted_info[-1]))
+    splitted_info[-1] = splitted_info[-1].replace('+', '')
+    if len(splitted_info[0]) == len(splitted_info[-1]):
+        return splitted_info
+    key_numbers = len(last_element)
+    prefix = splitted_info[0][:-key_numbers]
+    array = [f'{prefix}{n}' for n in splitted_info][1:]
+    array.insert(0, splitted_info[0])
+    return array
+
+
 def find_number_in_list(list_of_strings):
     for string in list_of_strings:
         try:

@@ -3,6 +3,7 @@ import logging
 from datetime import timedelta
 from sys import platform
 import pytesseract
+import time
 
 from asgiref.sync import sync_to_async
 from telethon.tl.types import User
@@ -11,14 +12,14 @@ from apps.signal.models import SignalOrig, Signal, EntryPoint, TakeProfit
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
 from tools.tools import rounded_result
-from utils.parse_channels.str_parser import left_numbers, check_pair, replace_rus_to_eng
+from utils.parse_channels.str_parser import left_numbers, check_pair, replace_rus_to_eng, handle_crypto_angel_to_array
 from .base_model import BaseTelegram
 from .image_parser import ChinaImageToSignal
 from apps.market.models import get_or_create_async_futures_market
 
 from .verify_signal import SignalVerification
 from ..pair.models import Pair
-from ..signal.utils import MarginType, calculate_position
+from ..signal.utils import MarginType, calculate_position, CANCELING__SIG_STATS
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +28,8 @@ if platform == "win32":
 
 
 class SignalModel:
-    short_label = 'SHORT'
-    long_label = 'LONG'
+    short_label = 'short'
+    long_label = 'long'
 
     def __init__(self, pair, current_price, margin_type, position, leverage, entry_points, take_profits, stop_loss,
                  msg_id, algorithm=None, is_shared=False):
@@ -56,41 +57,6 @@ class Telegram(BaseTelegram):
     name = 'Telegram'
     one_satoshi = 0.00000001
 
-    def is_urgent_close_position(self, message, channel_abbr):
-        should_close_label = ['closing', 'closed', 'close']
-        should_close = any(x in should_close_label for x in message)
-        if should_close:
-            if 'BTC' in message.text:
-                obj = SignalOrig.objects.filter(
-                    symbol='BTCUSDT', techannel__name=channel_abbr).order_by('id').last()
-                if obj:
-                    logger.debug(f'please close the position: {obj}')
-            if 'ETH' in message.text:
-                obj = SignalOrig.objects.filter(
-                    symbol='ETHUSDT', techannel__name=channel_abbr).order_by('id').last()
-                if obj:
-                    logger.debug(f'please close the position: {obj}')
-            return True
-        return False
-
-    def is_urgent_correct_position(self, message, channel_abbr):
-        # TODO: add logic here as it is not relevant --->>> TRY_TO_SPOIL()
-        should_move_label = ['move']
-        should_move = any(x in should_move_label for x in message)
-        if should_move:
-            if 'BTC' in message.text:
-                obj = SignalOrig.objects.filter(
-                    symbol='BTCUSDT', techannel__name=channel_abbr).order_by('id').last()
-                if obj:
-                    logger.debug(f'please close the position: {obj}')
-            if 'ETH' in message.text:
-                obj = SignalOrig.objects.filter(
-                    symbol='ETHUSDT', techannel__name=channel_abbr).order_by('id').last()
-                if obj:
-                    logger.debug(f'please close the position: {obj}')
-            return True
-        return False
-
     async def parse_cf_trader_channel(self):
         channel_abbr = 'cf_tr'
         tca = int(conf_obj.CFTrader)
@@ -99,24 +65,15 @@ class Telegram(BaseTelegram):
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_cf_trader_message(message.text, message.id)
-                if signal:
+                if signal.pair:
                     inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                     if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{channel_abbr}' algorithm: "
-                                                            f"{inserted_to_db}")
+                        await self.send_error_message_to_yourself(signal, inserted_to_db)
                     else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                             message.date, channel_abbr, message.id)
-                else:
-                    attention_to_close = self.is_urgent_close_position(message.text, channel_abbr)
-                    correct_position = self.is_urgent_correct_position(message.text, channel_abbr)
-                    if attention_to_close or correct_position:
-                        logger.error('A SIGNAL REQUIRES ATTENTION!')
 
     def parse_cf_trader_message(self, message_text, message_id):
-        signals = []
         text = replace_rus_to_eng(message_text)
         splitted_info = text.splitlines()
         possible_entry_label = ['Entry', 'Get', '**Entry']
@@ -124,35 +81,33 @@ class Telegram(BaseTelegram):
         possible_take_profits_label2 = 'Take profit'
         possible_stop_label = ['SL: ', 'SL : ', 'Stop loss:']
         pair_label = ['Pair: ', 'Asset', '**Asset']
-        pair = ''
-        position_label = '#'
-        current_price = ''
-        margin_type = MarginType.CROSSED.value
-        position = None
         leverage_label = 'Leverage:'
+        margin_type = MarginType.CROSSED.value
+        current_price = ''
+        position = ''
         leverage = ''
+        pair = ''
         entries = []
-        profits = ''
+        profits = []
         stop_loss = ['']
         signal_identification = 'CF Leverage Trading Signal'
         should_entry = [i for i, s in enumerate(splitted_info) if 'Stop loss:' in s]
         if not should_entry:
             should_entry = [i for i, s in enumerate(splitted_info) if 'SL:' in s]
         if not should_entry:
-            return signals.append(SignalModel(pair, current_price, margin_type, position,
-                                              leverage, entries, profits, stop_loss, message_id))
+            signal = SignalModel(pair, current_price, margin_type, position,
+                                 leverage, entries, profits, stop_loss, message_id)
+            return signal
+
         for line in splitted_info:
-            if line.startswith(pair_label[0]) or line.startswith(pair_label[1])  or line.startswith(pair_label[2]):
+            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]) or line.startswith(pair_label[2]):
                 if not pair:
                     possible_position_info = line.split(' ')
                     pair = ''.join(filter(str.isalpha, possible_position_info[1]))
                     if signal_identification:
                         position_info = list(filter(None, possible_position_info))
                         pair = ''.join(filter(str.isalpha, position_info[1]))
-            if position_label in line:
-                position_info = line.split(position_label)
-                position = ''.join(filter(str.isalpha, position_info[1]))
-            if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1])\
+            if line.startswith(possible_entry_label[0]) or line.startswith(possible_entry_label[1]) \
                     or line.startswith(possible_entry_label[2]):
                 splitted_entries = line.split(' - ')
                 possible_entries = splitted_entries[0].split(' ')
@@ -185,50 +140,48 @@ class Telegram(BaseTelegram):
                 except IndexError:
                     leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
 
+        position = calculate_position(stop_loss[0], entries, profits)
         entries = self.extend_nearest_ep(position, entries)
-
-        """ Take only first 4 take profits: """
         profits = profits[:4]
-        signals.append(SignalModel(pair, current_price, margin_type, position,
-                                   leverage, entries, profits, stop_loss[0], message_id))
-        return signals
 
-    async def parse_lucrative_trend_channel(self):
+        signal = SignalModel(pair, current_price, margin_type, position,
+                             leverage, entries, profits, stop_loss[0], message_id)
+        return signal
+
+    async def parse_lucrative_recommend_channel(self):
         chat_id = int(conf_obj.lucrative_channel)
         async for message in self.client.iter_messages(chat_id, limit=7):
-            signal = self.parse_lucrative_trend_message(message.text)
-            exists = await self.is_signal_handled(signal[0].msg_id, signal[0].algorithm)
-            if not exists and signal[0].entry_points != '':
-                inserted_to_db = await self.write_signal_to_db(
-                    signal[0].algorithm, signal, signal[0].msg_id, signal[0].current_price)
-                if inserted_to_db != 'success':
-                    await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                        f"please check logs for '{signal[0].pair}' "
-                                                        f"related to the '{signal[0].algorithm}' algorithm: "
-                                                        f"{inserted_to_db}")
+            signal = self.parse_lucrative_recommend_message(message.text)
+            exists = await self.is_signal_handled(signal.msg_id, signal.algorithm)
+            if not exists and signal.pair:
+                urgent_action = signal.current_price
+                if urgent_action == 'activate' or urgent_action == 'cancel':
+                    await self._recreate_signal(urgent_action, signal, signal.algorithm, message)
+                else:
+                    inserted_to_db = await self.write_signal_to_db(signal.algorithm, signal, signal.msg_id,
+                                                                   signal.current_price)
+                    if inserted_to_db != 'success':
+                        await self.send_error_message_to_yourself(signal, inserted_to_db)
 
     async def parse_luck_channel(self):
         chat_id = int(conf_obj.Luck8414)
         async for message in self.client.iter_messages(chat_id, limit=6):
             if message.text:
-                signal = self.parse_lucrative_trend_message(message.text)
-                is_shared = await self.is_signal_shared(signal[0].msg_id, signal[0].algorithm)
+                signal = self.parse_lucrative_recommend_message(message.text)
+                is_shared = await self.is_signal_shared(signal.msg_id, signal.algorithm)
                 if not is_shared:
-                    await self.send_shared_message(int(conf_obj.lucrative), signal[0],
-                                                   signal[0].current_price, signal[0].algorithm, signal[0].msg_id)
-                    await self.send_shared_message(int(conf_obj.lucrative_channel), signal[0],
-                                                   signal[0].current_price, signal[0].algorithm, signal[0].msg_id)
-                    await self.send_shared_message(int(conf_obj.lucrative_trend), signal[0],
-                                                   signal[0].current_price, signal[0].algorithm, signal[0].msg_id)
-                    await self.update_shared_signal(signal[0])
+                    await self.send_shared_message(int(conf_obj.lucrative_channel), signal,
+                                                   signal.current_price, signal.algorithm, signal.msg_id)
+                    await self.send_shared_message(int(conf_obj.lucrative_trend), signal,
+                                                   signal.current_price, signal.algorithm, signal.msg_id)
+                    await self.update_shared_signal(signal)
 
     @sync_to_async
     def update_shared_signal(self, signal):
         is_updated = SignalOrig.update_shared_signal(is_shared=True, techannel_name=signal.algorithm,
                                                      outer_signal_id=signal.msg_id)
 
-    def parse_lucrative_trend_message(self, message_text):
-        signals = []
+    def parse_lucrative_recommend_message(self, message_text):
         splitted_info = message_text.splitlines()
         buy_label = 'Entry Points: '
         pair_label = 'Pair:'
@@ -238,8 +191,6 @@ class Telegram(BaseTelegram):
         current_price = ''
         margin_type_label = 'Margin type:'
         margin_type = ''
-        position_label = 'Position: '
-        position = None
         leverage = 'Leverage: '
         entries = ''
         message_id = ''
@@ -256,9 +207,6 @@ class Telegram(BaseTelegram):
                 margin_type = line[12:]
                 margin_type = margin_type.replace('\'', '')
                 margin_type = margin_type.replace(' ', '')
-            if line.startswith(position_label):
-                position = line[10:]
-                position = position.replace('\'', '')
             if line.startswith(leverage):
                 possible_leverage = line.split(' ')
                 leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
@@ -272,14 +220,18 @@ class Telegram(BaseTelegram):
                 stop_loss = line[11:].replace('\'', '')
             if line.startswith(datetime_label):
                 current_price = line[7:].replace('\'', '')
-                current_price = current_price + '+02:00'
+                if 'cancel' in current_price or 'activate' in current_price:
+                    current_price = current_price
+                else:
+                    current_price = current_price + '+02:00'
             if line.startswith(algorithm):
                 algorithm = line[len(algorithm):].replace('\'', '')
             if line.startswith(outer_id_label):
                 message_id = line[4:].replace('\'', '')
-        signals.append(SignalModel(pair, current_price, margin_type, position,
-                                   leverage, entries, profits, stop_loss, message_id, algorithm=algorithm))
-        return signals
+        position = calculate_position(stop_loss, entries, profits)
+        signal = SignalModel(pair, current_price, margin_type, position,
+                             leverage, entries, profits, stop_loss, message_id, algorithm)
+        return signal
 
     async def parse_china_channel(self):
         info_getter = ChinaImageToSignal()
@@ -293,20 +245,16 @@ class Telegram(BaseTelegram):
                 await message.download_media()
                 pairs = info_getter.iterate_files(message.id)
                 signal = verify_signal.get_active_pairs_info(pairs)
-                if not signal:
+                if not signal.pair:
                     return
                 inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                 if inserted_to_db != 'success':
-                    await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                        f"please check logs for '{signal[0].pair}' "
-                                                        f"related to the '{channel_abbr}' algorithm: "
-                                                        f"{inserted_to_db}")
+                    await self.send_error_message_to_yourself(signal, inserted_to_db)
+
                 else:
-                    await self.send_shared_message(int(conf_obj.lucrative), signal[0],
+                    await self.send_shared_message(int(conf_obj.lucrative_channel), signal,
                                                    message.date, channel_abbr, message.id)
-                    await self.send_shared_message(int(conf_obj.lucrative_channel), signal[0],
-                                                   message.date, channel_abbr, message.id)
-                    await self.send_shared_message(int(conf_obj.lucrative_trend), signal[0],
+                    await self.send_shared_message(int(conf_obj.lucrative_trend), signal,
                                                    message.date, channel_abbr, message.id)
 
     async def parse_crypto_angel_channel(self):
@@ -317,15 +265,12 @@ class Telegram(BaseTelegram):
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_angel_message(message.text, message.id)
-                if signal[0].pair:
+                if signal.pair:
                     inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                     if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{channel_abbr}' algorithm: "
-                                                            f"{inserted_to_db}")
+                        await self.send_error_message_to_yourself(signal, inserted_to_db)
                     else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                             message.date, channel_abbr, message.id)
 
     async def parse_crypto_futures_channel(self):
@@ -339,16 +284,12 @@ class Telegram(BaseTelegram):
                 if signal:
                     inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                     if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{channel_abbr}' algorithm: "
-                                                            f"{inserted_to_db}")
+                        await self.send_error_message_to_yourself(signal[0], inserted_to_db)
                     else:
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                             message.date, channel_abbr, message.id)
+                                                            message.date, channel_abbr, message.id)
 
     def parse_angel_message(self, message_text, message_id):
-        signals = []
         splitted_info = message_text.splitlines()
         buy_label = 'Покупаем по цене: '
         goals_label = 'Цели: '
@@ -356,50 +297,48 @@ class Telegram(BaseTelegram):
         pair = ''
         current_price = ''
         is_margin = False
-        position = None
+        position = ''
         leverage = 1
         entries = ''
         profits = ''
         stop_loss = ''
         if buy_label not in splitted_info[2]:
-            return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                              leverage, entries, profits, stop_loss, message_id))
+            signal = SignalModel(pair, current_price, is_margin, position,
+                                 leverage, entries, profits, stop_loss, message_id)
+            return signal
+
         for line in splitted_info:
             if line.startswith(buy_label):
-                position = splitted_info[1]
                 pair = ''.join(filter(str.isalpha, splitted_info[0]))
             if line.startswith(buy_label):
                 fake_entries = line[18:]
-                entries = self.handle_ca_recommend_to_array(fake_entries)
+                entries = handle_crypto_angel_to_array(fake_entries)
             if line.startswith(goals_label):
                 fake_profits = line[6:]
-                profits = self.handle_ca_recommend_to_array(fake_profits)
+                profits = handle_crypto_angel_to_array(fake_profits)
             if line.startswith(stop_label):
                 stop_loss = line[4:]
-                stop_loss = self.handle_ca_recommend_to_array(stop_loss)
+                stop_loss = handle_crypto_angel_to_array(stop_loss)
                 try:
                     stop_loss = f'{min(float(s) for s in stop_loss)}'
                 except:
                     stop_loss = '0'
         """ Take only first 4 take profits: """
         profits = profits[:4]
-        signals.append(SignalModel(pair, current_price, is_margin, position,
-                                   leverage, entries, profits, stop_loss, message_id))
-        return signals
+        position = calculate_position(stop_loss, entries, profits)
+        signal = SignalModel(pair, current_price, is_margin, position,
+                             leverage, entries, profits, stop_loss, message_id)
+        return signal
 
     def parse_crypto_futures_message(self, message_text, message_id):
-        signals = []
         splitted_info = message_text.splitlines()
         buy_label = 'Вход'
-        cross_label = 'Cross'
-        long_label = SignalModel.long_label
-        short_label = SignalModel.short_label
         goals_label = 'Цели: '
         stop_label = 'Sl: '
         pair = ''
         current_price = ''
-        is_margin = False
-        position = None
+        margin_type = ''
+        position = ''
         leverage = 5
         entries = ''
         profits = ''
@@ -407,35 +346,34 @@ class Telegram(BaseTelegram):
         try:
             entry_index = [i for i, s in enumerate(splitted_info) if buy_label in s]
         except ValueError as e:
-            return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                              leverage, entries, profits, stop_loss, message_id))
+            signal = SignalModel(pair, current_price, margin_type, position,
+                                 leverage, entries, profits, stop_loss, message_id)
+            return signal
         if not entry_index:
-            return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                              leverage, entries, profits, stop_loss, message_id))
+            signal = SignalModel(pair, current_price, margin_type, position,
+                                 leverage, entries, profits, stop_loss, message_id)
+            return signal
         pair = ''.join(filter(str.isalpha, splitted_info[0]))
-        if long_label in splitted_info[1]:
-            position = long_label
-        if short_label in splitted_info[1]:
-            position = short_label
         for line in splitted_info:
             if line.startswith(buy_label):
                 fake_entries = line.split(buy_label)
-                entries = self.handle_ca_recommend_to_array(fake_entries[1])
+                entries = handle_crypto_angel_to_array(fake_entries[1])
             if line.startswith(goals_label):
                 fake_profits = line[6:]
-                profits = self.handle_ca_recommend_to_array(fake_profits)
+                profits = handle_crypto_angel_to_array(fake_profits)
             if line.startswith(stop_label):
                 stop_loss = line[4:]
-                stop_loss = self.handle_ca_recommend_to_array(stop_loss)
+                stop_loss = handle_crypto_angel_to_array(stop_loss)
                 try:
                     stop_loss = f'{min(float(s) for s in stop_loss)}'
                 except:
                     stop_loss = '0'
         """ Take only first 4 take profits: """
         profits = profits[:4]
-        signals.append(SignalModel(pair, current_price, is_margin, position,
-                                   leverage, entries, profits, stop_loss, message_id))
-        return signals
+        position = calculate_position(stop_loss, entries, profits)
+        signal = SignalModel(pair, current_price, margin_type, position,
+                             leverage, entries, profits, stop_loss, message_id)
+        return signal
 
     async def parse_white_bull_channel(self):
         channel_id = int(conf_obj.white_bull)
@@ -447,19 +385,15 @@ class Telegram(BaseTelegram):
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_white_bull_message(message.text, message.id)
-                if signal[0].entry_points and signal[0].pair:
+                if signal.entry_points and signal.pair:
                     inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                     if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{channel_abbr}' algorithm: "
-                                                            f"{inserted_to_db}")
+                        await self.send_error_message_to_yourself(signal, inserted_to_db)
                     else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                             message.date, channel_abbr, message.id)
 
     def parse_white_bull_message(self, message_text, message_id):
-        signals = []
         splitted_info = message_text.splitlines()
         pair_label = '#'
         buy_label = ['Buy: ', 'Short', 'short', 'buy']
@@ -468,8 +402,7 @@ class Telegram(BaseTelegram):
         stop_label_2 = 'Sl'
         pair = ''
         current_price = ''
-        is_margin = False
-        position = None
+        margin_type = ''
         leverage = 1
         entries = ''
         profits = ''
@@ -487,10 +420,6 @@ class Telegram(BaseTelegram):
                 fake_entries = line[4:]
                 possible_entries = fake_entries.split('-')
                 entries = left_numbers(possible_entries)
-                if line.startswith(buy_label[0]) or line.startswith(buy_label[1]):
-                    position = SignalModel.long_label
-                if line.startswith(buy_label[1]) or line.startswith(buy_label[2]):
-                    position = SignalModel.short_label
             if line.startswith(goals_label[0]) or line.startswith(goals_label[1]):
                 fake_entries = line[5:]
                 possible_take_profits = fake_entries.split('-')
@@ -504,9 +433,10 @@ class Telegram(BaseTelegram):
                     stop_loss = stop_loss[0]
         """ Take only first 4 take profits: """
         profits = profits[:4]
-        signals.append(SignalModel(pair, current_price, is_margin, position,
-                                   leverage, entries, profits, stop_loss, message_id))
-        return signals
+        position = calculate_position(stop_loss, entries, profits)
+        signal = SignalModel(pair, current_price, margin_type, position,
+                             leverage, entries, profits, stop_loss, message_id)
+        return signal
 
     async def parse_klondike_channel(self, name):
         if name == 'scalp':
@@ -524,31 +454,24 @@ class Telegram(BaseTelegram):
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_klondike_message(message.text, message.id)
-                if signal:
-                    if signal[0].entry_points and signal[0].pair:
-                        inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
-                        if inserted_to_db != 'success':
-                            await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                                f"please check logs for '{signal[0].pair}' "
-                                                                f"related to the '{channel_abbr}' algorithm: "
-                                                                f"{inserted_to_db}")
-                        else:
-                            await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                                message.date, channel_abbr, message.id)
+                if signal.entry_points and signal.pair:
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                    if inserted_to_db != 'success':
+                        await self.send_error_message_to_yourself(signal, inserted_to_db)
+                    else:
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
+                                                            message.date, channel_abbr, message.id)
 
     def parse_klondike_message(self, message_text, message_id):
-        signals = []
         splitted_info = message_text.splitlines()
         is_new_signal = '#SIGNAL'
         price_between_label = 'price between'
-        long_label = SignalModel.long_label
-        sell_label = SignalModel.short_label
         goals_label = 'Targets:'
         stop_label = 'STOP LOSS'
         pair = ''
         current_price = ''
-        is_margin = False
-        position = None
+        margin_type = ''
+        position = ''
         leverage = ''
         cross_leverage_label = 'cross leverage'
         alt_leverage_label = 'x leverage'
@@ -562,17 +485,12 @@ class Telegram(BaseTelegram):
         try:
             price_index = [i for i, s in enumerate(splitted_info) if price_between_label in s]
         except ValueError as e:
-            return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                              leverage, entries, profits, stop_loss, message_id))
+            signal = SignalModel(pair, current_price, margin_type, position,
+                                 leverage, entries, profits, stop_loss, message_id)
+            return signal
 
         if price_index:
             price_index = price_index[0]
-            if long_label in splitted_info[price_index]:
-                position = SignalModel.long_label
-            if sell_label in splitted_info[price_index]:
-                position = SignalModel.short_label
-            if sell_label or long_label not in splitted_info[price_index]:
-                position = SignalModel.long_label
             if cross_leverage_label in splitted_info[price_index]:
                 leverage = 20
             if 'X' in splitted_info[price_index]:
@@ -583,7 +501,7 @@ class Telegram(BaseTelegram):
                 possible_leverage = splitted_info[price_index].split(alt_leverage_label)
                 leverage = possible_leverage[0].split(' ')
                 leverage = leverage[-1]
-            if alt_leverage_label not in splitted_info[price_index] and 'X' not in splitted_info[price_index]\
+            if alt_leverage_label not in splitted_info[price_index] and 'X' not in splitted_info[price_index] \
                     and cross_leverage_label not in splitted_info[price_index]:
                 leverage = 3
 
@@ -596,8 +514,9 @@ class Telegram(BaseTelegram):
             try:
                 goals_index = [i for i, s in enumerate(splitted_info) if goals_label in s]
             except ValueError as e:
-                return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                                  leverage, entries, profits, stop_loss, message_id))
+                signal = SignalModel(pair, current_price, margin_type, position,
+                                     leverage, entries, profits, stop_loss, message_id)
+                return signal
             possible_targets = splitted_info[goals_index[0] + 2: goals_index[0] + 7]
             for possible_target in possible_targets:
                 target = possible_target.split('$')
@@ -608,9 +527,10 @@ class Telegram(BaseTelegram):
                 stop_loss = possible_stop[1]
                 stop_loss = stop_loss.replace('$', '')
 
-        signals.append(SignalModel(pair, current_price, is_margin, position,
-                                   leverage, entries, profits, stop_loss, message_id))
-        return signals
+        position = calculate_position(stop_loss, entries, profits)
+        signal = SignalModel(pair, current_price, margin_type, position,
+                             leverage, entries, profits, stop_loss, message_id)
+        return signal
 
     async def parse_wcse_channel(self):
         channel_id = int(conf_obj.wcse)
@@ -618,84 +538,129 @@ class Telegram(BaseTelegram):
         # entity = await self.client.get_entity('@WCSEBot')
         access_hash = 7265387611438966175
         channel_entity = User(id=channel_id, access_hash=access_hash)
-        async for message in self.client.iter_messages(entity=channel_entity, limit=6):
+        async for message in self.client.iter_messages(entity=channel_entity, limit=12):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_wcse_message(message.text, message.id)
-                if signal:
-                    if signal[0].entry_points and signal[0].pair:
+                if signal.pair:
+                    if signal.entry_points:
                         inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                         if inserted_to_db != 'success':
-                            await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                                f"please check logs for '{signal[0].pair}' "
-                                                                f"related to the '{channel_abbr}' algorithm: "
-                                                                f"{inserted_to_db}")
+                            await self.send_error_message_to_yourself(signal, inserted_to_db)
                         else:
-                            await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                            await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                                 message.date, channel_abbr, message.id)
-                    urgent_action = signal[0].current_price
-                    signal = SignalOrig.objects.filter(
-                        symbol=signal[0].pair, techannel__name=channel_abbr).order_by('id').last()
-                    if urgent_action == 'activate':
-                        logger.warning('BUY BY MARKET')
-                    if urgent_action == 'cancel':
-                        logger.warning('SELL BY MARKET')
-                        signal.try_to_spoil_by_one_signal()
+                    else:
+                        urgent_action = signal.current_price
+                        await self._recreate_signal(urgent_action, signal, channel_abbr, message, True)
 
+    async def _recreate_signal(self, urgent_action, old_signal, channel_abbr, message, distribution=False):
+        if urgent_action == 'activate':
+            signal_object = await self._get_async_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
+            if signal_object:
+                await self._close_signal(signal_object)
+            if not signal_object:
+                signal_object = await self._get_async_signal(symbol=old_signal.pair, channel_abbr=channel_abbr,
+                                                             sig_orig=True)
+                if not signal_object:
+                    return
+            signal = await self._form_signal(old_signal, signal_object, message.id, channel_abbr)
+            if distribution:
+                await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
+                                                    message.date, channel_abbr, message.id, urgent_action)
+
+            inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+            if inserted_to_db != 'success':
+                await self.send_error_message_to_yourself(signal, inserted_to_db)
+        if urgent_action == 'cancel':
+            signal_object = await self._get_async_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
+            if signal_object:
+                await self._close_signal(signal_object)
+            if distribution:
+                await self.send_message_by_template(int(conf_obj.lucrative_channel), old_signal,
+                                                    message.date, channel_abbr, message.id, urgent_action)
+
+    async def _form_signal(self, old_signal, signal_object, message_id, channel_abbr):
+        futures_market = await get_or_create_async_futures_market()
+        current_price = futures_market.logic.get_current_price(old_signal.pair)
+
+        pair = await Pair.get_async_pair(old_signal.pair, futures_market)
+        step_quantity = pair.step_price
+
+        profits = await self._get_profits_from_signal(signal_object)
+        entries = self._form_divergence_entries(signal_object.position, current_price, step_quantity)
+
+        signal = SignalModel(signal_object.symbol, current_price, signal_object.margin_type,
+                             signal_object.position, signal_object.leverage, entries,
+                             profits, signal_object.stop_loss, message_id, channel_abbr)
+        return signal
+
+    @sync_to_async
+    def _get_profits_from_signal(self, signal_object):
+        profits = []
+        for take_profit in signal_object.take_profits.all():
+            profits.append(take_profit.value)
+        return profits
+
+    async def _close_signal(self, signal):
+        counter = 0
+        cancelled_signal = False
+        while not cancelled_signal and counter < 600:
+            await signal.async_try_to_spoil_by_one_signal(True)
+            cancelled_signal = await self._is_signal_cancelled(signal)
+            time.sleep(0.3)
+            counter += 1
 
     def parse_wcse_message(self, message_text, message_id):
-        signals = []
         splitted_info = message_text.splitlines()
         is_new_signal = 'New Signal Created'
-        is_signal_activated = 'Signal Activated'
-        is_signal_cancelled = 'Signal Cancelled'
-        is_futures_label = 'BinanceFutures'
+        signal_activated = 'Signal Activated'
+        signal_cancelled = 'Signal Cancelled'
+        signal_closed = 'Signal Closed'
+        is_label = 'Binance'
         buy_label = '🔀 Entry Zone 🔀'
-        long_label = SignalModel.long_label
-        sell_label = SignalModel.short_label
         goals_label = '🔆 Exit Targets:🔆'
         stop_label = '⛔ StopLoss ⛔'
         pair = ''
-        current_price = ''
+        action_price = ''
         is_margin = False
-        position = None
+        position = ''
         leverage = ''
         entries = []
         profits = []
         stop_loss = ''
 
-        if is_signal_activated in splitted_info[0]:
+        if signal_activated in splitted_info[0]:
             pair_info = splitted_info[0].split('#')
             pair_info = pair_info[1].split('** **')
             pair = ''.join(filter(str.isalpha, pair_info[0]))
-            current_price = 'activate'
-            return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                              leverage, entries, profits, stop_loss, message_id))
-        if is_signal_cancelled in splitted_info[0]:
+            action_price = 'activate'
+            signal = SignalModel(pair, action_price, is_margin, position,
+                                 leverage, entries, profits, stop_loss, message_id)
+            return signal
+        if signal_cancelled in splitted_info[0] or signal_closed in splitted_info[0]:
             pair_info = splitted_info[0].split('#')
             pair_info = pair_info[1].split('** **')
             pair = ''.join(filter(str.isalpha, pair_info[0]))
-            current_price = 'cancel'
-            return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                              leverage, entries, profits, stop_loss, message_id))
+            action_price = 'cancel'
+            signal = SignalModel(pair, action_price, is_margin, position,
+                                 leverage, entries, profits, stop_loss, message_id)
+            return signal
         if is_new_signal in splitted_info[0]:
             pair_info = splitted_info[1].split('#')
             pair = ''.join(filter(str.isalpha, pair_info[1]))
-            if is_futures_label in splitted_info[2]:
-                if long_label in splitted_info[2]:
-                    position = SignalModel.long_label
-                elif sell_label in splitted_info[2]:
-                    position = SignalModel.short_label
+            if is_label in splitted_info[2]:
                 possible_leverage = splitted_info[2].split('(')
                 leverage = left_numbers([possible_leverage[1].split(' ')[1]])
                 leverage = leverage[0]
                 try:
                     entry_index = splitted_info.index(buy_label)
                 except ValueError as e:
-                    return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                                      leverage, entries, profits, stop_loss, message_id))
-                possible_entries = splitted_info[entry_index + 1:entry_index + 4]
+                    signal = SignalModel(pair, action_price, is_margin, position,
+                                         leverage, entries, profits, stop_loss, message_id)
+                    return signal
+                possible_entries = splitted_info[entry_index + 1:entry_index + 3]
                 for possible_entry in possible_entries:
                     entry = possible_entry.split(' ')
                     entries.append(entry[1])
@@ -703,8 +668,9 @@ class Telegram(BaseTelegram):
                 try:
                     goals_index = splitted_info.index(goals_label)
                 except ValueError as e:
-                    return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                                      leverage, entries, profits, stop_loss, message_id))
+                    signal = SignalModel(pair, action_price, is_margin, position,
+                                         leverage, entries, profits, stop_loss, message_id)
+                    return signal
                 possible_targets = splitted_info[goals_index + 1:goals_index + 9]
                 for possible_target in possible_targets:
                     target = possible_target.split(' ')
@@ -713,17 +679,16 @@ class Telegram(BaseTelegram):
                 try:
                     stop_index = splitted_info.index(stop_label)
                 except ValueError as e:
-                    return signals.append(SignalModel(pair, current_price, is_margin, position,
-                                                      leverage, entries, profits, stop_loss, message_id))
+                    signal = SignalModel(pair, action_price, is_margin, position,
+                                         leverage, entries, profits, stop_loss, message_id)
+                    return signal
                 possible_stop = splitted_info[stop_index + 1:stop_index + 2]
                 stop_loss = possible_stop[0].split(' ')
                 stop_loss = stop_loss[1]
-
-                """ Take only first 6 take profits: """
-                # profits = profits[:6]
-                signals.append(SignalModel(pair, current_price, is_margin, position,
-                                           leverage, entries, profits, stop_loss, message_id))
-        return signals
+        position = calculate_position(stop_loss, entries, profits)
+        signal = SignalModel(pair, action_price, is_margin, position,
+                             leverage, entries, profits, stop_loss, message_id)
+        return signal
 
     async def parse_server_channel(self):
         """
@@ -734,47 +699,39 @@ class Telegram(BaseTelegram):
         async for message in self.client.iter_messages(channel_id, limit=5):
             if message.text:
                 signal = self.parse_server_message(message.text)
-                exists = await self.is_signal_handled(signal[0].msg_id, channel_abbr)
-                if signal[0].pair and not exists and signal[0].current_price != 'close':
-                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, signal[0].msg_id, message.date)
+                exists = await self.is_signal_handled(signal.msg_id, channel_abbr)
+                if signal.pair and not exists and signal.current_price != 'close':
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, signal.msg_id, message.date)
                     if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{channel_abbr}' algorithm: "
-                                                            f"{inserted_to_db}")
-                if signal[0].pair and exists and 'close' in signal[0].current_price:
-                    not_served_signal = await self.get_not_served_signal(signal[0].msg_id, signal[0].algorithm)
-                    if not_served_signal and type(not_served_signal) is not bool:
-                        await not_served_signal.try_to_aync_spoil()
-                        await not_served_signal.make_signal_served(techannel_name=signal[0].algorithm,
-                                                                   outer_signal_id=signal[0].msg_id)
-                    if not not_served_signal and type(not_served_signal) is bool:
-                        pass
+                        await self.send_error_message_to_yourself(signal, inserted_to_db)
+                if signal.pair and exists and 'close' in signal.current_price:
+                    cancelled_signal = False
+                    signal_object = await self._get_async_signal(signal.msg_id, channel_abbr)
+                    while not cancelled_signal:
+                        time.sleep(0.2)
+                        await signal_object.async_try_to_spoil_by_one_signal(True)
+                        cancelled_signal = await self._is_signal_cancelled()
 
     async def parse_fsvzo_channel(self):
         channel_id = int(conf_obj.fsvzo)
-        channel_abbr = 'diver_'
         # entity = await self.client.get_entity('@alertatron_bot')
         access_hash = 475713384967520097
         channel_entity = User(id=channel_id, access_hash=access_hash)
         async for message in self.client.iter_messages(entity=channel_entity, limit=7):
             if message.text:
                 signal = await self.parse_fsvzo_message(message.text, message.id)
-                exists = await self.is_signal_handled(message.id, signal[0].algorithm)
-                if signal and not exists:
-                    inserted_to_db = await self.write_signal_to_db(signal[0].algorithm, signal, message.id, message.date)
+                exists = await self.is_signal_handled(message.id, signal.algorithm)
+                if signal.pair and not exists:
+                    inserted_to_db = await self.write_signal_to_db(signal.algorithm, signal, message.id,
+                                                                   message.date)
                     if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{signal[0].algorithm}' algorithm: "
-                                                            f"{inserted_to_db}")
+                        await self.send_error_message_to_yourself(signal, inserted_to_db)
                     else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
-                                                                message.date, signal[0].algorithm, message.id)
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
+                                                            message.date, signal.algorithm, message.id)
 
     async def parse_fsvzo_message(self, message_text, message_id):
         algorithm = 'diver_'
-        signals = []
         position = ''
         margin_type = 'ISOLATED'
         leverage = 10
@@ -797,9 +754,9 @@ class Telegram(BaseTelegram):
         stop_loss = self._form_divergence_stop(position, current_price, step_quantity)
         profits = self._form_divergence_profits(position, current_price, step_quantity)
 
-        signals.append(SignalModel(symbol, current_price, margin_type, position,
-                                   leverage, entries, profits, stop_loss, message_id, algorithm=algorithm))
-        return signals
+        signal = SignalModel(pair, current_price, margin_type, position,
+                             leverage, entries, profits, stop_loss, message_id, algorithm)
+        return signal
 
     def _form_divergence_entries(self, position, current_price, step_quantity):
         entries = []
@@ -869,7 +826,6 @@ class Telegram(BaseTelegram):
         return stop_loss
 
     def parse_server_message(self, message_text):
-        signals = []
         splitted_info = message_text.splitlines()
         buy_label = 'Entry Points: '
         pair_label = 'Pair:'
@@ -877,9 +833,7 @@ class Telegram(BaseTelegram):
         stop_label = 'Stop Loss: '
         pair = ''
         current_price = ''
-        is_margin = False
-        position_label = 'Position: '
-        position = None
+        margin_type = False
         leverage = 'Leverage: '
         entries = ''
         message_id = ''
@@ -892,9 +846,6 @@ class Telegram(BaseTelegram):
             if line.startswith(pair_label):
                 possible_pair = line.split(' ')
                 pair = ''.join(filter(str.isalpha, possible_pair[1]))
-            if line.startswith(position_label):
-                position = line[10:]
-                position = position.replace('\'', '')
             if line.startswith(leverage):
                 possible_leverage = line.split(' ')
                 leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
@@ -916,21 +867,10 @@ class Telegram(BaseTelegram):
                 algorithm = line[len(algorithm):].replace('\'', '')
             if line.startswith(outer_id_label):
                 message_id = line[4:].replace('\'', '')
-        signals.append(SignalModel(pair, current_price, is_margin, position,
-                                   leverage, entries, profits, stop_loss, message_id, algorithm=algorithm))
-        return signals
-
-    def handle_ca_recommend_to_array(self, message_line):
-        splitted_info = message_line.split('-')
-        last_element = ''.join(filter(str.isdigit, splitted_info[-1]))
-        splitted_info[-1] = splitted_info[-1].replace('+', '')
-        if len(splitted_info[0]) == len(splitted_info[-1]):
-            return splitted_info
-        key_numbers = len(last_element)
-        prefix = splitted_info[0][:-key_numbers]
-        array = [f'{prefix}{n}' for n in splitted_info][1:]
-        array.insert(0, splitted_info[0])
-        return array
+        position = calculate_position(stop_loss, entries, profits)
+        signal = SignalModel(pair, current_price, margin_type, position,
+                             leverage, entries, profits, stop_loss, message_id, algorithm)
+        return signal
 
     async def parse_tca_channel(self, sub_type: str):
         chat_id = int
@@ -946,29 +886,22 @@ class Telegram(BaseTelegram):
             should_handle_msg = not exists
             if message.text and should_handle_msg:
                 signal = self.parse_tca_message(message.text, message.id)
-                if signal:
+                if signal.pair:
                     inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                     if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{channel_abbr}' algorithm: "
-                                                            f"{inserted_to_db}")
+                        await self.send_error_message_to_yourself(signal, inserted_to_db)
                     else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                             message.date, channel_abbr, message.id)
 
     def parse_tca_message(self, message_text, message_id):
-        signals = []
         splitted_info = message_text.splitlines()
-        long_label = SignalModel.long_label
-        short_label = SignalModel.short_label
         buy_label = 'Entry at: '
         possible_take_profits = ['Sell at: ', 'Targets: ']
         stop_label = 'Stop Loss: '
         pair = 'Coin: '
         current_price = ''
         margin_type = MarginType.ISOLATED.value
-        position = None
         leverage = 25
         entries = ''
         profits = ''
@@ -978,10 +911,6 @@ class Telegram(BaseTelegram):
         if not is_signal:
             return
         for line in splitted_info:
-            if short_label in line:
-                position = short_label
-            if long_label in line:
-                position = long_label
             if line.startswith(pair):
                 pair = ''.join(filter(str.isalpha, line[6:]))
             if line.startswith(buy_label):
@@ -994,35 +923,31 @@ class Telegram(BaseTelegram):
                 profits = left_numbers(possible_profits)
             if line.startswith(stop_label):
                 stop_loss = line[11:]
-
+        position = calculate_position(stop_loss, entries, profits)
         entries = self.extend_nearest_ep(position, entries)
         """ Take only first 4 take profits: """
         profits = profits[:4]
-        signals.append(SignalModel(pair, current_price, margin_type, position,
-                                   leverage, entries, profits, stop_loss, message_id))
-        return signals
+        signal = SignalModel(pair, current_price, margin_type, position,
+                             leverage, entries, profits, stop_loss, message_id)
+        return signal
 
     async def parse_margin_whale_channel(self):
         chat_id = int(conf_obj.margin_whales)
         channel_abbr = 'margin_whale'
-        async for message in self.client.iter_messages(chat_id, limit=18):
+        async for message in self.client.iter_messages(chat_id, limit=5):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             should_handle_msg = not exists
             if should_handle_msg:
                 signal = self.parse_margin_whale_message(message.text, message.id)
-                if signal:
+                if signal.pair:
                     inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                     if inserted_to_db != 'success':
-                        await self.send_message_to_yourself(f"Error during processing the signal to DB, "
-                                                            f"please check logs for '{signal[0].pair}' "
-                                                            f"related to the '{channel_abbr}' algorithm: "
-                                                            f"{inserted_to_db}")
+                        await self.send_error_message_to_yourself(signal, inserted_to_db)
                     else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                             message.date, channel_abbr, message.id)
 
     def parse_margin_whale_message(self, message_text, message_id):
-        signals = []
         splitted_info = message_text.splitlines()
         buy_label = 'ENTRY'
         margin_label = '#MARGIN'
@@ -1040,8 +965,9 @@ class Telegram(BaseTelegram):
         stop_loss = ''
         should_entry = [i for i, s in enumerate(splitted_info) if margin_label in s]
         if not should_entry:
-            return signals.append(SignalModel(pair, current_price, margin_type, position,
-                                              leverage, entries, profits, stop_loss, message_id))
+            signal = SignalModel(pair, current_price, margin_type, position,
+                                 leverage, entries, profits, stop_loss, message_id)
+            return signal
         for line in splitted_info:
             if long_label in line:
                 position = long_label
@@ -1066,13 +992,11 @@ class Telegram(BaseTelegram):
                 stop_loss = line[11:]
         """ Take only first 5 take profits: """
         profits = profits[:5]
-
         entries = self.extend_nearest_ep(position, entries)
 
-        signals.append(SignalModel(pair, current_price, margin_type, position,
-                                   leverage, entries, profits, stop_loss, message_id))
-        return signals
-
+        signal = SignalModel(pair, current_price, margin_type, position,
+                             leverage, entries, profits, stop_loss, message_id)
+        return signal
 
     def extend_nearest_ep(self, position, entries):
         if position == SignalModel.short_label:
@@ -1087,6 +1011,11 @@ class Telegram(BaseTelegram):
             entries = [str(new_entry) if i == max_entry else i for i in entries]
 
         return entries
+
+    @sync_to_async
+    def _is_signal_cancelled(self, signal_object):
+        cancelled_signal = Signal.objects.filter(id=signal_object.id, _status__in=CANCELING__SIG_STATS)
+        return cancelled_signal.exists()
 
     @sync_to_async
     def is_signal_handled(self, message_id, channel_abbr):
@@ -1115,6 +1044,17 @@ class Telegram(BaseTelegram):
             return None
 
     @sync_to_async
+    def _get_async_signal(self, symbol, channel_abbr, message_id=None, sig_orig=False) -> Signal:
+        params = {'symbol': symbol, 'techannel__name': channel_abbr}
+        if message_id:
+            params.update({'outer_signal_id': message_id})
+        if not sig_orig:
+            signal = Signal.objects.filter(**params).order_by('id').last()
+        else:
+            signal = SignalOrig.objects.filter(**params).order_by('id').last()
+        return signal
+
+    @sync_to_async
     def is_lucrative_signal_handled(self, pair, channel_abbr, date_time):
         date_time = date_time.split('+')
         date_time = date_time[0]
@@ -1131,62 +1071,67 @@ class Telegram(BaseTelegram):
 
     @sync_to_async
     def write_signal_to_db(self, channel_abbr: str, signal, message_id, message_date):
-        if not signal[0].pair:
+        if not signal.pair:
             return
-        signal[0].pair = check_pair(signal[0].pair)
-        signal[0].pair = '1INCHUSDT' if signal[0].pair == 'INCHUSDT' else signal[0].pair
+        signal.pair = '1INCHUSDT' if 'INCHUSDT' in signal.pair else signal.pair
         sm_obj = SignalOrig.objects.filter(outer_signal_id=message_id, techannel__name=channel_abbr).first()
         if sm_obj:
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists")
             quit()
-        if signal[0].pair[-3:] == 'USD':
-            signal[0].pair = signal[0].pair.replace('USD', 'USDT')
+        if signal.pair[-3:] == 'USD':
+            signal.pair = signal.pair.replace('USD', 'USDT')
         logger.debug(f"Attempt to write into DB the following signal: "
-                     f" Pair: '{signal[0].pair}'\n"
-                     f" Leverage: '{signal[0].leverage}'\n"
-                     f" Margin type: '{signal[0].margin_type}'\n"
-                     f" Entry Points: '{signal[0].entry_points}'\n"
-                     f" Take Profits: '{signal[0].take_profits}'\n"
-                     f" Stop Loss: '{signal[0].stop_loss}'\n"
+                     f" Pair: '{signal.pair}'\n"
+                     f" Leverage: '{signal.leverage}'\n"
+                     f" Margin type: '{signal.margin_type}'\n"
+                     f" Entry Points: '{signal.entry_points}'\n"
+                     f" Take Profits: '{signal.take_profits}'\n"
+                     f" Stop Loss: '{signal.stop_loss}'\n"
                      f" Algorithm: '{channel_abbr}'\n"
                      f" Message ID: '{message_id}'")
         try:
             SignalOrig.create_signal(techannel_name=channel_abbr,
-                                     leverage=signal[0].leverage,
-                                     symbol=signal[0].pair,
-                                     stop_loss=signal[0].stop_loss,
-                                     entry_points=signal[0].entry_points,
-                                     take_profits=signal[0].take_profits,
+                                     leverage=signal.leverage,
+                                     symbol=signal.pair,
+                                     stop_loss=signal.stop_loss,
+                                     entry_points=signal.entry_points,
+                                     take_profits=signal.take_profits,
                                      outer_signal_id=message_id,
                                      message_date=message_date,
-                                     margin_type=signal[0].margin_type)
+                                     margin_type=signal.margin_type)
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
             return 'success'
         except Exception as e:
             logger.error(f"Write into DB failed: {e}")
             return e
 
-    # send messages to yourself...
-    async def send_message_to_yourself(self, message):
-        await self.client.send_message('me', message)
-
-    async def send_message_to_someone(self, name, message):
-        await self.client.send_message(name, message)
-
-    async def send_message_by_template(self, channel_name, signal, message_date, channel_abbr, message_id):
-        position = calculate_position(signal.stop_loss, signal.entry_points, signal.take_profits)
-        if not signal.leverage:
-            signal.leverage = 1
-        if signal.margin_type != 'CROSSED':
-            signal.margin_type = 'ISOLATED'
-        message = f"Pair: '{signal.pair}'\n" \
-                  f"Position: '{position}'\n" \
+    async def send_error_message_to_yourself(self, signal, inserted_to_db):
+        message = "Failed to create the signal into DB:\n" \
+                  f"Pair: '{signal.pair}'\n" \
                   f"Leverage: '{signal.leverage}'\n" \
                   f"Margin type: '{signal.margin_type}'\n" \
                   f"Entry Points: '{signal.entry_points}'\n" \
                   f"Take Profits: '{signal.take_profits}'\n" \
                   f"Stop Loss: '{signal.stop_loss}'\n" \
-                  f"Time: '{message_date.replace(tzinfo=None) + timedelta(hours=3)}'\n" \
+                  f"Algorithm: '{signal.algorithm}'\n" \
+                  f"ERROR: '{inserted_to_db}'\n"
+        await self.client.send_message('me', message)
+
+    async def send_message_by_template(self, channel_name, signal, message_date, channel_abbr, message_id,
+                                       urgent_action=None):
+        if not signal.leverage:
+            signal.leverage = 1
+        if signal.margin_type != 'CROSSED':
+            signal.margin_type = 'ISOLATED'
+        time_to_action = message_date.replace(tzinfo=None) + timedelta(hours=3) if not urgent_action else urgent_action
+        message = f"Pair: '{signal.pair}'\n" \
+                  f"Position: '{signal.position}'\n" \
+                  f"Leverage: '{signal.leverage}'\n" \
+                  f"Margin type: '{signal.margin_type}'\n" \
+                  f"Entry Points: '{signal.entry_points}'\n" \
+                  f"Take Profits: '{signal.take_profits}'\n" \
+                  f"Stop Loss: '{signal.stop_loss}'\n" \
+                  f"Time: '{time_to_action}'\n" \
                   f"Algorithm: '{channel_abbr}'\n" \
                   f"ID: '{message_id}'"
         await self.client.send_message(channel_name, message)
