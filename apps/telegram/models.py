@@ -478,8 +478,10 @@ class Telegram(BaseTelegram):
         entries = []
         profits = []
         stop_loss = ''
-        if is_new_signal in splitted_info[0]:
-            pair_info = splitted_info[0].split(' ')
+        pair_index = [i for i, s in enumerate(splitted_info) if is_new_signal in s]
+        pair_index = pair_index[0]
+        if is_new_signal in splitted_info[pair_index]:
+            pair_info = splitted_info[pair_index].split(' ')
             pair = ''.join(filter(str.isalpha, pair_info[1]))
 
         try:
@@ -527,7 +529,7 @@ class Telegram(BaseTelegram):
                 stop_loss = possible_stop[1]
                 stop_loss = stop_loss.replace('$', '')
 
-        position = calculate_position(stop_loss, entries, profits)
+            position = calculate_position(stop_loss, entries, profits)
         signal = SignalModel(pair, current_price, margin_type, position,
                              leverage, entries, profits, stop_loss, message_id)
         return signal
