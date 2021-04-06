@@ -3,11 +3,19 @@ version: '3.7'
 services:
   redis:
     image: redis:alpine
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 50m
     hostname: redis
     ports:
       - ${REDIS_PORT:-6379}:6379
   db:
     image: postgres:12.3-alpine
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 50m
 #    ports:
 #      - 9876:5432
     volumes:
@@ -30,6 +38,10 @@ services:
             binfun.wsgi:application
     expose:
       - 8300
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 100m
     volumes:
       - .:/binfun
       - static_volume:/binfun/static
@@ -40,10 +52,18 @@ services:
   cronjobs:
     build: .
     command: ["cron", "-f"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 50m
     volumes:
       - .:/binfun
   celery:
     build: .
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 100m
     volumes:
       - .:/binfun
     links:
@@ -57,6 +77,10 @@ services:
       - redis
   nginx:
     build: ./nginx
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 100m
     volumes:
       - static_volume:/binfun/static
       - ./nginx/nginx.binfun.conf:/etc/nginx/conf.d/web.conf
