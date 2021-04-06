@@ -245,7 +245,7 @@ class Telegram(BaseTelegram):
                 await message.download_media()
                 pairs = info_getter.iterate_files(message.id)
                 signal = verify_signal.get_active_pairs_info(pairs)
-                if not signal.pair:
+                if not signal:
                     return
                 inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                 if inserted_to_db != 'success':
