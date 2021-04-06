@@ -560,18 +560,21 @@ class Telegram(BaseTelegram):
         if urgent_action == 'activate':
             signal_object = await self._get_async_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
             if signal_object:
-                await self._close_signal(signal_object)
+                if signal_object.outer_signal_id == old_signal.msg_id:
+                    return
+                else:
+                    await self._close_signal(signal_object)
             if not signal_object:
                 signal_object = await self._get_async_signal(symbol=old_signal.pair, channel_abbr=channel_abbr,
                                                              sig_orig=True)
                 if not signal_object:
                     return
-            signal = await self._form_signal(old_signal, signal_object, message.id, channel_abbr)
+            signal = await self._form_signal(old_signal, signal_object, old_signal.msg_id, channel_abbr)
             if distribution:
                 await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                     message.date, channel_abbr, message.id, urgent_action)
 
-            inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+            inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, signal.msg_id, message.date)
             if inserted_to_db != 'success':
                 await self.send_error_message_to_yourself(signal, inserted_to_db)
         if urgent_action == 'cancel':
@@ -677,7 +680,8 @@ class Telegram(BaseTelegram):
                 possible_targets = splitted_info[goals_index + 1:goals_index + 9]
                 for possible_target in possible_targets:
                     target = possible_target.split(' ')
-                    profits.append(target[1])
+                    if target != ['']:
+                        profits.append(target[1])
 
                 try:
                     stop_index = splitted_info.index(stop_label)
