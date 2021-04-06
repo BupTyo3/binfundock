@@ -8,7 +8,6 @@ ENV PYTHONUNBUFFERED 1
 RUN apt-get update && \
     apt-get install -y gcc && \
     apt-get install -y git &&  \
-    apt-get install -y tesseract-ocr libtesseract-dev libleptonica-dev &&  \
     apt-get install -y cron &&  \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 

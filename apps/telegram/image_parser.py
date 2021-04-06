@@ -3,7 +3,7 @@ import regex
 import os
 import shutil
 import time
-from PIL import Image
+import matplotlib.pyplot as plt
 from django.conf import settings
 from pytesseract import image_to_string
 from datetime import datetime
@@ -16,8 +16,8 @@ regexp_stop = '\d+\.?\d+$'
 class ChinaImageToSignal:
     def read_image(self, image):
         self.wait_for_file(image)
-        buffered_image = Image.open(image)
-        text_in_image = image_to_string(buffered_image)
+        image = plt.imread(image)
+        text_in_image = image_to_string(image)
         splitted_info = text_in_image.splitlines()
         return splitted_info
 
