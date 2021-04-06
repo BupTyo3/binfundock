@@ -540,8 +540,7 @@ class Telegram(BaseTelegram):
         channel_entity = User(id=channel_id, access_hash=access_hash)
         async for message in self.client.iter_messages(entity=channel_entity, limit=12):
             exists = await self.is_signal_handled(message.id, channel_abbr)
-            should_handle_msg = not exists
-            if message.text and should_handle_msg:
+            if message.text and not exists:
                 signal = self.parse_wcse_message(message.text, message.id)
                 if signal.pair:
                     if signal.entry_points:
@@ -577,6 +576,8 @@ class Telegram(BaseTelegram):
             signal_object = await self._get_async_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
             if signal_object:
                 await self._close_signal(signal_object)
+            if not signal_object:
+                return
             if distribution:
                 await self.send_message_by_template(int(conf_obj.lucrative_channel), old_signal,
                                                     message.date, channel_abbr, message.id, urgent_action)
@@ -685,7 +686,7 @@ class Telegram(BaseTelegram):
                 possible_stop = splitted_info[stop_index + 1:stop_index + 2]
                 stop_loss = possible_stop[0].split(' ')
                 stop_loss = stop_loss[1]
-        position = calculate_position(stop_loss, entries, profits)
+                position = calculate_position(stop_loss, entries, profits)
         signal = SignalModel(pair, action_price, is_margin, position,
                              leverage, entries, profits, stop_loss, message_id)
         return signal
@@ -953,12 +954,10 @@ class Telegram(BaseTelegram):
         margin_label = '#MARGIN'
         goals_label = 'Target'
         stop_label = 'STOP LOSS: '
-        long_label = SignalModel.long_label
-        short_label = SignalModel.short_label
         pair = ''
         current_price = ''
         margin_type = 'ISOLATED'
-        position = None
+        position = ''
         leverage = 15
         entries = ''
         profits = []
@@ -969,10 +968,6 @@ class Telegram(BaseTelegram):
                                  leverage, entries, profits, stop_loss, message_id)
             return signal
         for line in splitted_info:
-            if long_label in line:
-                position = long_label
-            if short_label in line:
-                position = short_label
             if line.startswith(margin_label):
                 fake_pair = line.split(' ')
                 possible_pair = fake_pair[2]
@@ -992,6 +987,7 @@ class Telegram(BaseTelegram):
                 stop_loss = line[11:]
         """ Take only first 5 take profits: """
         profits = profits[:5]
+        position = calculate_position(stop_loss, entries, profits)
         entries = self.extend_nearest_ep(position, entries)
 
         signal = SignalModel(pair, current_price, margin_type, position,
