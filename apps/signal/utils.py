@@ -42,6 +42,9 @@ class MarginType(Enum):
 FORMED__SIG_STATS = [
     SignalStatus.FORMED.value,
 ]
+CANCELING__SIG_STATS = [
+    SignalStatus.CANCELING.value,
+]
 NEW_FORMED_PUSHED__SIG_STATS = [
     SignalStatus.NEW.value,
     SignalStatus.FORMED.value,

@@ -82,16 +82,16 @@ class Command(SystemCommand):
 
     def collect_info_from_tca_leverage_channel(self):
         session_name = 'TCA'
-        self.init_telegram_xy(session_name)
+        self.init_telegram_luck(session_name)
         logger.debug(f'Session {session_name} initialized')
         try:
-            with self._client_xy:
-                self._client_xy.loop.run_until_complete(self._telegram_xy.parse_tca_channel('leverage'))
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_tca_channel('leverage'))
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client_xy.disconnect()
+            self._client_luck.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
     def collect_info_from_cf_trader_channel(self):
@@ -121,13 +121,13 @@ class Command(SystemCommand):
         finally:
             self._client_luck.disconnect()
 
-    def collect_info_from_lucrative_trend_channel(self):
+    def collect_info_from_lucrative_recommend_channel(self):
         session_name = 'LucrativeRecommendations'
         self.init_telegram(session_name)
         logger.debug(f'Session {session_name} initialized')
         try:
             with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_lucrative_trend_channel())
+                self._client.loop.run_until_complete(self._telegram.parse_lucrative_recommend_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
@@ -151,16 +151,16 @@ class Command(SystemCommand):
 
     def collect_info_from_wcse_channel(self):
         session_name = 'WCSE'
-        self.init_telegram(session_name)
+        self.init_telegram_luck(session_name)
         logger.debug(f'Session {session_name} initialized')
         try:
-            with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_wcse_channel())
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_wcse_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
         finally:
-            self._client.disconnect()
+            self._client_luck.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
     def collect_info_from_klondike_channel(self):
@@ -219,6 +219,20 @@ class Command(SystemCommand):
             self._client.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
+    def collect_info_from_fsvzo_channel(self):
+        session_name = 'fsvzo'
+        self.init_telegram(session_name)
+        logger.debug(f'Session {session_name} initialized')
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_fsvzo_channel())
+        except Exception as e:
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
+        finally:
+            self._client.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
+
     def collect_info_from_margin_whales_channel(self):
         session_name = 'MarginWhales'
         self.init_telegram(session_name)
@@ -264,6 +278,7 @@ class Command(SystemCommand):
         klondike_altcoin_matches = ["klondike_altcoin"]
         margin_whale_matches = ["marginwhale"]
         server_matches = ["server"]
+        fsvzo_matches = ["fsvzo"]
 
         if not get_or_create_crontask().server:
             pass
@@ -303,7 +318,7 @@ class Command(SystemCommand):
         if not get_or_create_crontask().lucrative_recommendations:
             pass
         elif any(x in channel for x in lucrative_recommendation_matches):
-            self.collect_info_from_lucrative_trend_channel()
+            self.collect_info_from_lucrative_recommend_channel()
 
         if not get_or_create_crontask().luck8414:
             pass
@@ -340,3 +355,8 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in crypto_futures_matches):
             self.collect_info_from_crypto_futures_channel()
+
+        if not get_or_create_crontask().fsvzo:
+            pass
+        elif any(x in channel for x in fsvzo_matches):
+            self.collect_info_from_fsvzo_channel()

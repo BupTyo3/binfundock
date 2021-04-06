@@ -1,5 +1,6 @@
 import logging
 
+from asgiref.sync import sync_to_async
 from django.db import models, transaction
 from django.contrib.auth import get_user_model
 from .base_model import BasePair
@@ -34,6 +35,12 @@ class Pair(BasePair):
 
     @classmethod
     def get_pair(cls, symbol: str, market: Market):
+        pair = cls.objects.filter(symbol=symbol, market=market).first()
+        return pair
+
+    @classmethod
+    @sync_to_async
+    def get_async_pair(cls, symbol: str, market: Market):
         pair = cls.objects.filter(symbol=symbol, market=market).first()
         return pair
 

@@ -1,7 +1,6 @@
 import logging
 import uuid
 
-from asgiref.sync import sync_to_async
 from binance.exceptions import BinanceAPIException
 
 from functools import partial, wraps
@@ -51,7 +50,6 @@ def rounded_result(func: Optional[Callable] = None, *, digits: int = 8):
         result = func(*args, **kwargs)
         return round(result, digits)
     return wrapper
-
 
 # def rounded_quantity_by_rule(func: Optional[Callable] = None, *, digits: int = 8):
 #     """

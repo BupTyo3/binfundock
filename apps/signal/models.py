@@ -27,7 +27,7 @@ from .utils import (
     SOLD__SIG_STATS, FORMED__SIG_STATS, NEW_FORMED_PUSHED__SIG_STATS,
     FORMED_PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, PUSHED_BOUGHT_SOLD__SIG_STATS,
     PUSHED_BOUGHT_SOLD_CANCELING__SIG_STATS, BOUGHT_SOLD__SIG_STATS, BOUGHT__SIG_STATS,
-    ERROR__SIG_STATS, STARTED__SIG_STATS,
+    ERROR__SIG_STATS, STARTED__SIG_STATS, CANCELING__SIG_STATS,
 )
 from .exceptions import (
     MainCoinNotServicedError,
@@ -239,6 +239,8 @@ class SignalOrig(BaseSignalOrig):
         leverage = self._default_leverage if market.is_spot_market() else self.leverage
         # Trim leverage
         trimmed_leverage = get_or_create_crontask().trim_leverage_to
+        leverage_boost = self.techannel.leverage_boost
+        leverage = leverage if not leverage_boost else int(leverage) + leverage_boost
         leverage = trimmed_leverage if int(leverage) > trimmed_leverage else leverage
         signal = Signal.objects.create(
             techannel=self.techannel,
@@ -2034,6 +2036,7 @@ class Signal(BaseSignal):
 
     @debug_input_and_returned
     def __close_futures_short(self):
+        # TODO: get position amount from API position info
         residual_quantity = self._get_residual_quantity(ignore_fee=True)
         if not residual_quantity:
             self._close()
@@ -2429,6 +2432,22 @@ class Signal(BaseSignal):
         else:
             return self._check_is_ready_to_spoil_spot_or_long()
 
+    @sync_to_async
+    @debug_input_and_returned
+    @refuse_if_busy
+    def async_try_to_spoil_by_one_signal(self, force: bool = False):
+        """
+        Worker spoils the Signal if a current price reaches any of take_profits
+        and there are no worked Buy orders
+        """
+        if force:
+            self._spoil(force=True)
+            return
+        if self._status not in SIG_STATS_FOR_SPOIL_WORKER:
+            return
+        if self._check_is_ready_to_spoil():
+            self._spoil()
+
     @debug_input_and_returned
     @refuse_if_busy
     def try_to_spoil_by_one_signal(self, force: bool = False):
@@ -2444,21 +2463,6 @@ class Signal(BaseSignal):
         if self._check_is_ready_to_spoil():
             self._spoil()
 
-    # TODO: check working of this function after adding the refuse_if_busy decorator here
-    @sync_to_async
-    @refuse_if_busy
-    def try_to_aync_spoil(self, force: bool = False):
-        """
-        Worker spoils the Signal if a current price reaches any of take_profits
-        and there are no worked Buy orders
-        """
-        if force:
-            self._spoil(force=True)
-            return
-        if self._status not in SIG_STATS_FOR_SPOIL_WORKER:
-            return
-        if self._check_is_ready_to_spoil():
-            self._spoil()
 
     @debug_input_and_returned
     @refuse_if_busy
