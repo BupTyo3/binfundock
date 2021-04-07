@@ -150,7 +150,7 @@ class Telegram(BaseTelegram):
 
     async def parse_lucrative_recommend_channel(self):
         chat_id = int(conf_obj.lucrative_channel)
-        async for message in self.client.iter_messages(chat_id, limit=7):
+        async for message in self.client.iter_messages(chat_id, limit=12):
             signal = self.parse_lucrative_recommend_message(message.text)
             exists = await self.is_signal_handled(signal.msg_id, signal.algorithm)
             if not exists and signal.pair:
