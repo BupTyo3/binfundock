@@ -1110,6 +1110,9 @@ class Telegram(BaseTelegram):
             return e
 
     async def send_error_message_to_yourself(self, signal, inserted_to_db):
+        is_shared = await self.is_signal_shared(signal.msg_id, signal.algorithm)
+        if is_shared:
+            return
         message = "Failed to create the signal into DB:\n" \
                   f"Pair: '{signal.pair}'\n" \
                   f"Leverage: '{signal.leverage}'\n" \
@@ -1120,6 +1123,7 @@ class Telegram(BaseTelegram):
                   f"Algorithm: '{signal.algorithm}'\n" \
                   f"ERROR: '{inserted_to_db}'\n"
         await self.client.send_message('me', message)
+        await self.update_shared_signal(signal)
 
     async def send_message_by_template(self, channel_name, signal, message_date, channel_abbr, message_id,
                                        urgent_action=None):
