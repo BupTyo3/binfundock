@@ -416,9 +416,10 @@ class BiFuturesMarketLogic(BaseMarketLogic,
 
     @floated_result
     def get_current_price(self, symbol):
-        """Send request to get current average price by pair (symbol)"""
-        response = self.my_client.get_avg_price(symbol=symbol)
-        return response[self.price_]
+        """Send request to get Position info filtering it by symbol and obtaining its current mark price"""
+        response = self._get_position_info(symbol=symbol)
+        mark_price = response[0].get('markPrice')
+        return mark_price
 
     def get_ticker_current_prices(self, symbol: Optional[str] = None):
         pass
@@ -452,6 +453,11 @@ class BiFuturesMarketLogic(BaseMarketLogic,
     def _get_order_info_api(self, symbol, custom_order_id):
         """Send request to get order info"""
         return self.my_client.futures_get_order(symbol=symbol, origClientOrderId=custom_order_id)
+
+    @api_logging
+    def _get_position_info(self, symbol):
+        """Send request to get position info"""
+        return self.my_client.futures_position_information(symbol=symbol)
 
     @api_logging
     def _set_leverage(self, symbol, leverage):

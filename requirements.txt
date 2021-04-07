@@ -16,7 +16,6 @@ telethon==1.17.5
 asyncio~=3.4.3
 #image-parser:
 pytesseract
-libtesseract-dev
 matplotlib
 
 numpy~=1.19.4
