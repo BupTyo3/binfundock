@@ -610,11 +610,13 @@ class Telegram(BaseTelegram):
         return profits
 
     async def _close_signal(self, signal):
-        counter = 0
+        counter = 1
         cancelled_signal = False
-        while not cancelled_signal and counter < 600:
+        while not cancelled_signal and counter < 601:
+            logger.info(f'Trying to close the signal: {signal.symbol}, id:{signal.id}, Attempt #{counter}')
             await signal.async_try_to_spoil_by_one_signal(True)
             cancelled_signal = await self._is_signal_cancelled(signal)
+            logger.info(f'Is signal {signal.symbol} with id:{signal.id} cancelled: {cancelled_signal}')
             time.sleep(0.3)
             counter += 1
 
@@ -743,9 +745,9 @@ class Telegram(BaseTelegram):
         margin_type = 'ISOLATED'
         leverage = 10
         if 'Bear' in message_text:
-            position = 'SHORT'
+            position = SignalModel.short_label
         if 'Bull' in message_text:
-            position = 'LONG'
+            position = SignalModel.long_label
         splitted_text = message_text.split(' ')
         algorithm = algorithm + splitted_text[-1]
         algorithm = algorithm.lower()
