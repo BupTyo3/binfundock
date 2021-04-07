@@ -892,9 +892,8 @@ class Telegram(BaseTelegram):
             chat_id = int(conf_obj.tca_leverage)
         async for message in self.client.iter_messages(chat_id, limit=5):
             exists = await self.is_signal_handled(message.id, channel_abbr)
-            should_handle_msg = not exists
-            if message.text and should_handle_msg:
-                signal = self.parse_tca_message(message.text, message.id)
+            if message.text and not exists:
+                signal = self.parse_tca_message(message.text, message.id, channel_abbr)
                 if signal.pair:
                     inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
                     if inserted_to_db != 'success':
@@ -903,7 +902,7 @@ class Telegram(BaseTelegram):
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                             message.date, channel_abbr, message.id)
 
-    def parse_tca_message(self, message_text, message_id):
+    def parse_tca_message(self, message_text, message_id, channel_abbr):
         splitted_info = message_text.splitlines()
         buy_label = 'Entry at: '
         possible_take_profits = ['Sell at: ', 'Targets: ']
@@ -937,7 +936,7 @@ class Telegram(BaseTelegram):
         """ Take only first 4 take profits: """
         profits = profits[:4]
         signal = SignalModel(pair, current_price, margin_type, position,
-                             leverage, entries, profits, stop_loss, message_id)
+                             leverage, entries, profits, stop_loss, message_id, channel_abbr)
         return signal
 
     async def parse_margin_whale_channel(self):
