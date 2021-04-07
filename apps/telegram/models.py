@@ -763,7 +763,7 @@ class Telegram(BaseTelegram):
         stop_loss = self._form_divergence_stop(position, current_price, step_quantity)
         profits = self._form_divergence_profits(position, current_price, step_quantity)
 
-        signal = SignalModel(pair, current_price, margin_type, position,
+        signal = SignalModel(pair.symbol, current_price, margin_type, position,
                              leverage, entries, profits, stop_loss, message_id, algorithm)
         return signal
 
