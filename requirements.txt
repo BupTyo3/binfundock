@@ -8,7 +8,7 @@ djangorestframework==3.11.0
 drf-rw-serializers==1.0.3
 drf-yasg==1.17.1
 gunicorn==20.0.4
-psycopg2-binary==2.8.5
+psycopg2-binary==2.8.6
 python-dotenv==0.14.0
 python-binance==0.7.9
 redis==3.5.3
