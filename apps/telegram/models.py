@@ -569,7 +569,10 @@ class Telegram(BaseTelegram):
                                                              sig_orig=True)
                 if not signal_object:
                     return
-            signal = await self._form_signal(old_signal, signal_object, old_signal.msg_id, channel_abbr)
+            if signal_object.symbol[-3:] != 'BTC':
+                signal = await self._form_signal(old_signal, signal_object, old_signal.msg_id, channel_abbr)
+            else:
+                return
             if distribution:
                 await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                     message.date, channel_abbr, message.id, urgent_action)
