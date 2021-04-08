@@ -907,19 +907,23 @@ class Telegram(BaseTelegram):
         buy_label = 'Entry at: '
         possible_take_profits = ['Sell at: ', 'Targets: ']
         stop_label = 'Stop Loss: '
-        pair = 'Coin: '
-        current_price = ''
+        pair_label = ['Coin: ', 'Pair']
+        action_price = ''
         margin_type = MarginType.ISOLATED.value
         leverage = 25
         entries = ''
+        position = ''
+        pair = ''
         profits = ''
         stop_loss = ''
         signal_identification = ['Exchange: Binance', 'Exchange: Binance Futures', 'Exchange: ByBit']
         is_signal = any(x in signal_identification for x in splitted_info)
         if not is_signal:
-            return
+            signal = SignalModel(pair, action_price, margin_type, position,
+                                 leverage, entries, profits, stop_loss, message_id)
+            return signal
         for line in splitted_info:
-            if line.startswith(pair):
+            if line.startswith(pair_label[0]) or line.startswith(pair_label[1]):
                 pair = ''.join(filter(str.isalpha, line[6:]))
             if line.startswith(buy_label):
                 fake_entries = line[10:]
@@ -933,9 +937,9 @@ class Telegram(BaseTelegram):
                 stop_loss = line[11:]
         position = calculate_position(stop_loss, entries, profits)
         entries = self.extend_nearest_ep(position, entries)
-        """ Take only first 4 take profits: """
-        profits = profits[:4]
-        signal = SignalModel(pair, current_price, margin_type, position,
+        """ Take only first 5 take profits: """
+        profits = profits[:5]
+        signal = SignalModel(pair, action_price, margin_type, position,
                              leverage, entries, profits, stop_loss, message_id, channel_abbr)
         return signal
 
@@ -1122,7 +1126,7 @@ class Telegram(BaseTelegram):
                   f"Algorithm: '{signal.algorithm}'\n" \
                   f"ERROR: '{inserted_to_db}'\n"
         await self.client.send_message('me', message)
-        await self.update_shared_signal(signal)
+        # await self.update_shared_signal(signal) it does not work as we doesn't have the signal in DB, due to the ERROR
 
     async def send_message_by_template(self, channel_name, signal, message_date, channel_abbr, message_id,
                                        urgent_action=None):
