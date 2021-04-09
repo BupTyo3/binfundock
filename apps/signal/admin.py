@@ -1,4 +1,5 @@
-from decimal import Decimal, Inexact, Context
+import logging
+import time
 
 from django.contrib import admin, messages
 from django.utils.html import format_html
@@ -8,8 +9,7 @@ from django.db.models import (
     CharField, Count, Sum, Q, Subquery, OuterRef,
     FloatField, Func, Value, Aggregate,
 )
-from django.db.models.functions import Abs, Concat, Upper, Cast
-from django.contrib.postgres.aggregates.general import StringAgg
+from django.db.models.functions import Abs
 
 from apps.market.models import get_or_create_market, get_or_create_futures_market
 from utils.admin import InputFilter
@@ -25,6 +25,9 @@ from .models import (
     EntryPointOrig,
     TakeProfitOrig,
 )
+from .utils import CANCELING__SIG_STATS
+
+logger = logging.getLogger(__name__)
 
 
 class OuterIDFilter(InputFilter):
@@ -259,7 +262,15 @@ class SignalAdmin(admin.ModelAdmin):
 
     @notifications_handling('')
     def _sell_by_market_one(self, request, signal):
-        signal.try_to_spoil_by_one_signal(force=True)
+        counter = 1
+        cancelled_signal = False
+        while not cancelled_signal and counter < 601:
+            logger.info(f'Trying to close the signal: {signal.symbol}, id:{signal.id}, Attempt #{counter}')
+            signal.try_to_spoil_by_one_signal(True)
+            cancelled_signal = Signal.objects.filter(id=signal.id, _status__in=CANCELING__SIG_STATS).exists()
+            logger.info(f'Is signal {signal.symbol} with id:{signal.id} cancelled: {cancelled_signal}')
+            time.sleep(0.3)
+            counter += 1
 
     @notifications_handling('')
     def _try_to_close(self, request, signal):
