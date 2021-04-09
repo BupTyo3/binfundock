@@ -12,14 +12,14 @@ from apps.signal.models import SignalOrig, Signal, EntryPoint, TakeProfit
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
 from tools.tools import rounded_result
-from utils.parse_channels.str_parser import left_numbers, check_pair, replace_rus_to_eng, handle_crypto_angel_to_array
+from utils.parse_channels.str_parser import left_numbers, replace_rus_to_eng, handle_crypto_angel_to_array
 from .base_model import BaseTelegram
 from .image_parser import ChinaImageToSignal
 from apps.market.models import get_or_create_async_futures_market
 
 from .verify_signal import SignalVerification
 from ..pair.models import Pair
-from ..signal.utils import MarginType, calculate_position, CANCELING__SIG_STATS
+from ..signal.utils import MarginType, calculate_position, CANCELING__SIG_STATS, NEW_FORMED_PUSHED__SIG_STATS
 
 logger = logging.getLogger(__name__)
 
@@ -540,7 +540,7 @@ class Telegram(BaseTelegram):
         # entity = await self.client.get_entity('@WCSEBot')
         access_hash = 7265387611438966175
         channel_entity = User(id=channel_id, access_hash=access_hash)
-        async for message in self.client.iter_messages(entity=channel_entity, limit=12):
+        async for message in self.client.iter_messages(entity=channel_entity, limit=15):
             exists = await self.is_signal_handled(message.id, channel_abbr)
             if message.text and not exists:
                 signal = self.parse_wcse_message(message.text, message.id)
@@ -558,30 +558,20 @@ class Telegram(BaseTelegram):
 
     async def _recreate_signal(self, urgent_action, old_signal, channel_abbr, message, distribution=False):
         if urgent_action == 'activate':
-            signal_object = await self._get_async_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
+            signal_object = await self._get_async_new_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
             if signal_object:
-                if signal_object.outer_signal_id == old_signal.msg_id:
-                    return
-                else:
-                    await self._close_signal(signal_object)
+                await self._close_signal(signal_object)
             if not signal_object:
-                signal_object = await self._get_async_signal(symbol=old_signal.pair, channel_abbr=channel_abbr,
-                                                             sig_orig=True)
-                if not signal_object:
-                    return
-            if signal_object.symbol[-3:] != 'BTC':
-                signal = await self._form_signal(old_signal, signal_object, old_signal.msg_id, channel_abbr)
-            else:
                 return
+            signal = await self._form_signal(old_signal, signal_object, old_signal.msg_id, channel_abbr)
             if distribution:
                 await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                     message.date, channel_abbr, message.id, urgent_action)
-
             inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, signal.msg_id, message.date)
             if inserted_to_db != 'success':
                 await self.send_error_message_to_yourself(signal, inserted_to_db)
         if urgent_action == 'cancel':
-            signal_object = await self._get_async_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
+            signal_object = await self._get_async_new_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
             if signal_object:
                 await self._close_signal(signal_object)
             if not signal_object:
@@ -591,15 +581,12 @@ class Telegram(BaseTelegram):
                                                     message.date, channel_abbr, message.id, urgent_action)
 
     async def _form_signal(self, old_signal, signal_object, message_id, channel_abbr):
-        futures_market = await get_or_create_async_futures_market()
-        current_price = futures_market.logic.get_current_price(old_signal.pair)
-
-        pair = await Pair.get_async_pair(old_signal.pair, futures_market)
+        current_price = signal_object.market.logic.get_current_price(old_signal.pair)
+        pair = await Pair.get_async_pair(old_signal.pair, signal_object.market)
         step_quantity = pair.step_price
 
         profits = await self._get_profits_from_signal(signal_object)
         entries = self._form_divergence_entries(signal_object.position, current_price, step_quantity)
-
         signal = SignalModel(signal_object.symbol, current_price, signal_object.margin_type,
                              signal_object.position, signal_object.leverage, entries,
                              profits, signal_object.stop_loss, message_id, channel_abbr)
@@ -718,7 +705,7 @@ class Telegram(BaseTelegram):
                         await self.send_error_message_to_yourself(signal, inserted_to_db)
                 if signal.pair and exists and 'close' in signal.current_price:
                     cancelled_signal = False
-                    signal_object = await self._get_async_signal(signal.msg_id, channel_abbr)
+                    signal_object = await self._get_async_new_signal(signal.pair, channel_abbr, signal.msg_id)
                     while not cancelled_signal:
                         time.sleep(0.2)
                         await signal_object.async_try_to_spoil_by_one_signal(True)
@@ -1054,14 +1041,11 @@ class Telegram(BaseTelegram):
             return None
 
     @sync_to_async
-    def _get_async_signal(self, symbol, channel_abbr, message_id=None, sig_orig=False) -> Signal:
-        params = {'symbol': symbol, 'techannel__name': channel_abbr}
+    def _get_async_new_signal(self, symbol, channel_abbr, message_id=None) -> Signal:
+        params = {'symbol': symbol, 'techannel__name': channel_abbr, '_status__in': NEW_FORMED_PUSHED__SIG_STATS}
         if message_id:
             params.update({'outer_signal_id': message_id})
-        if not sig_orig:
-            signal = Signal.objects.filter(**params).order_by('id').last()
-        else:
-            signal = SignalOrig.objects.filter(**params).order_by('id').last()
+        signal = Signal.objects.filter(**params).order_by('id').last()
         return signal
 
     @sync_to_async
