@@ -19,7 +19,8 @@ from apps.market.models import get_or_create_async_futures_market
 
 from .verify_signal import SignalVerification
 from ..pair.models import Pair
-from ..signal.utils import MarginType, calculate_position, CANCELING__SIG_STATS, NEW_FORMED_PUSHED__SIG_STATS
+from ..signal.utils import MarginType, calculate_position, CANCELING__SIG_STATS, \
+    NEW_FORMED_PUSHED_BOUGHT_SOLD__SIG_STATS
 
 logger = logging.getLogger(__name__)
 
@@ -564,7 +565,7 @@ class Telegram(BaseTelegram):
 
     async def _recreate_signal(self, urgent_action, old_signal, channel_abbr, message, distribution=False):
         if urgent_action == 'activate':
-            signal_object = await self._get_async_new_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
+            signal_object = await self._get_async_processing_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
             if signal_object:
                 await self._close_signal(signal_object)
             if not signal_object:
@@ -577,7 +578,7 @@ class Telegram(BaseTelegram):
             if inserted_to_db != 'success':
                 await self.send_error_message_to_yourself(signal, inserted_to_db)
         if urgent_action == 'cancel':
-            signal_object = await self._get_async_new_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
+            signal_object = await self._get_async_processing_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
             if signal_object:
                 await self._close_signal(signal_object)
             if not signal_object:
@@ -711,7 +712,7 @@ class Telegram(BaseTelegram):
                         await self.send_error_message_to_yourself(signal, inserted_to_db)
                 if signal.pair and exists and 'close' in signal.current_price:
                     cancelled_signal = False
-                    signal_object = await self._get_async_new_signal(signal.pair, channel_abbr, signal.msg_id)
+                    signal_object = await self._get_async_processing_signal(signal.pair, channel_abbr, signal.msg_id)
                     while not cancelled_signal:
                         time.sleep(0.2)
                         await signal_object.async_try_to_spoil_by_one_signal(True)
@@ -1047,8 +1048,9 @@ class Telegram(BaseTelegram):
             return None
 
     @sync_to_async
-    def _get_async_new_signal(self, symbol, channel_abbr, message_id=None) -> Signal:
-        params = {'symbol': symbol, 'techannel__name': channel_abbr, '_status__in': NEW_FORMED_PUSHED__SIG_STATS}
+    def _get_async_processing_signal(self, symbol, channel_abbr, message_id=None) -> Signal:
+        params = {'symbol': symbol, 'techannel__name': channel_abbr,
+                  '_status__in': NEW_FORMED_PUSHED_BOUGHT_SOLD__SIG_STATS}
         if message_id:
             params.update({'outer_signal_id': message_id})
         signal = Signal.objects.filter(**params).order_by('id').last()
