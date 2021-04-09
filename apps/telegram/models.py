@@ -478,8 +478,13 @@ class Telegram(BaseTelegram):
         entries = []
         profits = []
         stop_loss = ''
-        pair_index = [i for i, s in enumerate(splitted_info) if is_new_signal in s]
-        pair_index = pair_index[0]
+        try:
+            pair_index = [i for i, s in enumerate(splitted_info) if is_new_signal in s]
+            pair_index = pair_index[0]
+        except Exception as e:
+            signal = SignalModel(pair, current_price, margin_type, position,
+                                 leverage, entries, profits, stop_loss, message_id)
+            return signal
         if is_new_signal in splitted_info[pair_index]:
             pair_info = splitted_info[pair_index].split(' ')
             pair = ''.join(filter(str.isalpha, pair_info[1]))
@@ -554,6 +559,7 @@ class Telegram(BaseTelegram):
                                                                 message.date, channel_abbr, message.id)
                     else:
                         urgent_action = signal.current_price
+                        # Works only for signals located in table Signal with status NEW, FORMED, PUSHED
                         await self._recreate_signal(urgent_action, signal, channel_abbr, message, True)
 
     async def _recreate_signal(self, urgent_action, old_signal, channel_abbr, message, distribution=False):
