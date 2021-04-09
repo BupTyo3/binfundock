@@ -59,7 +59,8 @@ FORMED_PUSHED_BOUGHT__SIG_STATS = [
     SignalStatus.PUSHED.value,
     SignalStatus.BOUGHT.value,
 ]
-FORMED_PUSHED_BOUGHT_SOLD__SIG_STATS = [
+NEW_FORMED_PUSHED_BOUGHT_SOLD__SIG_STATS = [
+    SignalStatus.NEW.value,
     SignalStatus.FORMED.value,
     SignalStatus.PUSHED.value,
     SignalStatus.BOUGHT.value,
