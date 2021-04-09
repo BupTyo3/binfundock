@@ -602,12 +602,12 @@ class Telegram(BaseTelegram):
     async def _close_signal(self, signal):
         counter = 1
         cancelled_signal = False
-        while not cancelled_signal and counter < 601:
+        while not cancelled_signal and counter < 301:
             logger.info(f'Trying to close the signal: {signal.symbol}, id:{signal.id}, Attempt #{counter}')
             await signal.async_try_to_spoil_by_one_signal(True)
             cancelled_signal = await self._is_signal_cancelled(signal)
             logger.info(f'Is signal {signal.symbol} with id:{signal.id} cancelled: {cancelled_signal}')
-            time.sleep(0.3)
+            time.sleep(1)
             counter += 1
 
     def parse_wcse_message(self, message_text, message_id):
