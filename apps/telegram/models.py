@@ -194,6 +194,7 @@ class Telegram(BaseTelegram):
         margin_type = ''
         leverage = 'Leverage: '
         entries = ''
+        position = ''
         message_id = ''
         profits = []
         stop_loss = ''
@@ -229,7 +230,8 @@ class Telegram(BaseTelegram):
                 algorithm = line[len(algorithm):].replace('\'', '')
             if line.startswith(outer_id_label):
                 message_id = line[4:].replace('\'', '')
-        position = calculate_position(stop_loss, entries, profits)
+        if stop_loss and entries and profits:
+            position = calculate_position(stop_loss, entries, profits)
         signal = SignalModel(pair, current_price, margin_type, position,
                              leverage, entries, profits, stop_loss, message_id, algorithm)
         return signal
@@ -560,7 +562,7 @@ class Telegram(BaseTelegram):
                                                                 message.date, channel_abbr, message.id)
                     else:
                         urgent_action = signal.current_price
-                        # Works only for signals located in table Signal with status NEW, FORMED, PUSHED
+                        # Works only for signals located in table Signal with status NEW, FORMED, PUSHED, BOUGHT, SOLD
                         await self._recreate_signal(urgent_action, signal, channel_abbr, message, True)
 
     async def _recreate_signal(self, urgent_action, old_signal, channel_abbr, message, distribution=False):
