@@ -581,7 +581,7 @@ class Telegram(BaseTelegram):
                 await self.send_error_message_to_yourself(signal, inserted_to_db)
         if urgent_action == 'cancel':
             signal_object = await self._get_async_processing_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
-            if signal_object:
+            if signal_object and int(old_signal.msg_id) > int(signal_object.outer_signal_id):
                 await self._close_signal(signal_object)
             if not signal_object:
                 return
@@ -678,7 +678,7 @@ class Telegram(BaseTelegram):
                     signal = SignalModel(pair, action_price, is_margin, position,
                                          leverage, entries, profits, stop_loss, message_id)
                     return signal
-                possible_targets = splitted_info[goals_index + 1:goals_index + 9]
+                possible_targets = splitted_info[goals_index + 1:goals_index + 6]
                 for possible_target in possible_targets:
                     target = possible_target.split(' ')
                     if target != ['']:
