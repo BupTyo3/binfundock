@@ -596,6 +596,14 @@ class Telegram(BaseTelegram):
 
         profits = await self._get_profits_from_signal(signal_object)
         entries = self._form_divergence_entries(signal_object.position, current_price, step_quantity)
+        if signal_object.position == SignalModel.long_label and max(entries) > min(profits):
+            delta = (min(profits) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
+            lowest_profit_index = profits.index(min(profits))
+            profits[lowest_profit_index] = profits[lowest_profit_index] + delta
+        if signal_object.position == SignalModel.short_label and min(entries) > max(profits):
+            delta = (max(profits) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
+            lowest_profit_index = profits.index(max(profits))
+            profits[lowest_profit_index] = profits[lowest_profit_index] - delta
         signal = SignalModel(signal_object.symbol, current_price, signal_object.margin_type,
                              signal_object.position, signal_object.leverage, entries,
                              profits, signal_object.stop_loss, message_id, channel_abbr)
