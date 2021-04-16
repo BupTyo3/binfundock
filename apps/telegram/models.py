@@ -581,10 +581,11 @@ class Telegram(BaseTelegram):
                 await self.send_error_message_to_yourself(signal, inserted_to_db)
         if urgent_action == 'cancel':
             signal_object = await self._get_async_processing_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
-            if signal_object and int(old_signal.msg_id) > int(signal_object.outer_signal_id) and distribution:
+            if signal_object and int(old_signal.msg_id) > int(signal_object.outer_signal_id):
                 await self._close_signal(signal_object)
-                await self.send_message_by_template(int(conf_obj.lucrative_channel), old_signal,
-                                                    message.date, channel_abbr, message.id, urgent_action)
+                if distribution:
+                    await self.send_message_by_template(int(conf_obj.lucrative_channel), old_signal,
+                                                        message.date, channel_abbr, message.id, urgent_action)
             if not signal_object:
                 return
 
