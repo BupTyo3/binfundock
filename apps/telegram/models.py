@@ -597,13 +597,13 @@ class Telegram(BaseTelegram):
         profits = await self._get_profits_from_signal(signal_object)
         entries = self._form_divergence_entries(signal_object.position, current_price, step_quantity)
         if signal_object.position == SignalModel.long_label and max(entries) > min(profits):
-            delta = (min(profits) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
-            lowest_profit_index = profits.index(min(profits))
-            profits[lowest_profit_index] = profits[lowest_profit_index] + delta
+            while max(entries) > min(profits):
+                nearest_profit_index = profits.index(min(profits))
+                del profits[nearest_profit_index]
         if signal_object.position == SignalModel.short_label and min(entries) > max(profits):
-            delta = (max(profits) * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
-            lowest_profit_index = profits.index(max(profits))
-            profits[lowest_profit_index] = profits[lowest_profit_index] - delta
+            while min(entries) > max(profits):
+                nearest_profit_index = profits.index(max(profits))
+                del profits[nearest_profit_index]
         signal = SignalModel(signal_object.symbol, current_price, signal_object.margin_type,
                              signal_object.position, signal_object.leverage, entries,
                              profits, signal_object.stop_loss, message_id, channel_abbr)
@@ -1129,6 +1129,7 @@ class Telegram(BaseTelegram):
                   f"Take Profits: '{signal.take_profits}'\n" \
                   f"Stop Loss: '{signal.stop_loss}'\n" \
                   f"Algorithm: '{signal.algorithm}'\n" \
+                  f"ID: '{signal.msg_id}'\n" \
                   f"ERROR: '{inserted_to_db}'\n"
         await self.client.send_message('me', message)
         # await self.update_shared_signal(signal) it does not work as we doesn't have the signal in DB, due to the ERROR
