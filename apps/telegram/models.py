@@ -581,13 +581,12 @@ class Telegram(BaseTelegram):
                 await self.send_error_message_to_yourself(signal, inserted_to_db)
         if urgent_action == 'cancel':
             signal_object = await self._get_async_processing_signal(symbol=old_signal.pair, channel_abbr=channel_abbr)
-            if signal_object and int(old_signal.msg_id) > int(signal_object.outer_signal_id):
+            if signal_object and int(old_signal.msg_id) > int(signal_object.outer_signal_id) and distribution:
                 await self._close_signal(signal_object)
-            if not signal_object:
-                return
-            if distribution:
                 await self.send_message_by_template(int(conf_obj.lucrative_channel), old_signal,
                                                     message.date, channel_abbr, message.id, urgent_action)
+            if not signal_object:
+                return
 
     async def _form_signal(self, old_signal, signal_object, message_id, channel_abbr):
         current_price = signal_object.market.logic.get_current_price(old_signal.pair)
