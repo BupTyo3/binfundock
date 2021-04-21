@@ -481,12 +481,14 @@ class Telegram(BaseTelegram):
         entries = []
         profits = []
         stop_loss = ''
+        signal = SignalModel(pair, current_price, margin_type, position,
+                             leverage, entries, profits, stop_loss, message_id)
+        if '❌DELETED❌' in splitted_info[0]:
+            return signal
         try:
             pair_index = [i for i, s in enumerate(splitted_info) if is_new_signal in s]
             pair_index = pair_index[0]
         except Exception as e:
-            signal = SignalModel(pair, current_price, margin_type, position,
-                                 leverage, entries, profits, stop_loss, message_id)
             return signal
         if is_new_signal in splitted_info[pair_index]:
             pair_info = splitted_info[pair_index].split(' ')
@@ -495,8 +497,6 @@ class Telegram(BaseTelegram):
         try:
             price_index = [i for i, s in enumerate(splitted_info) if price_between_label in s]
         except ValueError as e:
-            signal = SignalModel(pair, current_price, margin_type, position,
-                                 leverage, entries, profits, stop_loss, message_id)
             return signal
 
         if price_index:
@@ -524,8 +524,6 @@ class Telegram(BaseTelegram):
             try:
                 goals_index = [i for i, s in enumerate(splitted_info) if goals_label in s]
             except ValueError as e:
-                signal = SignalModel(pair, current_price, margin_type, position,
-                                     leverage, entries, profits, stop_loss, message_id)
                 return signal
             possible_targets = splitted_info[goals_index[0] + 2: goals_index[0] + 7]
             for possible_target in possible_targets:
@@ -917,7 +915,7 @@ class Telegram(BaseTelegram):
         pair_label = ['Coin: ', 'Pair']
         action_price = ''
         margin_type = MarginType.ISOLATED.value
-        leverage = 25
+        leverage = 30
         entries = ''
         position = ''
         pair = ''
