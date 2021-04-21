@@ -262,15 +262,7 @@ class SignalAdmin(admin.ModelAdmin):
 
     @notifications_handling('')
     def _sell_by_market_one(self, request, signal):
-        counter = 1
-        cancelled_signal = False
-        while not cancelled_signal and counter < 301:
-            logger.info(f'Trying to close the signal: {signal.symbol}, id:{signal.id}, Attempt #{counter}')
-            signal.try_to_spoil_by_one_signal(True)
-            cancelled_signal = Signal.objects.filter(id=signal.id, _status__in=CANCELING__SIG_STATS).exists()
-            logger.info(f'Is signal {signal.symbol} with id:{signal.id} cancelled: {cancelled_signal}')
-            time.sleep(1)
-            counter += 1
+        signal.try_to_spoil_by_one_signal(force=True)
 
     @notifications_handling('')
     def _try_to_close(self, request, signal):
