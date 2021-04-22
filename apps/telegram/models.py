@@ -86,7 +86,7 @@ class Telegram(BaseTelegram):
         margin_type = MarginType.ISOLATED.value
         current_price = ''
         position = ''
-        leverage = ''
+        leverage = 30
         pair = ''
         entries = []
         profits = []
@@ -133,13 +133,13 @@ class Telegram(BaseTelegram):
             if line.startswith(possible_stop_label[2]):
                 stop_loss = line[10:]
                 stop_loss = left_numbers([stop_loss])
-            if line.startswith(leverage_label):
-                possible_leverage = line.split(' ')
-                possible_leverage = list(filter(None, possible_leverage))
-                try:
-                    leverage = ''.join(filter(str.isdigit, possible_leverage[2]))
-                except IndexError:
-                    leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
+            # if line.startswith(leverage_label):
+            #     possible_leverage = line.split(' ')
+            #     possible_leverage = list(filter(None, possible_leverage))
+            #     try:
+            #         leverage = ''.join(filter(str.isdigit, possible_leverage[2]))
+            #     except IndexError:
+            #         leverage = ''.join(filter(str.isdigit, possible_leverage[1]))
 
         position = calculate_position(stop_loss[0], entries, profits)
         entries = self.extend_nearest_ep(position, entries)
