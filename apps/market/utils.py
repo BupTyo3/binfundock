@@ -37,6 +37,8 @@ class MarketAPIExceptionError(Enum):
     NO_SUCH_ORDER = APIError(-2013, 'Order does not exist.')
     CANCEL_REJECTED = APIError(-2011, 'CANCEL_REJECTED')
     INVALID_OPTIONS_EVENT_TYPE = APIError(-4066, 'Invalid options event type')
+    LEVERAGE_REDUCTION_NOT_SUPPORTED = APIError(-4161, 'Leverage reduction is not supported in Isolated Margin Mode '
+                                                       'with open positions')
 
     @classmethod
     def choices(cls):

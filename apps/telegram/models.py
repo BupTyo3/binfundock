@@ -83,7 +83,7 @@ class Telegram(BaseTelegram):
         possible_stop_label = ['SL: ', 'SL : ', 'Stop loss:']
         pair_label = ['Pair: ', 'Asset', '**Asset']
         leverage_label = 'Leverage:'
-        margin_type = MarginType.CROSSED.value
+        margin_type = MarginType.ISOLATED.value
         current_price = ''
         position = ''
         leverage = ''

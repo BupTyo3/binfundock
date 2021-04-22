@@ -625,10 +625,13 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         return self.my_client.futures_cancel_order(symbol=symbol, origClientOrderId=custom_order_id)
 
     def _push_preconditions(self, order: 'BaseOrder'):
-        # Set leverage
-        self._set_leverage(order.symbol, order.signal.leverage)
-        # Set margin type
-        self._change_margin_type(order.symbol, order.signal.margin_type)
+        try:
+            # Set leverage
+            self._set_leverage(order.symbol, order.signal.leverage)
+            # Set margin type
+            self._change_margin_type(order.symbol, order.signal.margin_type)
+        except BiFuturesMarketException.api_exception as ex:
+            logger.error(f'ORDER {order.id} for {order.symbol}, PUSH PRECONDITIONS ERROR: {ex}')
 
     def push_buy_limit_order(self, order: 'BuyOrder'):
         """Push BUY LIMIT order to Futures"""
