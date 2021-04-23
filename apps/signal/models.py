@@ -177,8 +177,8 @@ class SignalOrig(BaseSignalOrig):
 
     @classmethod
     def update_shared_signal(cls, is_shared: Optional[bool] = False,
-                      techannel_name: Optional[str] = None,
-                      outer_signal_id: Optional[int] = None):
+                             techannel_name: Optional[str] = None,
+                             outer_signal_id: Optional[int] = None):
         """
         Update signal
         """
@@ -242,10 +242,12 @@ class SignalOrig(BaseSignalOrig):
         leverage_boost = self.techannel.leverage_boost
         leverage = leverage if not leverage_boost else int(leverage) + leverage_boost
         leverage = trimmed_leverage if int(leverage) > trimmed_leverage else leverage
+        new_stop_loss = self._get_new_stop_loss_value()
+        stop_loss = new_stop_loss if self.techannel.custom_stop_loss_perc > 0 else self.stop_loss
         signal = Signal.objects.create(
             techannel=self.techannel,
             symbol=self.symbol,
-            stop_loss=self.stop_loss,
+            stop_loss=stop_loss,
             outer_signal_id=self.outer_signal_id,
             position=self.position,
             leverage=leverage,
@@ -261,6 +263,11 @@ class SignalOrig(BaseSignalOrig):
         for take_profit in self.take_profits.all():
             value = signal.get_not_fractional_price(take_profit.value)
             TakeProfit.objects.create(signal=signal, value=value)
+
+        if self.techannel.custom_stop_loss_perc > 0:
+            rounded_stop_loss = signal.get_not_fractional_price(stop_loss)
+            Signal.objects.filter(outer_signal_id=self.outer_signal_id,
+                                  techannel=self.techannel).update(stop_loss=rounded_stop_loss)
         return signal
 
     def _get_main_coin(self, symbol) -> str:
@@ -274,6 +281,17 @@ class SignalOrig(BaseSignalOrig):
             if symbol[-len(main_coin):] == main_coin:
                 return main_coin
         raise MainCoinNotServicedError
+
+    @rounded_result()
+    def _get_new_stop_loss_value(self):
+        custom_stop_loss_perc = self.techannel.custom_stop_loss_perc
+        average_price_value = (self.entry_points.first().value + self.entry_points.last().value) / self.entry_points.count()
+        stop_loss_delta = (average_price_value * custom_stop_loss_perc) / self.conf.one_hundred_percent
+        if self.is_position_short():
+            new_stop_loss_value = average_price_value + stop_loss_delta
+        else:
+            new_stop_loss_value = average_price_value - stop_loss_delta
+        return new_stop_loss_value
 
 
 class Signal(BaseSignal):
