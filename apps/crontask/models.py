@@ -57,8 +57,12 @@ class CronTask(CronTaskBase):
         help_text='slip delta stop loss percentage'
     )
     do_not_create_if_symbol_already_started = models.BooleanField(
+        default=False,
+        help_text='Do not create Signal both similar or opposite direction if there is started one with this symbol'
+    )
+    do_not_create_opposite_position_to_a_started_one = models.BooleanField(
         default=True,
-        help_text='Do not create Signal if there is started one with this symbol'
+        help_text='Do not create Signal if there is started one with opposite direction'
     )
     trim_leverage_to = models.PositiveIntegerField(
         default=default_trim_leverage_to,
