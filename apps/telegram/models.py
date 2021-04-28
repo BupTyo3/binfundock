@@ -143,7 +143,7 @@ class Telegram(BaseTelegram):
 
         position = calculate_position(stop_loss[0], entries, profits)
         entries = self.extend_nearest_ep(position, entries)
-        profits = profits[:4]
+        profits = profits[:3]
 
         signal = SignalModel(pair, current_price, margin_type, position,
                              leverage, entries, profits, stop_loss[0], message_id)

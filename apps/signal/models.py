@@ -1619,6 +1619,31 @@ class Signal(BaseSignal):
         return True
 
     @debug_input_and_returned
+    def __catch_api_exc_immediately_trigger_tp_order_futures(
+            self, ex: BaseExternalAPIException, order: 'BaseOrder') -> bool:
+        """
+        True if we managed to fix.
+        Just cancel the order caused the error.
+        """
+        from apps.order.base_model import BaseOrder
+        if ex.code != self.market_exception_class.api_errors.ORDER_WOULD_IMMEDIATELY_TRIGGER.value.code:
+            return False
+        if not self._is_market_type_futures():
+            return False
+        if order.index == BaseOrder.GL_SM_INDEX:
+            return False
+        # LONG
+        current_price = self._get_current_price()
+        if not self.is_position_short():
+            if current_price > order.price:
+                order.cancel()
+        # SHORT
+        else:
+            if current_price < order.price:
+                order.cancel()
+        return True
+
+    @debug_input_and_returned
     def _handle_catching_api_exceptions(self, ex: BaseExternalAPIException, order: 'BaseOrder') -> bool:
         """
         True if we managed to fix or this is a minor exception or this is a minor exception
@@ -1626,6 +1651,7 @@ class Signal(BaseSignal):
         return (self.__catch_minor_api_exc(ex=ex) or
                 self.__catch_api_exc_immediately_trigger_sl_order_futures(ex=ex, order=order) or
                 self.__catch_api_exc_min_notional_tp_order_spot(ex=ex, order=order) or
+                self.__catch_api_exc_immediately_trigger_tp_order_futures(ex=ex, order=order) or
                 False)
 
     # POINT PUSH JOB
