@@ -121,7 +121,7 @@ class ChinaImageToSignal:
         pairs = []
         directory = settings.BASE_DIR
         for filename in os.listdir(directory):
-            if filename.endswith(".jpg"):
+            if filename.endswith(".jpg") or filename.endswith(".png"):
                 pair_info = self.get_parsed(filename, message_id)
                 pairs.append(pair_info)
                 now = str(datetime.now())[:19]
