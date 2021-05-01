@@ -134,6 +134,13 @@ class SignalOrig(BaseSignalOrig):
             if started_signals.last().position != self.position:
                 raise SymbolAlreadyStartedError(signal=self, market=market)
 
+    def _check_several_positions_opened(self, market: BaseMarket) -> None:
+        started_signals = Signal.objects.filter(symbol=self.symbol,
+                                                _status__in=STARTED__SIG_STATS,
+                                                market=market)
+        if started_signals.count() > 3:
+            raise SymbolAlreadyStartedError(signal=self, market=market)
+
     def _check_if_pair_does_not_exist_in_market(self, market: BaseMarket) -> None:
         pair = Pair.get_pair(self.symbol, market)
         if not pair:
@@ -241,6 +248,7 @@ class SignalOrig(BaseSignalOrig):
         self._check_inappropriate_position_to_market_type(market)
         self._check_correct_position()
         self._check_existing_duplicates(market)
+        self._check_several_positions_opened(market)
         if not force and get_or_create_crontask().do_not_create_if_symbol_already_started:
             self._check_existing_started_pairs(market)
         if not force and get_or_create_crontask().do_not_create_opposite_position_to_a_started_one:
