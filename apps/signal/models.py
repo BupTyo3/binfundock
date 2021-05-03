@@ -138,7 +138,7 @@ class SignalOrig(BaseSignalOrig):
         started_signals = Signal.objects.filter(symbol=self.symbol,
                                                 _status__in=STARTED__SIG_STATS,
                                                 market=market)
-        if started_signals.count() > 3:
+        if started_signals.count() > 2:
             raise SymbolAlreadyStartedError(signal=self, market=market)
 
     def _check_if_pair_does_not_exist_in_market(self, market: BaseMarket) -> None:
