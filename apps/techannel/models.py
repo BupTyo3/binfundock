@@ -57,7 +57,7 @@ class Techannel(TechannelBase):
         default=0,
         help_text='The number to add to the recommended leverage'
     )
-    custom_stop_loss_perc = models.PositiveIntegerField(
+    custom_stop_loss_perc = models.FloatField(
         default=0,
         help_text='Own stop-loss value in % from average EP'
     )
