@@ -63,19 +63,24 @@ class Telegram(BaseTelegram):
         tca = int(conf_obj.CFTrader)
         async for message in self.client.iter_messages(tca, limit=7):
             exists = await self.is_signal_handled(message.id, channel_abbr)
-            should_handle_msg = not exists
-            if message.text and should_handle_msg:
+            if message.text and not exists:
                 signal = self.parse_cf_trader_message(message.text, message.id)
                 if signal.pair:
-                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
-                    if inserted_to_db != 'success':
-                        await self.send_error_message_to_yourself(signal, inserted_to_db)
+                    urgent_action = signal.current_price
+                    if urgent_action == 'cancel':
+                        await self._recreate_signal(urgent_action, signal, signal.algorithm, message)
                     else:
-                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
-                                                            message.date, channel_abbr, message.id)
+                        inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                        if inserted_to_db != 'success':
+                            await self.send_error_message_to_yourself(signal, inserted_to_db)
+                        else:
+                            await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
+                                                                message.date, channel_abbr, message.id)
 
     def parse_cf_trader_message(self, message_text, message_id):
         text = replace_rus_to_eng(message_text)
+        lower_text = text.lower()
+        lower_info = lower_text.splitlines()
         splitted_info = text.splitlines()
         possible_entry_label = ['Entry', 'Get', '**Entry']
         possible_take_profits_label = ['Sell at', 'Targets']
@@ -86,13 +91,28 @@ class Telegram(BaseTelegram):
         margin_type = MarginType.ISOLATED.value
         current_price = ''
         position = ''
-        leverage = 30
+        leverage = 25
         pair = ''
         entries = []
         profits = []
         stop_loss = ['']
         signal_identification = 'CF Leverage Trading Signal'
         should_entry = [i for i, s in enumerate(splitted_info) if 'Stop loss:' in s]
+        should_close = [i for i, s in enumerate(lower_info) if 'close' in s or 'closing' in s or 'closed' in s]
+        if should_close:
+            reached_label = [i for i, s in enumerate(splitted_info) if 'reached' in s]
+            coin = ''
+            if reached_label:
+                coin = splitted_info[0].split()[0]
+            if 'close position' in lower_info:
+                coin = splitted_info[1].split()[0]
+            if 'closing' in lower_info[0]:
+                coin = splitted_info[0].split()[1]
+            pair = coin + 'USDT'
+            current_price = 'cancel'
+            signal = SignalModel(pair, current_price, margin_type, position,
+                                 leverage, entries, profits, stop_loss, message_id)
+            return signal
         if not should_entry:
             should_entry = [i for i, s in enumerate(splitted_info) if 'SL:' in s]
         if not should_entry:
