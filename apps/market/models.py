@@ -357,6 +357,7 @@ class BiMarketLogic(BaseMarketLogic,
         from apps.pair.models import Pair
 
         info = self._get_rules_api()[self.symbols_]
+        new_count = 0
         for i in info:
             symbol = i[self.symbol_]
             min_price = self._get_pair_rule(i, self.filters_, 0, self.minPrice_)
@@ -364,15 +365,19 @@ class BiMarketLogic(BaseMarketLogic,
             min_quantity = self._get_pair_rule(i, self.filters_, 2, self.minQty_)
             min_amount = self._get_pair_rule(i, self.filters_, 3, self.minAmount_)
             step_size = self._get_pair_rule(i, self.filters_, 2, self.stepSize_)
-            if not Pair.objects.filter(symbol=symbol, market=self.market):
-                logger.debug(f"Add a new pair rule {symbol}")
-                Pair.objects.create(symbol=symbol,
-                                    min_price=min_price,
-                                    step_price=step_price,
-                                    step_quantity=step_size,
-                                    min_quantity=min_quantity,
-                                    min_amount=min_amount,
-                                    market=self.market)
+            defaults = {
+                'min_price': min_price,
+                'step_price': step_price,
+                'step_quantity': step_size,
+                'min_quantity': min_quantity,
+                'min_amount': min_amount,
+            }
+            obj, created = Pair.objects.update_or_create(
+                symbol=symbol, market=self.market, defaults=defaults)
+            if created:
+                logger.debug(f"Add a new pair rule for '{self.market}' Market: {symbol}")
+                new_count += 1
+        logger.debug(f"'{self.market}' Market Pairs info: '{len(info)}' updated, '{new_count}' created")
 
 
 class BiFuturesMarketException(BaseMarketException):
@@ -766,18 +771,23 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         min_amount = 0.00000001
 
         info = self._get_rules_api()[self.symbols_]
+        new_count = 0
         for i in info:
             symbol = i[self.symbol_]
             min_price = self._get_pair_rule(i, self.filters_, 0, self.minPrice_)
             step_price = self._get_pair_rule(i, self.filters_, 0, self.stepPrice_)
             min_quantity = self._get_pair_rule(i, self.filters_, 1, self.minQty_)
             step_size = self._get_pair_rule(i, self.filters_, 1, self.stepSize_)
-            if not Pair.objects.filter(symbol=symbol, market=self.market):
-                logger.debug(f"Add a new pair rule {symbol}")
-                Pair.objects.create(symbol=symbol,
-                                    min_price=min_price,
-                                    step_price=step_price,
-                                    step_quantity=step_size,
-                                    min_quantity=min_quantity,
-                                    min_amount=min_amount,
-                                    market=self.market)
+            defaults = {
+                'min_price': min_price,
+                'step_price': step_price,
+                'step_quantity': step_size,
+                'min_quantity': min_quantity,
+                'min_amount': min_amount,
+            }
+            obj, created = Pair.objects.update_or_create(
+                symbol=symbol, market=self.market, defaults=defaults)
+            if created:
+                logger.debug(f"Add a new pair rule for '{self.market}' Market: {symbol}")
+                new_count += 1
+        logger.debug(f"'{self.market}' Market Pairs info: '{len(info)}' updated, '{new_count}' created")
