@@ -135,20 +135,6 @@ class Command(SystemCommand):
             self._client.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
-    def collect_info_from_luck_channel(self):
-        session_name = 'Luck'
-        self.init_telegram(session_name)
-        logger.debug(f'Session {session_name} initialized')
-        try:
-            with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_luck_channel())
-        except Exception as e:
-            logger.error(f'Session {session_name} ERROR: {e}')
-            traceback.print_exc()
-        finally:
-            self._client.disconnect()
-            logger.debug(f'Session {session_name} disconnected')
-
     def collect_info_from_wcse_channel(self):
         session_name = 'WCSE'
         self.init_telegram_luck(session_name)

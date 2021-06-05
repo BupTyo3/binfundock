@@ -362,7 +362,7 @@ class Config:
         self.Luck8414 = telegram.get('Luck8414', None)
         self.lucrative_trend = telegram.get('Lucrative_Trend', None)
         self.wcse = telegram.get('wcse', None)
-        self.lucrative = telegram.get('Lucrative', None)
+        self.token_fast_signals = telegram.get('TokenFastSignals', None)
         self.klondike_margin = telegram.get('klondike_margin', None)
         self.klondike_scalp = telegram.get('klondike_scalp', None)
         self.klondike_altcoin = telegram.get('klondike_altcoin', None)

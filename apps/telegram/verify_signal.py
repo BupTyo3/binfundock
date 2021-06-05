@@ -15,6 +15,7 @@ class SignalVerification:
                 return False
             price_json = ''
             try:
+                pair_object.pair = '1INCHUSDT' if 'INCHUSDT' in pair_object.pair else pair_object.pair
                 price_json = urllib.request.urlopen(
                     'https://api.binance.com/api/v3/ticker/price?symbol={}'.format(pair_object.pair))
             except:
