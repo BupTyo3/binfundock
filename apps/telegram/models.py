@@ -184,6 +184,7 @@ class Telegram(BaseTelegram):
                     if inserted_to_db != 'success':
                         await self.send_error_message_to_yourself(signal, inserted_to_db)
 
+
     async def parse_luck_channel(self):
         chat_id = int(conf_obj.Luck8414)
         async for message in self.client.iter_messages(chat_id, limit=6):
@@ -278,6 +279,8 @@ class Telegram(BaseTelegram):
                     await self.send_shared_message(int(conf_obj.lucrative_channel), signal,
                                                    message.date, channel_abbr, message.id)
                     await self.send_shared_message(int(conf_obj.lucrative_trend), signal,
+                                                   message.date, channel_abbr, message.id)
+                    await self.send_shared_message(int(conf_obj.token_fast_signals), signal,
                                                    message.date, channel_abbr, message.id)
 
     async def parse_crypto_angel_channel(self):
@@ -935,7 +938,7 @@ class Telegram(BaseTelegram):
         pair_label = ['Coin: ', 'Pair']
         action_price = ''
         margin_type = MarginType.ISOLATED.value
-        leverage = 30
+        leverage = 25
         entries = ''
         position = ''
         pair = ''
