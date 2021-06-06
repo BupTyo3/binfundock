@@ -260,7 +260,7 @@ class Telegram(BaseTelegram):
     async def parse_china_channel(self):
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
-        chat_id = int(conf_obj.chat_china_id)
+        chat_id = int(conf_obj.china_channel)
         channel_abbr = 'ai'
         async for message in self.client.iter_messages(chat_id, limit=6):
             exists = await self.is_signal_handled(message.id, channel_abbr)
@@ -282,6 +282,32 @@ class Telegram(BaseTelegram):
                                                    message.date, channel_abbr, message.id)
                     await self.send_shared_message(int(conf_obj.token_fast_signals), signal,
                                                    message.date, channel_abbr, message.id)
+
+    async def parse_china_chat(self):
+        info_getter = ChinaImageToSignal()
+        verify_signal = SignalVerification()
+        chat_id = int(conf_obj.china_chat)
+        channel_abbr = 'ai_se'
+        async for message in self.client.iter_messages(chat_id, limit=6):
+            exists = await self.is_signal_handled(message.id, channel_abbr)
+            should_handle_msg = not exists
+            if should_handle_msg and message.media:
+                await message.download_media()
+                pairs = info_getter.iterate_files(message.id)
+                signal = verify_signal.get_active_pairs_info(pairs)
+                if not signal:
+                    return
+                inserted_to_db = await self.write_signal_to_db(channel_abbr, signal, message.id, message.date)
+                if inserted_to_db != 'success':
+                    await self.send_error_message_to_yourself(signal, inserted_to_db)
+
+                # else:
+                #     await self.send_shared_message(int(conf_obj.lucrative_channel), signal,
+                #                                    message.date, channel_abbr, message.id)
+                #     await self.send_shared_message(int(conf_obj.lucrative_trend), signal,
+                #                                    message.date, channel_abbr, message.id)
+                #     await self.send_shared_message(int(conf_obj.token_fast_signals), signal,
+                #                                    message.date, channel_abbr, message.id)
 
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)

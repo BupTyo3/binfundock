@@ -53,6 +53,20 @@ class Command(SystemCommand):
             self._client.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
+    def collect_info_from_china_chat(self):
+        session_name = 'Sensei_Chat'
+        self.init_telegram(session_name)
+        logger.debug(f'Session {session_name} initialized')
+        try:
+            with self._client:
+                self._client.loop.run_until_complete(self._telegram.parse_china_chat())
+        except Exception as e:
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
+        finally:
+            self._client.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
+
     def collect_info_from_angel_channel(self):
         session_name = 'CryptoAngel'
         self.init_telegram_luck(session_name)
@@ -250,6 +264,7 @@ class Command(SystemCommand):
     def handle(self, *args, **options):
         channel = options['channel']
         china_matches = ["China", "china"]
+        china_chat_matches = ["sensei"]
         angel_matches = ["angel", "Angel", 'cryptoangel', 'crypto_angel', 'CryptoAngel']
         crypto_futures_matches = ["crypto_futures"]
         tca_altcoin_matches = ["tca_altcoin", "altcoin", "altcoins"]
@@ -275,6 +290,11 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in china_matches):
             self.collect_info_from_china_channel()
+
+        if not get_or_create_crontask().ai_se:
+            pass
+        elif any(x in channel for x in china_chat_matches):
+            self.collect_info_from_china_chat()
 
         if not get_or_create_crontask().crypto_passive:
             pass

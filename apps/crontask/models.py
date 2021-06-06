@@ -32,6 +32,7 @@ class CronTask(CronTaskBase):
         help_text="Allow price updates into the Pair table (prices_update_worker)")
 
     ai_algorithm = models.BooleanField(default=False)
+    ai_se = models.BooleanField(default=False)
     crypto_passive = models.BooleanField(default=False)
     crypto_futures = models.BooleanField(default=False)
     assist_leverage = models.BooleanField(default=False)
