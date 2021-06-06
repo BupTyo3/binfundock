@@ -2,6 +2,7 @@ PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 * * * * * root cd ../binfun; python manage.py parse_channel --channel tca_origin > /proc/1/fd/1 2>/proc/1/fd/2
 */2 * * * * root cd ../binfun; python manage.py parse_channel --channel china > /proc/1/fd/1 2>/proc/1/fd/2
+* * * * * root cd ../binfun; python manage.py parse_channel --channel sensei > /proc/1/fd/1 2>/proc/1/fd/2
 * * * * * root cd ../binfun; python manage.py parse_channel --channel tca_leverage > /proc/1/fd/1 2>/proc/1/fd/2
 */6 * * * * root cd ../binfun; python manage.py parse_channel --channel tca_altcoin > /proc/1/fd/1 2>/proc/1/fd/2
 */3 * * * * root cd ../binfun; python manage.py parse_channel --channel crypto_angel > /proc/1/fd/1 2>/proc/1/fd/2
