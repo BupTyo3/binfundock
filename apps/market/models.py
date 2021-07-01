@@ -775,15 +775,15 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         ]
     ]
     """
-    def get_affected_30m_BTC_candle(self):
-        history = self._get_candles_api(limit=3, symbol='BTCUSDT', interval='30m')
+    def get_affected_30m_candle(self, symbol):
+        history = self._get_candles_api(limit=3, symbol=symbol, interval='30m')
         third_candle = history[0]
         high_price = third_candle[2]
         low_price = third_candle[3]
         return float(high_price), float(low_price)
 
-    def get_affected_2h_BTC_candle(self):
-        history = self._get_candles_api(limit=3, symbol='BTCUSDT', interval='2h')
+    def get_affected_2h_candle(self, symbol):
+        history = self._get_candles_api(limit=3, symbol=symbol, interval='2h')
         third_candle = history[0]
         high_price = third_candle[2]
         low_price = third_candle[3]
