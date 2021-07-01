@@ -65,6 +65,10 @@ class CronTask(CronTaskBase):
         default=True,
         help_text='Do not create Signal if there is started one with opposite direction'
     )
+    allow_recreate_opposite_position = models.BooleanField(
+        default=True,
+        help_text='Allow closing signal and open a new one with opposite direction'
+    )
     trim_leverage_to = models.PositiveIntegerField(
         default=default_trim_leverage_to,
         help_text='Trim leverage when create the Signal from SignalOrig'

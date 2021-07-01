@@ -4,6 +4,7 @@ import os
 import shutil
 import time
 import matplotlib.pyplot as plt
+import logging
 from django.conf import settings
 from pytesseract import image_to_string
 from datetime import datetime
@@ -11,6 +12,7 @@ from datetime import datetime
 leverage_matches = ["LATHFFA", "EFA", "FFA", "EEA", "LETHEFA", "LATHEFA", "LETHFFA", "#LAT", "#LET", "HFFA"]
 regexp_numbers = '\d+\.?\d+'
 regexp_stop = '\d+\.?\d+$'
+logger = logging.getLogger(__name__)
 
 
 class ChinaImageToSignal:
@@ -122,12 +124,16 @@ class ChinaImageToSignal:
         directory = settings.BASE_DIR
         for filename in os.listdir(directory):
             if filename.endswith(".jpg") or filename.endswith(".png"):
-                pair_info = self.get_parsed(filename, message_id)
-                pairs.append(pair_info)
-                now = str(datetime.now())[:19]
-                now = now.replace(":", "_")
-                shutil.move(f"{directory}/{filename}",
-                            f"{settings.PARSED_IMAGES_STORAGE}/" + str(now) + ".jpg")
+                try:
+                    pair_info = self.get_parsed(filename, message_id)
+                    pairs.append(pair_info)
+                    now = str(datetime.now())[:19]
+                    now = now.replace(":", "_")
+                except:
+                    logger.error(f"Image parser ERROR: Cannot parse image'{filename}'")
+                finally:
+                    shutil.move(f"{directory}/{filename}",
+                                f"{settings.PARSED_IMAGES_STORAGE}/" + str(now) + ".jpg")
         return pairs
 
     def is_locked(self, filepath):

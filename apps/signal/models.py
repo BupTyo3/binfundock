@@ -134,6 +134,14 @@ class SignalOrig(BaseSignalOrig):
             if started_signals.last().position != self.position:
                 raise SymbolAlreadyStartedError(signal=self, market=market)
 
+    def _check_existing_opposite_position_and_close(self, market: BaseMarket) -> None:
+        started_signals = Signal.objects.filter(symbol=self.symbol,
+                                                _status__in=STARTED__SIG_STATS,
+                                                market=market)
+        if started_signals.exists():
+            if started_signals.last().position != self.position:
+                started_signals.try_to_spoil_by_one_signal(force=True)
+
     def _check_several_positions_opened(self, market: BaseMarket) -> None:
         started_signals = Signal.objects.filter(symbol=self.symbol,
                                                 _status__in=STARTED__SIG_STATS,
@@ -251,8 +259,11 @@ class SignalOrig(BaseSignalOrig):
         self._check_several_positions_opened(market)
         if not force and get_or_create_crontask().do_not_create_if_symbol_already_started:
             self._check_existing_started_pairs(market)
-        if not force and get_or_create_crontask().do_not_create_opposite_position_to_a_started_one:
-            self._check_existing_opposite_position(market)
+        if not force and get_or_create_crontask().allow_recreate_opposite_position:
+            self._check_existing_opposite_position_and_close(market)
+        # removed as not used:
+        # if not force and get_or_create_crontask().do_not_create_opposite_position_to_a_started_one:
+        #     self._check_existing_opposite_position(market)
         # Set leverage = 1 for Spot Market
         leverage = self._default_leverage if market.is_spot_market() else self.leverage
         # Trim leverage
