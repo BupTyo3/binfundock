@@ -757,10 +757,52 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         """Cancel order"""
         self._cancel_order(order.symbol, order.custom_order_id)
 
+    """
+    [
+        [
+        1591256400000,          // Open time
+        "9653.69440000",        // Open
+        "9653.69640000",        // High
+        "9651.38600000",        // Low
+        "9651.55200000",        // Close (or latest price)
+        "0  ",                  // Ignore
+        1591256459999,          // Close time
+        "0",                    // Ignore
+        60,                     // Number of bisic data
+        "0",                    // Ignore
+        "0",                    // Ignore
+        "0"                     // Ignore
+        ]
+    ]
+    """
+    def get_affected_30m_BTC_candle(self):
+        history = self._get_candles_api(limit=3, symbol='BTCUSDT', interval='30m')
+        third_candle = history[0]
+        high_price = third_candle[2]
+        low_price = third_candle[3]
+        return float(high_price), float(low_price)
+
+    def get_affected_2h_BTC_candle(self):
+        history = self._get_candles_api(limit=3, symbol='BTCUSDT', interval='2h')
+        third_candle = history[0]
+        high_price = third_candle[2]
+        low_price = third_candle[3]
+        return float(high_price), float(low_price)
+
     # @api_logging
     def _get_rules_api(self):
         """Send request to get Pairs rules info"""
         return self.my_client.futures_exchange_info()
+
+    @api_logging
+    def _get_candles_api(self, limit, symbol, interval):
+        """Send request to get Kline/candlestick bars for a symbol."""
+        params = {
+            'limit': limit,
+            'symbol': symbol,
+            'interval': interval,
+        }
+        return self.my_client.futures_klines(limit=limit, symbol=symbol, interval=interval)
 
     @debug_input_and_returned
     def update_pairs_info_api(self) -> None:

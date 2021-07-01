@@ -803,9 +803,13 @@ class Telegram(BaseTelegram):
         if 'Bull' in message_text:
             position = SignalModel.long_label
         splitted_text = message_text.split(' ')
-        algorithm = algorithm + splitted_text[-1]
+        exchange = splitted_text[-3]
+        timeframe = splitted_text[-1]
+        algorithm = algorithm + timeframe
         algorithm = algorithm.lower()
         symbol = splitted_text[-2] + 'USDT'
+
+        algorithm = algorithm + '_' + exchange
 
         futures_market = await get_or_create_async_futures_market()
         current_price = futures_market.logic.get_current_price(symbol)
@@ -813,8 +817,13 @@ class Telegram(BaseTelegram):
         pair = await Pair.get_async_pair(symbol, futures_market)
         step_quantity = pair.step_price
 
-        entries = self._form_divergence_entries(position, current_price, step_quantity)
-        stop_loss = self._form_divergence_stop(position, current_price, step_quantity)
+        if timeframe == '30m':
+            high_price, low_price = futures_market.logic.get_affected_30m_BTC_candle()
+        if timeframe == '2h':
+            high_price, low_price = futures_market.logic.get_affected_2h_BTC_candle()
+
+        entries = self._form_fsvzo_entries(position, current_price, high_price, low_price, step_quantity)
+        stop_loss = self._form_divergence_stop(position, high_price, low_price, step_quantity)
         profits = self._form_divergence_profits(position, current_price, step_quantity)
 
         signal = SignalModel(pair.symbol, current_price, margin_type, position,
@@ -836,6 +845,27 @@ class Telegram(BaseTelegram):
 
         entries.append(self._round_price(first_entry, step_quantity))
         entries.append(self._round_price(second_entry, step_quantity))
+
+        return entries
+
+    def _form_fsvzo_entries(self, position, current_price, high_price, low_price, step_quantity):
+        entries = []
+        first_entry = ''
+        second_entry = ''
+        third_entry = ''
+        delta_first_entry = (current_price * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
+        # delta_second_entry = (current_price * conf_obj.second_entry_deviation_perc) / conf_obj.one_hundred_percent
+        if position == SignalModel.short_label:
+            first_entry = current_price - delta_first_entry
+            second_entry = low_price
+            third_entry = high_price
+        if position == SignalModel.long_label:
+            first_entry = current_price + delta_first_entry
+            second_entry = high_price
+            third_entry = low_price
+        entries.append(self._round_price(first_entry, step_quantity))
+        entries.append(second_entry)
+        entries.append(third_entry)
 
         return entries
 
@@ -877,14 +907,14 @@ class Telegram(BaseTelegram):
 
         return profits
 
-    def _form_divergence_stop(self, position, current_price, step_quantity):
+    def _form_divergence_stop(self, position, high_price, low_price, step_quantity):
         stop_loss = ''
         if position == SignalModel.short_label:
-            delta_stop = (current_price * conf_obj.delta_stop_deviation_perc) / conf_obj.one_hundred_percent
-            stop_loss = current_price + delta_stop
+            delta_stop = (high_price * conf_obj.delta_stop_deviation_perc) / conf_obj.one_hundred_percent
+            stop_loss = high_price + delta_stop
         if position == SignalModel.long_label:
-            delta_stop = (current_price * conf_obj.delta_stop_deviation_perc) / conf_obj.one_hundred_percent
-            stop_loss = current_price - delta_stop
+            delta_stop = (low_price * conf_obj.delta_stop_deviation_perc) / conf_obj.one_hundred_percent
+            stop_loss = low_price - delta_stop
         stop_loss = self._round_price(stop_loss, step_quantity)
         return stop_loss
 
