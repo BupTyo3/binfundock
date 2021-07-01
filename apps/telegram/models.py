@@ -818,9 +818,9 @@ class Telegram(BaseTelegram):
         step_quantity = pair.step_price
 
         if timeframe == '30m':
-            high_price, low_price = futures_market.logic.get_affected_30m_BTC_candle()
+            high_price, low_price = futures_market.logic.get_affected_30m_candle(symbol)
         if timeframe == '2h':
-            high_price, low_price = futures_market.logic.get_affected_2h_BTC_candle()
+            high_price, low_price = futures_market.logic.get_affected_2h_candle(symbol)
 
         entries = self._form_fsvzo_entries(position, current_price, high_price, low_price, step_quantity)
         stop_loss = self._form_divergence_stop(position, high_price, low_price, step_quantity)
