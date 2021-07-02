@@ -200,10 +200,10 @@ DEFAULT_MARKET_ENTRY_DEVIATION_PERC = '0.25'  # Changes closest EP by this amoun
 DEFAULT_SECOND_ENTRY_DEVIATION_PERC = '1.25'  # Second EP distance in % from current price
 DEFAULT_FIRST_PROFIT_DEVIATION_PERC = '1'  # First TP distance in % from current price
 DEFAULT_SECOND_PROFIT_DEVIATION_PERC = '2.5'  # Second TP distance in % from current price
-DEFAULT_THIRD_PROFIT_DEVIATION_PERC = '4'  # Third TP distance in % from current price
-DEFAULT_FOURTH_PROFIT_DEVIATION_PERC = '6'  # Fourth TP distance in % from current price
-DEFAULT_FIFTH_PROFIT_DEVIATION_PERC = '15'  # Fifth TP distance in % from current price
-DEFAULT_STOP_LOSS_DEVIATION_PERC = '1.3'  # Stop loss distance in % from current price
+DEFAULT_THIRD_PROFIT_DEVIATION_PERC = '4.3'  # Third TP distance in % from current price
+DEFAULT_FOURTH_PROFIT_DEVIATION_PERC = '6.4'  # Fourth TP distance in % from current price
+DEFAULT_FIFTH_PROFIT_DEVIATION_PERC = '12'  # Fifth TP distance in % from current price
+DEFAULT_STOP_LOSS_DEVIATION_PERC = '1.51'  # Stop loss distance in % from current price
 
 DEFAULT_MARKET_SPOT_RAW_URL = 'https://www.binance.com/en/trade/{}?theme=dark'
 DEFAULT_MARKET_FUTURES_RAW_URL = 'https://www.binance.com/en/futures/{}?theme=dark'
