@@ -203,7 +203,7 @@ DEFAULT_SECOND_PROFIT_DEVIATION_PERC = '2.5'  # Second TP distance in % from cur
 DEFAULT_THIRD_PROFIT_DEVIATION_PERC = '4'  # Third TP distance in % from current price
 DEFAULT_FOURTH_PROFIT_DEVIATION_PERC = '6'  # Fourth TP distance in % from current price
 DEFAULT_FIFTH_PROFIT_DEVIATION_PERC = '15'  # Fifth TP distance in % from current price
-DEFAULT_STOP_LOSS_DEVIATION_PERC = '2.25'  # Stop loss distance in % from current price
+DEFAULT_STOP_LOSS_DEVIATION_PERC = '1.3'  # Stop loss distance in % from current price
 
 DEFAULT_MARKET_SPOT_RAW_URL = 'https://www.binance.com/en/trade/{}?theme=dark'
 DEFAULT_MARKET_FUTURES_RAW_URL = 'https://www.binance.com/en/futures/{}?theme=dark'
