@@ -826,6 +826,15 @@ class Telegram(BaseTelegram):
         stop_loss = self._form_divergence_stop(position, high_price, low_price, step_quantity)
         profits = self._form_divergence_profits(position, current_price, step_quantity)
 
+        if position == SignalModel.long_label and max(entries) > min(profits):
+            while max(entries) > min(profits):
+                nearest_profit_index = profits.index(min(profits))
+                del profits[nearest_profit_index]
+        if position == SignalModel.short_label and min(entries) > max(profits):
+            while min(entries) > max(profits):
+                nearest_profit_index = profits.index(max(profits))
+                del profits[nearest_profit_index]
+
         signal = SignalModel(pair.symbol, current_price, margin_type, position,
                              leverage, entries, profits, stop_loss, message_id, algorithm)
         return signal
