@@ -831,7 +831,7 @@ class Telegram(BaseTelegram):
                 nearest_profit_index = profits.index(min(profits))
                 del profits[nearest_profit_index]
         if position == SignalModel.short_label and min(entries) < max(profits):
-            while min(entries) > max(profits):
+            while min(entries) < max(profits):
                 nearest_profit_index = profits.index(max(profits))
                 del profits[nearest_profit_index]
 
