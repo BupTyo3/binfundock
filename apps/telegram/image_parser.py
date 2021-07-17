@@ -129,6 +129,8 @@ class ChinaImageToSignal:
                     pairs.append(pair_info)
                     now = str(datetime.now())[:19]
                     now = now.replace(":", "_")
+                    if pair_info.pair == '':
+                        raise Exception
                 except:
                     logger.error(f"Image parser ERROR: Cannot parse image'{filename}'")
                 finally:
