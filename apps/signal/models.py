@@ -1,6 +1,6 @@
 import logging
 
-from typing import Optional, List, Set, Union, TYPE_CHECKING
+from typing import Optional, List, Set, Union, TYPE_CHECKING, Tuple
 
 from asgiref.sync import sync_to_async
 from django.db import models, transaction
@@ -126,6 +126,30 @@ class SignalOrig(BaseSignalOrig):
         if started_signals.exists():
             raise SymbolAlreadyStartedError(signal=self, market=market)
 
+    @classmethod
+    def _check_confirmation_signal(cls, pair, techannel_name, position) -> bool:
+        techannel_diver, created = Techannel.objects.get_or_create(name="diver_2h")
+        techannel_corn, created = Techannel.objects.get_or_create(name="corn_2h")
+        confirmation_position = position
+        if 'corn_2h' in techannel_name:
+            confirmation_signal_query = SignalOrig.objects.filter(symbol=pair,
+                                                                  techannel=techannel_diver)
+            confirmation_signal = confirmation_signal_query.last()
+            if confirmation_signal.position == confirmation_position:
+                return confirmation_signal
+            else:
+                return False
+
+        if 'diver_2h' in techannel_name:
+            confirmation_signal_query = SignalOrig.objects.filter(symbol=pair,
+                                                                  techannel=techannel_corn)
+            confirmation_signal = confirmation_signal_query.last()
+            if confirmation_signal.position == confirmation_position:
+                return confirmation_signal
+            else:
+                return False
+
+
     def _check_existing_opposite_position(self, market: BaseMarket) -> None:
         started_signals = Signal.objects.filter(symbol=self.symbol,
                                                 _status__in=STARTED__SIG_STATS,
@@ -186,7 +210,7 @@ class SignalOrig(BaseSignalOrig):
         """
         Create signal
         """
-        sig_orig = cls._create_signal(
+        sig_orig, is_confirmed = cls._create_signal(
             symbol=symbol, techannel_name=techannel_name,
             stop_loss=stop_loss, outer_signal_id=outer_signal_id,
             entry_points=entry_points, take_profits=take_profits,
@@ -196,7 +220,7 @@ class SignalOrig(BaseSignalOrig):
         sig_market_list = sig_orig._create_into_markets_if_auto()
         logger.debug(f"SignalOrig created: '{sig_orig}' and next '{len(sig_market_list)}' "
                      f"Signals: '{sig_market_list}'")
-        return sig_orig
+        return sig_orig, is_confirmed
 
     @classmethod
     def update_shared_signal(cls, is_shared: Optional[bool] = False,
@@ -220,7 +244,7 @@ class SignalOrig(BaseSignalOrig):
                        entry_points: List[float], take_profits: List[float],
                        margin_type: Optional[str] = None,
                        leverage: Optional[int] = None,
-                       message_date=timezone.now()) -> Optional['SignalOrig']:
+                       message_date=timezone.now()) -> Optional[Tuple['SignalOrig', bool]]:
         """
         Create signal
         """
@@ -232,6 +256,7 @@ class SignalOrig(BaseSignalOrig):
             logger.warning(f"SignalOrig '{outer_signal_id}':'{techannel_name}' already exists")
             return
         position = calculate_position(stop_loss, entry_points, take_profits)
+
         sm_obj = cls.objects.create(
             techannel=techannel,
             symbol=symbol,
@@ -246,7 +271,27 @@ class SignalOrig(BaseSignalOrig):
         for take_profit in take_profits:
             TakeProfitOrig.objects.create(signal=sm_obj, value=take_profit)
         logger.debug(f"SignalOrig '{sm_obj}' has been created successfully")
-        return sm_obj
+
+        is_confirmed = cls._check_confirmation_signal(symbol, techannel_name, position)
+        if is_confirmed:
+            alg, created = Techannel.objects.get_or_create(name='firm_2h')
+            techannel_new = alg
+            sm_obj = cls.objects.create(
+                techannel=techannel_new,
+                symbol=symbol,
+                stop_loss=stop_loss,
+                outer_signal_id=outer_signal_id,
+                position=position,
+                leverage=leverage if leverage else cls._default_leverage,
+                message_date=message_date,
+                margin_type=margin_type if margin_type else cls._default_margin_type)
+            for entry_point in entry_points:
+                EntryPointOrig.objects.create(signal=sm_obj, value=entry_point)
+            for take_profit in take_profits:
+                TakeProfitOrig.objects.create(signal=sm_obj, value=take_profit)
+            logger.debug(f"Confirmed Signal '{sm_obj}' has been created successfully")
+
+        return sm_obj, is_confirmed
 
     @transaction.atomic
     def create_market_signal(self, market: BaseMarket, force: bool = False) -> 'Signal':

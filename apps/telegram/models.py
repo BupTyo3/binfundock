@@ -775,14 +775,14 @@ class Telegram(BaseTelegram):
                         await signal_object.async_try_to_spoil_by_one_signal(True)
                         cancelled_signal = await self._is_signal_cancelled()
 
-    async def parse_fsvzo_channel(self):
+    async def parse_alertatron_channel(self):
         channel_id = int(conf_obj.fsvzo)
         # entity = await self.client.get_entity('@alertatron_bot')
         access_hash = 475713384967520097
         channel_entity = User(id=channel_id, access_hash=access_hash)
         async for message in self.client.iter_messages(entity=channel_entity, limit=7):
             if message.text:
-                signal = await self.parse_fsvzo_message(message.text, message.id)
+                signal = await self.parse_alertatron_message(message.text, message.id)
                 exists = await self.is_signal_handled(message.id, signal.algorithm)
                 if signal.pair and not exists:
                     inserted_to_db = await self.write_signal_to_db(signal.algorithm, signal, message.id,
@@ -793,23 +793,33 @@ class Telegram(BaseTelegram):
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                             message.date, signal.algorithm, message.id)
 
-    async def parse_fsvzo_message(self, message_text, message_id):
-        algorithm = 'diver_'
+    async def parse_alertatron_message(self, message_text, message_id):
+        alg_diver = 'diver_'
+        alg_corn = 'corn_'
+        algorithm = ''
         position = ''
         margin_type = 'ISOLATED'
-        leverage = 10
+        leverage = 20
+        if 'Fsvzo' in message_text:
+            algorithm = alg_diver
+        if 'Cornucopia' in message_text:
+            algorithm = alg_corn
         if 'Bear' in message_text:
             position = SignalModel.short_label
         if 'Bull' in message_text:
             position = SignalModel.long_label
+        if 'Sell' in message_text:
+            position = SignalModel.short_label
+        if 'Buy' in message_text:
+            position = SignalModel.long_label
         splitted_text = message_text.split(' ')
-        exchange = splitted_text[-3]
+        # exchange = splitted_text[-3]
         timeframe = splitted_text[-1]
         algorithm = algorithm + timeframe
         algorithm = algorithm.lower()
         symbol = splitted_text[-2] + 'USDT'
 
-        algorithm = algorithm + '_' + exchange
+        # algorithm = algorithm + '_' + exchange
 
         futures_market = await get_or_create_async_futures_market()
         current_price = futures_market.logic.get_current_price(symbol)
@@ -1188,16 +1198,18 @@ class Telegram(BaseTelegram):
                      f" Algorithm: '{channel_abbr}'\n"
                      f" Message ID: '{message_id}'")
         try:
-            SignalOrig.create_signal(techannel_name=channel_abbr,
-                                     leverage=signal.leverage,
-                                     symbol=signal.pair,
-                                     stop_loss=signal.stop_loss,
-                                     entry_points=signal.entry_points,
-                                     take_profits=signal.take_profits,
-                                     outer_signal_id=message_id,
-                                     message_date=message_date,
-                                     margin_type=signal.margin_type)
+            sm_obj, is_confirmed = SignalOrig.create_signal(techannel_name=channel_abbr,
+                                                            leverage=signal.leverage,
+                                                            symbol=signal.pair,
+                                                            stop_loss=signal.stop_loss,
+                                                            entry_points=signal.entry_points,
+                                                            take_profits=signal.take_profits,
+                                                            outer_signal_id=message_id,
+                                                            message_date=message_date,
+                                                            margin_type=signal.margin_type)
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
+            if is_confirmed:
+                return 'success', 'confirmed'
             return 'success'
         except Exception as e:
             logger.error(f"Write into DB failed: {e}")

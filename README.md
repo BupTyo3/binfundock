@@ -86,7 +86,7 @@ docker-compose -f docker-compose-aggregator.yml build
 
 - Start containers (without -d flag - not in daemon mode)
 ```bash
-docker-compose up -d
+docker-compose up -d 
 ```
 
 - Start containers for separate AGGREGATOR service (without -d flag - not in daemon mode)

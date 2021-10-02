@@ -219,13 +219,13 @@ class Command(SystemCommand):
             self._client.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
-    def collect_info_from_fsvzo_channel(self):
+    def collect_info_from_alertatron_channel(self):
         session_name = 'fsvzo'
         self.init_telegram(session_name)
         logger.debug(f'Session {session_name} initialized')
         try:
             with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_fsvzo_channel())
+                self._client.loop.run_until_complete(self._telegram.parse_alertatron_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
@@ -365,4 +365,4 @@ class Command(SystemCommand):
         if not get_or_create_crontask().fsvzo:
             pass
         elif any(x in channel for x in fsvzo_matches):
-            self.collect_info_from_fsvzo_channel()
+            self.collect_info_from_alertatron_channel()
