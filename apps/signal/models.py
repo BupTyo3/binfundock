@@ -135,7 +135,7 @@ class SignalOrig(BaseSignalOrig):
             confirmation_signal_query = SignalOrig.objects.filter(symbol=pair,
                                                                   techannel=techannel_diver)
             confirmation_signal = confirmation_signal_query.last()
-            if confirmation_signal.position == confirmation_position:
+            if confirmation_signal and confirmation_signal.position == confirmation_position:
                 return confirmation_signal
             else:
                 return False
@@ -144,7 +144,7 @@ class SignalOrig(BaseSignalOrig):
             confirmation_signal_query = SignalOrig.objects.filter(symbol=pair,
                                                                   techannel=techannel_corn)
             confirmation_signal = confirmation_signal_query.last()
-            if confirmation_signal.position == confirmation_position:
+            if confirmation_signal and confirmation_signal.position == confirmation_position:
                 return confirmation_signal
             else:
                 return False
