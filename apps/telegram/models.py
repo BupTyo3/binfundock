@@ -787,8 +787,10 @@ class Telegram(BaseTelegram):
                 if signal.pair and not exists:
                     inserted_to_db = await self.write_signal_to_db(signal.algorithm, signal, message.id,
                                                                    message.date)
-                    if inserted_to_db != 'success':
+                    if inserted_to_db != 'success' or inserted_to_db != ('success','confirmed'):
                         await self.send_error_message_to_yourself(signal, inserted_to_db)
+                    if inserted_to_db == ('success','confirmed'):
+                        await self.client.send_message(int(conf_obj.lucrative_channel), 'Confirmation')
                     else:
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                             message.date, signal.algorithm, message.id)
