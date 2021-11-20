@@ -1036,6 +1036,8 @@ class Telegram(BaseTelegram):
                 entries = left_numbers(possible_entries)
             if line.startswith(possible_take_profits[0]) or line.startswith(possible_take_profits[1]):
                 fake_profits = line[9:]
+                if '+' in fake_profits:
+                    fake_profits = fake_profits.replace('+', '-')
                 possible_profits = fake_profits.split('-')
                 profits = left_numbers(possible_profits)
             if line.startswith(stop_label):
