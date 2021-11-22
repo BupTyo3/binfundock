@@ -52,6 +52,7 @@ from tools.tools import (
     convert_to_coin_quantity,
     convert_to_amount,
 )
+from apps.crontask.models import CronTask
 
 if TYPE_CHECKING:
     from apps.order.models import SellOrder, BuyOrder
@@ -527,6 +528,7 @@ class Signal(BaseSignal):
             result = self.market_logic.get_current_balance(self.main_coin)
         result -= self._get_sum_of_not_sent_orders_for_formed_signals()
         return result
+
 
     @debug_input_and_returned
     def _get_sum_of_not_sent_orders_for_formed_signals(self) -> float:
@@ -2478,6 +2480,10 @@ class Signal(BaseSignal):
             buy_order.update_buy_order_info_by_api()
         for sell_order in self.sell_orders.filter(**params):
             sell_order.update_sell_order_info_by_api()
+
+        get_or_create_crontask().see_result = self._get_current_balance_of_main_coin()
+
+
 
     @debug_input_and_returned
     @refuse_if_busy
