@@ -9,7 +9,7 @@ services:
         max-size: 50m
     hostname: redis
     ports:
-      - ${REDIS_PORT:-6379}:6379
+      - ${REDIS_PORT:-6379}
   db:
     image: postgres:12.3-alpine
     logging:

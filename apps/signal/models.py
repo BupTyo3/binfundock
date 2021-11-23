@@ -52,6 +52,7 @@ from tools.tools import (
     convert_to_coin_quantity,
     convert_to_amount,
 )
+from ..crontask.models import CronTask
 
 if TYPE_CHECKING:
     from apps.order.models import SellOrder, BuyOrder
@@ -528,6 +529,7 @@ class Signal(BaseSignal):
         result -= self._get_sum_of_not_sent_orders_for_formed_signals()
         return result
 
+
     @debug_input_and_returned
     def _get_sum_of_not_sent_orders_for_formed_signals(self) -> float:
         """
@@ -563,7 +565,7 @@ class Signal(BaseSignal):
         How much money we allocate for one Signal
         If free_balance 1000 usd, 10% - config parameter, so
          result will be 100 usd"""
-        current_balance = self._get_current_balance_of_main_coin(fake_balance=fake_balance)
+        current_balance = self._get_current_balance_of_main_coin(fake_balance=None)
         # subtract inviolable balance
         current_balance_minus_inviolable = subtract_fee(current_balance, self.conf.inviolable_balance_perc)
         res = (current_balance_minus_inviolable * self.techannel.balance_to_signal_perc /
@@ -1575,10 +1577,10 @@ class Signal(BaseSignal):
             return
         if self.is_position_short():
             logger.debug(f"Form Futures SHORT: '{self}'")
-            is_success = self._first_formation_futures_short_orders(fake_balance=fake_balance)
+            is_success = self._first_formation_futures_short_orders(fake_balance=None)
         else:
             logger.debug(f"Form Futures LONG: '{self}'")
-            is_success = self._first_formation_futures_long_orders(fake_balance=fake_balance)
+            is_success = self._first_formation_futures_long_orders(fake_balance=None)
         if is_success:
             self.status = SignalStatus.FORMED.value
             self.save()
@@ -2441,6 +2443,8 @@ class Signal(BaseSignal):
         """
         Function for first formation orders for NEW signal
         """
+        CronTask.objects.update(see_result=self._get_current_balance_of_main_coin())
+
         if self._status != SignalStatus.NEW.value:
             logger.warning(f"Not valid Signal status for formation BUY order: "
                            f"{self._status} : {SignalStatus.NEW.value}")
@@ -2450,9 +2454,9 @@ class Signal(BaseSignal):
                      f" slip_delta_sl_perc='{get_or_create_crontask().slip_delta_sl_perc}',"
                      f" inviolable_balance_perc='{conf_obj.inviolable_balance_perc}")
         if self._is_market_type_futures():
-            return self._first_formation_futures_orders(fake_balance=fake_balance)
+            return self._first_formation_futures_orders(fake_balance=None)
         else:
-            return self._first_formation_spot_orders(fake_balance=fake_balance)
+            return self._first_formation_spot_orders(fake_balance=None)
 
     @debug_input_and_returned
     @refuse_if_busy
@@ -2626,7 +2630,7 @@ class Signal(BaseSignal):
         if only_get_ids:
             return new_signals.values_list('id', flat=True)
         for signal in new_signals:
-            signal.first_formation_orders_by_one_signal(fake_balance=fake_balance)
+            signal.first_formation_orders_by_one_signal(fake_balance=None)
 
     @classmethod
     def push_signals(cls,
