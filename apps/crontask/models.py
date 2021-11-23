@@ -48,6 +48,7 @@ class CronTask(CronTaskBase):
     klondike_altcoin = models.BooleanField(default=False)
     server = models.BooleanField(default=False)
     fsvzo = models.BooleanField(default=False)
+    current_balance = models.FloatField(default=0)
 
     balance_to_signal_perc = models.FloatField(
         default=default_balance_percentage_by_signal,

@@ -52,6 +52,7 @@ from tools.tools import (
     convert_to_coin_quantity,
     convert_to_amount,
 )
+from ..crontask.models import CronTask
 
 if TYPE_CHECKING:
     from apps.order.models import SellOrder, BuyOrder
@@ -2441,6 +2442,8 @@ class Signal(BaseSignal):
         """
         Function for first formation orders for NEW signal
         """
+        CronTask.objects.update(see_result=self._get_current_balance_of_main_coin())
+
         if self._status != SignalStatus.NEW.value:
             logger.warning(f"Not valid Signal status for formation BUY order: "
                            f"{self._status} : {SignalStatus.NEW.value}")
