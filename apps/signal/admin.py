@@ -429,7 +429,7 @@ class TakeProfitOrigAdmin(admin.ModelAdmin):
 class SignalDescAdmin(admin.ModelAdmin):
     list_display = [
         'id',
-        'sym',
+        'symbol',
         'descriptions',
         'position',
         'leverage',
