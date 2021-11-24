@@ -52,6 +52,7 @@ from tools.tools import (
     convert_to_coin_quantity,
     convert_to_amount,
 )
+from ..crontask.models import CronTask
 
 if TYPE_CHECKING:
     from apps.order.models import SellOrder, BuyOrder
@@ -64,6 +65,66 @@ logger = logging.getLogger(__name__)
 QSSellO = Union[QuerySet, List['SellOrder']]
 QSBuyO = Union[QuerySet, List['BuyOrder']]
 QSBaseO = Union[QuerySet, List['BaseOrder']]
+
+
+class SignalDesc(BaseSignalOrig):
+    _default_leverage = 1
+    _default_margin_type = MarginType.ISOLATED.value
+    conf = conf_obj
+
+    descriptions = models.TextField()
+    techannel = models.ForeignKey(to=Techannel, related_name='signal_desc', on_delete=models.DO_NOTHING)
+    symbol = models.CharField(max_length=24)
+    outer_signal_id = models.PositiveIntegerField()
+    main_coin = models.CharField(max_length=16)
+    stop_loss = models.FloatField()
+    position = models.CharField(max_length=32,
+                                choices=SignalPosition.choices(),
+                                default=SignalPosition.LONG.value, )
+    leverage = models.PositiveIntegerField(default=_default_leverage)
+    margin_type = models.CharField(max_length=9,
+                                   choices=MarginType.choices(),
+                                   default=_default_margin_type)
+    message_date = models.DateTimeField(default=timezone.now, blank=True)
+
+    techannel: Techannel
+    symbol: str
+
+    objects = models.Manager()
+
+    @classmethod
+    @transaction.atomic
+    def _create_signal_desc(cls, symbol: str, techannel_name: str, stop_loss: float,
+                       outer_signal_id: int, position: str,
+                       margin_type: Optional[str] = None,
+                       leverage: Optional[int] = None,
+                       message_date=timezone.now()) -> Optional[Tuple['SignalDesc', bool]]:
+        """
+        Create signal
+        """
+        techannel, created = Techannel.objects.get_or_create(name=techannel_name)
+        if created:
+            logger.debug(f"Telegram channel '{techannel}' was created")
+        obj = Signal.objects.filter(outer_signal_id=outer_signal_id, techannel=techannel).first()
+        if obj:
+            logger.warning(f"SignalOrig '{outer_signal_id}':'{techannel_name}' already exists")
+            return
+
+        obj = cls.objects.create(
+            techannel=techannel,
+            symbol=symbol,
+            stop_loss=stop_loss,
+            outer_signal_id=outer_signal_id,
+            position=position,
+            leverage=leverage if leverage else cls._default_leverage,
+            message_date=message_date,
+            margin_type=margin_type if margin_type else cls._default_margin_type)
+        logger.debug(f"SignalOrig '{obj}' has been created successfully")
+        return obj
+
+    def __str__(self):
+        return f"SignalDesc:{self.pk}:{self.descriptions}:{self.symbol}:{self.techannel.abbr}" \
+               f":{self.outer_signal_id}:{self.position}"
 
 
 class SignalOrig(BaseSignalOrig):
@@ -148,7 +209,6 @@ class SignalOrig(BaseSignalOrig):
                 return confirmation_signal
             else:
                 return False
-
 
     def _check_existing_opposite_position(self, market: BaseMarket) -> None:
         started_signals = Signal.objects.filter(symbol=self.symbol,
@@ -359,7 +419,8 @@ class SignalOrig(BaseSignalOrig):
     @rounded_result()
     def _get_new_stop_loss_value(self):
         custom_stop_loss_perc = self.techannel.custom_stop_loss_perc
-        average_price_value = (self.entry_points.first().value + self.entry_points.last().value) / self.entry_points.count()
+        average_price_value = (
+                                          self.entry_points.first().value + self.entry_points.last().value) / self.entry_points.count()
         stop_loss_delta = (average_price_value * custom_stop_loss_perc) / self.conf.one_hundred_percent
         if self.is_position_short():
             new_stop_loss_value = average_price_value + stop_loss_delta
@@ -731,7 +792,7 @@ class Signal(BaseSignal):
         residual_quantity = sold_quantity - bought_quantity if bought_quantity else sold_quantity
         if with_planned:
             opened_ep_orders = self.__get_opened_ep_orders()
-            residual_quantity = residual_quantity + self.__get_planned_executed_quantity(opened_ep_orders) if\
+            residual_quantity = residual_quantity + self.__get_planned_executed_quantity(opened_ep_orders) if \
                 opened_ep_orders else residual_quantity
         pair = self._get_pair()
         step_quantity = pair.step_quantity
@@ -968,7 +1029,7 @@ class Signal(BaseSignal):
         """
         # Case if there were sell_orders to generate a new custom_order_id
         last_sell_order = self.sell_orders.filter(no_need_push=False).last()
-        custom_order_id = get_increased_leading_number(last_sell_order.custom_order_id) if\
+        custom_order_id = get_increased_leading_number(last_sell_order.custom_order_id) if \
             last_sell_order else None
 
         distributed_quantity = self._get_distributed_quantity_by_take_profits(sell_quantity)
@@ -1302,7 +1363,7 @@ class Signal(BaseSignal):
         return qs
 
     def __get_opened_ep_orders(self):
-        return self.__get_opened_sell_orders() if self.is_position_short()\
+        return self.__get_opened_sell_orders() if self.is_position_short() \
             else self.__get_opened_buy_orders()
 
     def __get_gl_sl_orders(self, statuses: Optional[List] = None, any_existing: bool = False) -> QSBaseO:
@@ -1483,16 +1544,16 @@ class Signal(BaseSignal):
         if self.sell_orders.filter(**not_finished_orders_params).exists():
             logger.debug(f"2/4:Signal '{self}' has Opened SELL orders")
             return False
-        if self.buy_orders.filter(**completed_not_handled_params).\
-                exclude(index=BaseOrder.MARKET_INDEX).\
-                exclude(no_need_push=True).\
+        if self.buy_orders.filter(**completed_not_handled_params). \
+                exclude(index=BaseOrder.MARKET_INDEX). \
+                exclude(no_need_push=True). \
                 exists():
             logger.debug(f"3/4:Signal '{self}' has Completed not handled BUY orders")
             return False
         # TODO: change this and the filters above with get_order_exclude... but pay attention local_canceled
-        if self.sell_orders.filter(**completed_not_handled_params).\
+        if self.sell_orders.filter(**completed_not_handled_params). \
                 exclude(index=BaseOrder.MARKET_INDEX). \
-                exclude(no_need_push=True).\
+                exclude(no_need_push=True). \
                 exists():
             logger.debug(f"4/4:Signal '{self}' has Completed not handled SELL orders")
             return False
@@ -1516,7 +1577,7 @@ class Signal(BaseSignal):
         self._cancel_opened_orders(buy=True, sell=True)
         residual_quantity = self._get_residual_quantity(ignore_fee=ignore_fee)
         price = self._get_current_price()
-        if residual_quantity > 0 and\
+        if residual_quantity > 0 and \
                 self._check_if_quantity_enough_to_form_tp_order(quantity=residual_quantity, price=price):
             if self.is_position_short():
                 self.__form_buy_market_order(quantity=residual_quantity, price=price)
@@ -1742,7 +1803,6 @@ class Signal(BaseSignal):
         5)Sent request to create real Sell orders (NOT_SENT -> SENT)
         6)Sent request to create real Buy orders (NOT_SENT -> SENT)
         7)Change Signal status (NEW -> PUSHED) if this is the first launch
-
         """
         from apps.order.utils import (
             NOT_SENT_ORDERS_STATUSES, SENT_ORDERS_STATUSES, ORDER_STATUSES_FOR_PUSH_JOB,
@@ -2185,7 +2245,6 @@ class Signal(BaseSignal):
     @debug_input_and_returned
     def __trail_stop_futures_short(self, fake_price: Optional[float] = None) -> bool:
         """
-
         FUTURES Market
         SHORT Position
         If the current price has crossed the threshold,
@@ -2293,7 +2352,7 @@ class Signal(BaseSignal):
         # For the next crossing
         old_value_of_price = 2 * sl_value - zero_value
         # For the first crossing of the threshold
-        old_value_of_price = zero_value + delta_from_zero_value if\
+        old_value_of_price = zero_value + delta_from_zero_value if \
             old_value_of_price < zero_value else old_value_of_price
         threshold = old_value_of_price + delta_from_zero_value
         msg = f"Check trailing_stop '{self}':" \
@@ -2441,6 +2500,8 @@ class Signal(BaseSignal):
         """
         Function for first formation orders for NEW signal
         """
+        CronTask.objects.update(see_result=self._get_current_balance_of_main_coin())
+
         if self._status != SignalStatus.NEW.value:
             logger.warning(f"Not valid Signal status for formation BUY order: "
                            f"{self._status} : {SignalStatus.NEW.value}")
@@ -2581,7 +2642,6 @@ class Signal(BaseSignal):
         if self._check_is_ready_to_spoil():
             self._spoil()
 
-
     @debug_input_and_returned
     @refuse_if_busy
     def try_to_close_by_one_signal(self):
@@ -2607,7 +2667,6 @@ class Signal(BaseSignal):
             return self._trail_stop_futures(fake_price=fake_price)
         else:
             return self._trail_stop_spot()
-
 
     # POINT MAIN FOR ALL SIGNALS
 
