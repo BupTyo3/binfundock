@@ -2442,8 +2442,6 @@ class Signal(BaseSignal):
         """
         Function for first formation orders for NEW signal
         """
-        CronTask.objects.update(see_result=self._get_current_balance_of_main_coin())
-
         if self._status != SignalStatus.NEW.value:
             logger.warning(f"Not valid Signal status for formation BUY order: "
                            f"{self._status} : {SignalStatus.NEW.value}")
@@ -2456,6 +2454,14 @@ class Signal(BaseSignal):
             return self._first_formation_futures_orders(fake_balance=fake_balance)
         else:
             return self._first_formation_spot_orders(fake_balance=fake_balance)
+
+    @refuse_if_busy
+    def update_balance_info(self):
+        """
+        Function for updating information on current account balance
+        """
+        CronTask.objects.update(current_balance=self._get_current_balance_of_main_coin())
+
 
     @debug_input_and_returned
     @refuse_if_busy
@@ -2620,6 +2626,11 @@ class Signal(BaseSignal):
                            outer_signal_id: Optional[int] = None,
                            techannel_abbr: Optional[str] = None,
                            fake_balance: Optional[float] = None):
+        """Update current balance info in Cron table"""
+        closed_params = {'_status': SignalStatus.CLOSED.value}
+        closed_signal = Signal.objects.filter(**closed_params).first()
+        closed_signal.update_balance_info()
+
         """Handle all NEW signals: Step 2"""
         params = {'_status': SignalStatus.NEW.value}
         if outer_signal_id:
