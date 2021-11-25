@@ -94,11 +94,11 @@ class SignalDesc(BaseSignalOrig):
 
     @classmethod
     @transaction.atomic
-    def _create_signal_desc(cls, symbol: str, techannel_name: str, stop_loss: float,
-                       outer_signal_id: int, position: str,
-                       margin_type: Optional[str] = None,
-                       leverage: Optional[int] = None,
-                       message_date=timezone.now()) -> Optional[Tuple['SignalDesc', bool]]:
+    def _create_signal_desc(cls, symbol: str, techannel_name: str,
+                            descriptions: str, stop_loss: float,
+                            outer_signal_id: int, margin_type: Optional[str] = None,
+                            leverage: Optional[int] = None,
+                            message_date=timezone.now()) -> Optional[Tuple['SignalDesc', bool]]:
         """
         Create signal
         """
@@ -113,14 +113,33 @@ class SignalDesc(BaseSignalOrig):
         obj = cls.objects.create(
             techannel=techannel,
             symbol=symbol,
+            descriptions=descriptions,
             stop_loss=stop_loss,
             outer_signal_id=outer_signal_id,
-            position=position,
             leverage=leverage if leverage else cls._default_leverage,
             message_date=message_date,
             margin_type=margin_type if margin_type else cls._default_margin_type)
         logger.debug(f"SignalOrig '{obj}' has been created successfully")
         return obj
+
+    @classmethod
+    def create_signal_desc(cls, symbol: str, techannel_name: str,
+                           descriptions:str, outer_signal_id: int,
+                           stop_loss: float, margin_type: Optional[str] = None,
+                           leverage: Optional[int] = None, message_date=timezone.now()):
+        """
+        Create signal
+        """
+        sig_orig = cls._create_signal_desc(
+            symbol=symbol, techannel_name=techannel_name,
+            descriptions=descriptions, outer_signal_id=outer_signal_id,
+            leverage=leverage, message_date=message_date,
+            margin_type=margin_type, stop_loss=stop_loss)
+        if not sig_orig:
+            return
+        # sig_market_list = sig_orig._create_into_markets_if_auto()
+        logger.debug(f"SignalOrig created: '{sig_orig}")
+        return sig_orig
 
     def __str__(self):
         return f"SignalDesc:{self.pk}:{self.descriptions}:{self.symbol}:{self.techannel.abbr}" \
@@ -209,7 +228,6 @@ class SignalOrig(BaseSignalOrig):
                 return confirmation_signal
             else:
                 return False
-
 
     def _check_existing_opposite_position(self, market: BaseMarket) -> None:
         started_signals = Signal.objects.filter(symbol=self.symbol,
