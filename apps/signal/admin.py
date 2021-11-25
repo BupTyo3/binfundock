@@ -23,7 +23,7 @@ from .models import (
     HistorySignal,
     SignalOrig,
     EntryPointOrig,
-    TakeProfitOrig,
+    TakeProfitOrig, SignalDesc,
 )
 from .utils import CANCELING__SIG_STATS
 
@@ -423,8 +423,23 @@ class TakeProfitOrigAdmin(admin.ModelAdmin):
     ]
 
 
+@admin.register(SignalDesc)
+class SignalDescAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'symbol',
+        'descriptions',
+        'position',
+        'leverage',
+        'stop_loss',
+        'techannel',
+        'outer_signal_id',
+        'message_date',
+        'created',
+    ]
 
-
+    select_related_fields = ['techannel']
+    list_filter = [OuterIDFilter, TechannelFilter]
 
 
 @admin.register(SignalOrig)
@@ -563,7 +578,6 @@ class SignalOrigAdmin(admin.ModelAdmin):
         signal.create_market_signal(market=market, force=True)
 
 
-
     def remove_far_tp(self, request, queryset):
         for signal in queryset:
             self._remove_far_tp(request, signal)
@@ -571,7 +585,6 @@ class SignalOrigAdmin(admin.ModelAdmin):
     @notifications_handling('')
     def _remove_far_tp(self, request, signal):
         signal.remove_far_tp()
-
 
     def remove_near_tp(self, request, queryset):
         for signal in queryset:
@@ -581,7 +594,6 @@ class SignalOrigAdmin(admin.ModelAdmin):
     def _remove_near_tp(self, request, signal):
         signal.remove_near_tp()
 
-
     def remove_far_ep(self, request, queryset):
         for signal in queryset:
             self._remove_far_ep(request, signal)
@@ -589,7 +601,6 @@ class SignalOrigAdmin(admin.ModelAdmin):
     @notifications_handling('')
     def _remove_far_ep(self, request, signal):
         signal.remove_far_ep()
-
 
     def remove_near_ep(self, request, queryset):
         for signal in queryset:
