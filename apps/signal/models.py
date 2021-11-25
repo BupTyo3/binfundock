@@ -67,6 +67,66 @@ QSBuyO = Union[QuerySet, List['BuyOrder']]
 QSBaseO = Union[QuerySet, List['BaseOrder']]
 
 
+class SignalDesc(BaseSignalOrig):
+    _default_leverage = 1
+    _default_margin_type = MarginType.ISOLATED.value
+    conf = conf_obj
+
+    descriptions = models.TextField()
+    techannel = models.ForeignKey(to=Techannel, related_name='signal_desc', on_delete=models.DO_NOTHING)
+    symbol = models.CharField(max_length=24)
+    outer_signal_id = models.PositiveIntegerField()
+    main_coin = models.CharField(max_length=16)
+    stop_loss = models.FloatField()
+    position = models.CharField(max_length=32,
+                                choices=SignalPosition.choices(),
+                                default=SignalPosition.LONG.value, )
+    leverage = models.PositiveIntegerField(default=_default_leverage)
+    margin_type = models.CharField(max_length=9,
+                                   choices=MarginType.choices(),
+                                   default=_default_margin_type)
+    message_date = models.DateTimeField(default=timezone.now, blank=True)
+
+    techannel: Techannel
+    symbol: str
+
+    objects = models.Manager()
+
+    @classmethod
+    @transaction.atomic
+    def _create_signal_desc(cls, symbol: str, techannel_name: str, stop_loss: float,
+                       outer_signal_id: int, position: str,
+                       margin_type: Optional[str] = None,
+                       leverage: Optional[int] = None,
+                       message_date=timezone.now()) -> Optional[Tuple['SignalDesc', bool]]:
+        """
+        Create signal
+        """
+        techannel, created = Techannel.objects.get_or_create(name=techannel_name)
+        if created:
+            logger.debug(f"Telegram channel '{techannel}' was created")
+        obj = Signal.objects.filter(outer_signal_id=outer_signal_id, techannel=techannel).first()
+        if obj:
+            logger.warning(f"SignalOrig '{outer_signal_id}':'{techannel_name}' already exists")
+            return
+
+        obj = cls.objects.create(
+            techannel=techannel,
+            symbol=symbol,
+            stop_loss=stop_loss,
+            outer_signal_id=outer_signal_id,
+            position=position,
+            leverage=leverage if leverage else cls._default_leverage,
+            message_date=message_date,
+            margin_type=margin_type if margin_type else cls._default_margin_type)
+        logger.debug(f"SignalOrig '{obj}' has been created successfully")
+        return obj
+
+    def __str__(self):
+        return f"SignalDesc:{self.pk}:{self.descriptions}:{self.symbol}:{self.techannel.abbr}" \
+               f":{self.outer_signal_id}:{self.position}"
+
+
 class SignalOrig(BaseSignalOrig):
     _default_leverage = 1
     _default_margin_type = MarginType.ISOLATED.value
