@@ -8,7 +8,7 @@ import time
 from asgiref.sync import sync_to_async
 from telethon.tl.types import User
 
-from apps.signal.models import SignalOrig, Signal, EntryPoint, TakeProfit
+from apps.signal.models import SignalOrig, Signal, EntryPoint, TakeProfit, SignalDesc
 from apps.techannel.models import Techannel
 from binfun.settings import conf_obj
 from tools.tools import rounded_result
@@ -287,11 +287,18 @@ class Telegram(BaseTelegram):
         info_getter = ChinaImageToSignal()
         verify_signal = SignalVerification()
         chat_id = int(conf_obj.china_chat)
+        sensei_id = 667858439
         channel_abbr = 'ai_se'
-        async for message in self.client.iter_messages(chat_id, limit=6):
-            exists = await self.is_signal_handled(message.id, channel_abbr)
-            should_handle_msg = not exists
-            if should_handle_msg and message.media:
+        async for message in self.client.iter_messages(chat_id, limit=8):
+            media_signal_exists = await self.is_signal_handled(message.id, channel_abbr)
+            exists_text_signal = await self.is_text_signal_handled(message.id, channel_abbr)
+
+            if not exists_text_signal and message.sender_id == sensei_id and not message.media:
+                channel_abbr = 'ai_se_tx'
+                position, possible_info = self.parse_sensei_message(message.text)
+                await self.write_possible_signal_to_db(channel_abbr, message.id, position, possible_info, message.date)
+
+            if not media_signal_exists and message.media:
                 await message.download_media()
                 pairs = info_getter.iterate_files(message.id)
                 signal = verify_signal.get_active_pairs_info(pairs)
@@ -308,6 +315,12 @@ class Telegram(BaseTelegram):
                                                    message.date, channel_abbr, message.id)
                     await self.send_shared_message(int(conf_obj.token_fast_signals), signal,
                                                    message.date, channel_abbr, message.id)
+
+    def parse_sensei_message(self, message_text):
+        position = SignalModel.long_label
+        if "шорт" in message_text:
+            position = SignalModel.short_label
+        return position, message_text
 
     async def parse_crypto_angel_channel(self):
         chat_id = int(conf_obj.crypto_angel_id)
@@ -1139,6 +1152,13 @@ class Telegram(BaseTelegram):
         return is_exist
 
     @sync_to_async
+    def is_text_signal_handled(self, message_id, channel_abbr):
+        is_exist = SignalDesc.objects.filter(outer_signal_id=message_id, techannel__name=channel_abbr).exists()
+        if is_exist:
+            logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists in DB")
+        return is_exist
+
+    @sync_to_async
     def is_signal_shared(self, message_id, channel_abbr):
         is_shared = SignalOrig.objects.filter(is_shared=True, outer_signal_id=message_id,
                                               techannel__name=channel_abbr).exists()
@@ -1214,6 +1234,28 @@ class Telegram(BaseTelegram):
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
             if is_confirmed:
                 return 'success', 'confirmed'
+            return 'success'
+        except Exception as e:
+            logger.error(f"Write into DB failed: {e}")
+            return e
+
+
+    @sync_to_async
+    def write_possible_signal_to_db(self, channel_abbr: str, message_id, position, description, message_date):
+        sm_obj = SignalDesc.objects.filter(outer_signal_id=message_id, techannel__name=channel_abbr).first()
+        if sm_obj:
+            logger.debug(f"Signal '{message_id}':'{channel_abbr}' already exists")
+            quit()
+        logger.debug(f"Attempt to write into DB the following signal: \n"
+                     f" Algorithm: '{channel_abbr}'\n"
+                     f" Message ID: '{message_id}'")
+        try:
+            sm_obj = SignalDesc.create_signal_desc(techannel_name=channel_abbr,
+                                                   position=position,
+                                                   descriptions=description.encode("utf-8"),
+                                                   outer_signal_id=message_id,
+                                                   message_date=message_date)
+            logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
             return 'success'
         except Exception as e:
             logger.error(f"Write into DB failed: {e}")

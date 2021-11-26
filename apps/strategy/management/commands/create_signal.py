@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from apps.signal.models import SignalOrig
+from apps.signal.models import SignalOrig, SignalDesc
 # from binfun.settings import conf_obj
 from utils.framework.models import SystemCommand
 
@@ -48,11 +48,15 @@ class Command(SystemCommand):
         entry_points = options['entry_points']
         take_profits = options['take_profits']
         stop_loss = options['stop_loss']
+        position = options['position']
         leverage = options['leverage']
         outer_signal_id = options['outer_signal_id']
         techannel = options['techannel']
 
-        # self.check_signal_input(entry_points, take_profits, stop_loss)
+        self.check_signal_input(entry_points, take_profits, stop_loss)
+        logger.debug(f"Signal:{symbol}"
+                     f"StopLoss:{stop_loss}"
+                     f":SignalId:{outer_signal_id}")
         logger.debug(f"Signal:{symbol}:EntryPoints:{entry_points}:"
                      f"TakeProfits:{take_profits}:StopLoss:{stop_loss}"
                      f":SignalId:{outer_signal_id}")
@@ -64,14 +68,59 @@ class Command(SystemCommand):
                 logger.debug("You typed No - The End")
                 quit()
         sm_obj, is_confirmed = SignalOrig.create_signal(techannel_name=techannel,
-                                          symbol=symbol,
-                                          stop_loss=stop_loss,
-                                          entry_points=entry_points,
-                                          take_profits=take_profits,
-                                          leverage=leverage,
-                                          outer_signal_id=outer_signal_id)
-
+                                                        symbol=symbol,
+                                                        stop_loss=stop_loss,
+                                                        entry_points=entry_points,
+                                                        take_profits=take_profits,
+                                                        leverage=leverage,
+                                                        outer_signal_id=outer_signal_id)
         if sm_obj:
             self.log_success(f"SignalOrig '{sm_obj}' created successfully")
         else:
             self.log_error(f"SignalOrig '{outer_signal_id}':'{techannel}' has not been created")
+
+
+# This class is used to create Signal in the table SignalDesc
+
+# class Command(SystemCommand):
+#     help = 'Closes the specified poll for voting'
+#
+#     def add_arguments(self, parser):
+#         parser.add_argument('symbol', type=str, help='Pair of coins')
+#         parser.add_argument('--descriptions', type=str, help='descriptions')
+#         parser.add_argument('--stop_loss', type=float, required=True, help='Stop loss value')
+#         parser.add_argument('--leverage', type=int, default=1, help='Leverage for futures')
+#         parser.add_argument('--techannel', type=str, required=True,
+#                             help='Unique abbreviation of Telegram channel in lowercase')
+#         parser.add_argument('--outer_signal_id', type=int, required=True)
+#         parser.add_argument('--without_checking', action='store_true')
+#
+#     def handle(self, *args, **options):
+#         symbol = options['symbol']
+#         descriptions = options['descriptions']
+#         stop_loss = options['stop_loss']
+#         stop_loss = options['stop_loss']
+#         leverage = options['leverage']
+#         outer_signal_id = options['outer_signal_id']
+#         techannel = options['techannel']
+#
+#         logger.debug(f"Signal:{symbol}"
+#                      f"StopLoss:{stop_loss}"
+#                      f":SignalId:{outer_signal_id}")
+#         if not options['without_checking']:
+#             key = input('y/n: ')
+#             if key.lower() in ['y', 'yes']:
+#                 logger.debug('You are agreed! Continue...')
+#             else:
+#                 logger.debug("You typed No - The End")
+#                 quit()
+#         obj = SignalDesc.create_signal_desc(techannel_name=techannel,
+#                                             symbol=symbol,
+#                                             descriptions=descriptions,
+#                                             stop_loss=stop_loss,
+#                                             leverage=leverage,
+#                                             outer_signal_id=outer_signal_id)
+#         if obj:
+#             self.log_success(f"SignalDesc '{obj}' created successfully")
+#         else:
+#             self.log_error(f"SignalDesc '{outer_signal_id}':'{techannel}' has not been created")

@@ -23,7 +23,7 @@ from .models import (
     HistorySignal,
     SignalOrig,
     EntryPointOrig,
-    TakeProfitOrig,
+    TakeProfitOrig, SignalDesc,
 )
 from .utils import CANCELING__SIG_STATS
 
@@ -423,8 +423,22 @@ class TakeProfitOrigAdmin(admin.ModelAdmin):
     ]
 
 
+@admin.register(SignalDesc)
+class SignalDescAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'symbol',
+        'descriptions',
+        'position',
+        'leverage',
+        'techannel',
+        'outer_signal_id',
+        'message_date',
+        'created',
+    ]
 
-
+    select_related_fields = ['techannel']
+    list_filter = [OuterIDFilter, TechannelFilter]
 
 
 @admin.register(SignalOrig)
