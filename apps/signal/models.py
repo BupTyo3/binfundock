@@ -77,7 +77,6 @@ class SignalDesc(BaseSignalOrig):
     symbol = models.CharField(max_length=24)
     outer_signal_id = models.PositiveIntegerField()
     main_coin = models.CharField(max_length=16)
-    stop_loss = models.FloatField()
     position = models.CharField(max_length=32,
                                 choices=SignalPosition.choices(),
                                 default=SignalPosition.LONG.value, )
@@ -94,10 +93,7 @@ class SignalDesc(BaseSignalOrig):
 
     @classmethod
     @transaction.atomic
-    def _create_signal_desc(cls, symbol: str, techannel_name: str,
-                            descriptions: str, stop_loss: float,
-                            outer_signal_id: int, margin_type: Optional[str] = None,
-                            leverage: Optional[int] = None,
+    def _create_signal_desc(cls, techannel_name: str, position, descriptions: str, outer_signal_id,
                             message_date=timezone.now()) -> Optional[Tuple['SignalDesc', bool]]:
         """
         Create signal
@@ -110,34 +106,27 @@ class SignalDesc(BaseSignalOrig):
             logger.warning(f"SignalOrig '{outer_signal_id}':'{techannel_name}' already exists")
             return
 
-        obj = cls.objects.create(
-            techannel=techannel,
-            symbol=symbol,
-            descriptions=descriptions,
-            stop_loss=stop_loss,
-            outer_signal_id=outer_signal_id,
-            leverage=leverage if leverage else cls._default_leverage,
-            message_date=message_date,
-            margin_type=margin_type if margin_type else cls._default_margin_type)
+        obj = cls.objects.create(techannel=techannel,
+                                 position=position,
+                                 descriptions=descriptions,
+                                 outer_signal_id=outer_signal_id,
+                                 message_date=message_date)
         logger.debug(f"SignalOrig '{obj}' has been created successfully")
         return obj
 
     @classmethod
-    def create_signal_desc(cls, symbol: str, techannel_name: str,
-                           descriptions:str, outer_signal_id: int,
-                           stop_loss: float, margin_type: Optional[str] = None,
-                           leverage: Optional[int] = None, message_date=timezone.now()):
+    def create_signal_desc(cls, techannel_name: str, position,
+                           descriptions: str, outer_signal_id: int,
+                           message_date=timezone.now()):
         """
         Create signal
         """
-        sig_orig = cls._create_signal_desc(
-            symbol=symbol, techannel_name=techannel_name,
-            descriptions=descriptions, outer_signal_id=outer_signal_id,
-            leverage=leverage, message_date=message_date,
-            margin_type=margin_type, stop_loss=stop_loss)
+        sig_orig = cls._create_signal_desc(techannel_name=techannel_name, position=position,
+                                           descriptions=descriptions,
+                                           outer_signal_id=outer_signal_id,
+                                           message_date=message_date)
         if not sig_orig:
             return
-        # sig_market_list = sig_orig._create_into_markets_if_auto()
         logger.debug(f"SignalOrig created: '{sig_orig}")
         return sig_orig
 

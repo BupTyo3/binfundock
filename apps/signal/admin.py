@@ -431,7 +431,6 @@ class SignalDescAdmin(admin.ModelAdmin):
         'descriptions',
         'position',
         'leverage',
-        'stop_loss',
         'techannel',
         'outer_signal_id',
         'message_date',
