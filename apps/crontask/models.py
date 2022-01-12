@@ -9,7 +9,7 @@ class CronTask(CronTaskBase):
     """
     Model of CronTask entity
     """
-    _default_slip_delta_stop_loss_percentage = 0.2
+    _default_slip_delta_stop_loss_percentage = 0.1
     default_balance_percentage_by_signal = 3
     default_trim_leverage_to = 10
 

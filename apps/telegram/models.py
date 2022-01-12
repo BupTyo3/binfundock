@@ -184,7 +184,6 @@ class Telegram(BaseTelegram):
                     if inserted_to_db != 'success':
                         await self.send_error_message_to_yourself(signal, inserted_to_db)
 
-
     async def parse_luck_channel(self):
         chat_id = int(conf_obj.Luck8414)
         async for message in self.client.iter_messages(chat_id, limit=6):
@@ -800,9 +799,9 @@ class Telegram(BaseTelegram):
                 if signal.pair and not exists:
                     inserted_to_db = await self.write_signal_to_db(signal.algorithm, signal, message.id,
                                                                    message.date)
-                    if inserted_to_db != 'success' or inserted_to_db != ('success','confirmed'):
+                    if inserted_to_db != 'success' or inserted_to_db != ('success', 'confirmed'):
                         await self.send_error_message_to_yourself(signal, inserted_to_db)
-                    if inserted_to_db == ('success','confirmed'):
+                    if inserted_to_db == ('success', 'confirmed'):
                         await self.client.send_message(int(conf_obj.lucrative_channel), 'Confirmation')
                     else:
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
@@ -814,7 +813,7 @@ class Telegram(BaseTelegram):
         algorithm = ''
         position = ''
         margin_type = 'ISOLATED'
-        leverage = 20
+        leverage = 10
         if 'Fsvzo' in message_text:
             algorithm = alg_diver
         if 'Cornucopia' in message_text:
@@ -829,10 +828,10 @@ class Telegram(BaseTelegram):
             position = SignalModel.long_label
         splitted_text = message_text.split(' ')
         # exchange = splitted_text[-3]
-        timeframe = splitted_text[-1]
+        timeframe = splitted_text[-2]
         algorithm = algorithm + timeframe
         algorithm = algorithm.lower()
-        symbol = splitted_text[-2] + 'USDT'
+        symbol = splitted_text[-3] + 'USDT'
 
         # algorithm = algorithm + '_' + exchange
 
@@ -842,6 +841,9 @@ class Telegram(BaseTelegram):
         pair = await Pair.get_async_pair(symbol, futures_market)
         step_quantity = pair.step_price
 
+        high_price = ''
+        low_price = ''
+
         if timeframe == '30m':
             high_price, low_price = futures_market.logic.get_affected_30m_candle(symbol)
         if timeframe == '2h':
@@ -849,7 +851,7 @@ class Telegram(BaseTelegram):
 
         entries = self._form_fsvzo_entries(position, current_price, high_price, low_price, step_quantity)
         stop_loss = self._form_divergence_stop(position, high_price, low_price, step_quantity)
-        profits = self._form_divergence_profits(position, current_price, step_quantity)
+        profits = self._form_divergence_profits(position, low_price, step_quantity)
 
         if position == SignalModel.long_label and max(entries) > min(profits):
             while max(entries) > min(profits):
@@ -888,18 +890,16 @@ class Telegram(BaseTelegram):
         second_entry = ''
         third_entry = ''
         delta_first_entry = (current_price * conf_obj.market_entry_deviation_perc) / conf_obj.one_hundred_percent
-        # delta_second_entry = (current_price * conf_obj.second_entry_deviation_perc) / conf_obj.one_hundred_percent
+        delta_second_entry = (low_price * conf_obj.second_entry_deviation_perc) / conf_obj.one_hundred_percent
         if position == SignalModel.short_label:
-            first_entry = current_price - delta_first_entry
-            second_entry = low_price
-            third_entry = high_price
+            first_entry = low_price
+            second_entry = float(low_price) + delta_second_entry
         if position == SignalModel.long_label:
             first_entry = current_price + delta_first_entry
             second_entry = high_price
             third_entry = low_price
-        entries.append(self._round_price(first_entry, step_quantity))
-        entries.append(second_entry)
-        entries.append(third_entry)
+        entries.append(self._round_price(second_entry, step_quantity))
+        entries.append(first_entry)
 
         return entries
 
@@ -912,40 +912,26 @@ class Telegram(BaseTelegram):
         profits = []
         first_profit = ''
         second_profit = ''
-        third_profit = ''
-        fourth_profit = ''
-        fifth_profit = ''
+
         delta_first_profit = (current_price * conf_obj.first_profit_deviation_perc) / conf_obj.one_hundred_percent
         delta_second_profit = (current_price * conf_obj.second_profit_deviation_perc) / conf_obj.one_hundred_percent
-        delta_third_profit = (current_price * conf_obj.third_profit_deviation_perc) / conf_obj.one_hundred_percent
-        delta_fourth_profit = (current_price * conf_obj.fourth_profit_deviation_perc) / conf_obj.one_hundred_percent
-        delta_fifth_profit = (current_price * conf_obj.fifth_profit_deviation_perc) / conf_obj.one_hundred_percent
         if position == SignalModel.short_label:
             first_profit = current_price - delta_first_profit
             second_profit = current_price - delta_second_profit
-            third_profit = current_price - delta_third_profit
-            fourth_profit = current_price - delta_fourth_profit
-            fifth_profit = current_price - delta_fifth_profit
         if position == SignalModel.long_label:
             first_profit = current_price + delta_first_profit
             second_profit = current_price + delta_second_profit
-            third_profit = current_price + delta_third_profit
-            fourth_profit = current_price + delta_fourth_profit
-            fifth_profit = current_price + delta_fifth_profit
 
         profits.append(self._round_price(first_profit, step_quantity))
         profits.append(self._round_price(second_profit, step_quantity))
-        profits.append(self._round_price(third_profit, step_quantity))
-        profits.append(self._round_price(fourth_profit, step_quantity))
-        profits.append(self._round_price(fifth_profit, step_quantity))
 
         return profits
 
     def _form_divergence_stop(self, position, high_price, low_price, step_quantity):
         stop_loss = ''
         if position == SignalModel.short_label:
-            delta_stop = (high_price * conf_obj.delta_stop_deviation_perc) / conf_obj.one_hundred_percent
-            stop_loss = high_price + delta_stop
+            delta_stop = (low_price * conf_obj.delta_stop_deviation_perc) / conf_obj.one_hundred_percent
+            stop_loss = low_price + delta_stop
         if position == SignalModel.long_label:
             delta_stop = (low_price * conf_obj.delta_stop_deviation_perc) / conf_obj.one_hundred_percent
             stop_loss = low_price - delta_stop
@@ -1238,7 +1224,6 @@ class Telegram(BaseTelegram):
         except Exception as e:
             logger.error(f"Write into DB failed: {e}")
             return e
-
 
     @sync_to_async
     def write_possible_signal_to_db(self, channel_abbr: str, message_id, position, description, message_date):
