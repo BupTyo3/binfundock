@@ -799,7 +799,7 @@ class Signal(BaseSignal):
         residual_quantity = sold_quantity - bought_quantity if bought_quantity else sold_quantity
         if with_planned:
             opened_ep_orders = self.__get_opened_ep_orders()
-            residual_quantity = residual_quantity + self.__get_planned_executed_quantity(opened_ep_orders) if\
+            residual_quantity = residual_quantity + self.__get_planned_executed_quantity(opened_ep_orders) if \
                 opened_ep_orders else residual_quantity
         pair = self._get_pair()
         step_quantity = pair.step_quantity
@@ -1036,7 +1036,7 @@ class Signal(BaseSignal):
         """
         # Case if there were sell_orders to generate a new custom_order_id
         last_sell_order = self.sell_orders.filter(no_need_push=False).last()
-        custom_order_id = get_increased_leading_number(last_sell_order.custom_order_id) if\
+        custom_order_id = get_increased_leading_number(last_sell_order.custom_order_id) if \
             last_sell_order else None
 
         distributed_quantity = self._get_distributed_quantity_by_take_profits(sell_quantity)
@@ -1130,9 +1130,11 @@ class Signal(BaseSignal):
         """
         res = list()
         original_orders_ids.sort()
+        techannel_abbr = self.techannel.abbr
         for order_id in original_orders_ids:
-            res.append(self._formation_copied_buy_order_futures_short(
-                original_order_id=order_id, buy_quantity=buy_quantity))
+            res.append(self._formation_copied_buy_order_futures_short(techannel=techannel_abbr,
+                                                                      original_order_id=order_id,
+                                                                      buy_quantity=buy_quantity))
         return res
 
     @debug_input_and_returned
@@ -1195,7 +1197,7 @@ class Signal(BaseSignal):
         return new_sell_order
 
     @debug_input_and_returned
-    def _formation_copied_buy_order_futures_short(self,
+    def _formation_copied_buy_order_futures_short(self, techannel,
                                                   original_order_id: int,
                                                   buy_quantity: Optional[float] = None):
         """
@@ -1206,12 +1208,20 @@ class Signal(BaseSignal):
         order = BuyOrder.objects.filter(id=original_order_id).first()
         new_custom_order_id = get_increased_leading_number(order.custom_order_id)
         logger.debug(f"[SHORT] New copied BUY order custom_order_id = '{new_custom_order_id}'")
+        # If EP2 achieved the new order with EP forms with the price of EP1 (TP1 recreated = TP1 + 1.5%)
+        if techannel == 'di30':
+            new_order_price = order.price * (1 + conf_obj.first_profit_deviation_perc) / conf_obj.one_hundred_percent
+            new_trigger = order.trigger * (1 + conf_obj.first_profit_deviation_perc) / conf_obj.one_hundred_percent
+        else:
+            new_order_price = order.price
+            new_trigger = order.trigger
+
         new_buy_order = self.__form_buy_tp_order(
             custom_order_id=new_custom_order_id,
             quantity=buy_quantity if buy_quantity is not None else order.quantity,
-            price=order.price,
+            price=new_order_price,
             index=order.index,
-            trigger_price=order.trigger)
+            trigger_price=new_trigger)
         return new_buy_order
 
     @debug_input_and_returned
@@ -1370,7 +1380,7 @@ class Signal(BaseSignal):
         return qs
 
     def __get_opened_ep_orders(self):
-        return self.__get_opened_sell_orders() if self.is_position_short()\
+        return self.__get_opened_sell_orders() if self.is_position_short() \
             else self.__get_opened_buy_orders()
 
     def __get_gl_sl_orders(self, statuses: Optional[List] = None, any_existing: bool = False) -> QSBaseO:
@@ -1551,16 +1561,16 @@ class Signal(BaseSignal):
         if self.sell_orders.filter(**not_finished_orders_params).exists():
             logger.debug(f"2/4:Signal '{self}' has Opened SELL orders")
             return False
-        if self.buy_orders.filter(**completed_not_handled_params).\
-                exclude(index=BaseOrder.MARKET_INDEX).\
-                exclude(no_need_push=True).\
+        if self.buy_orders.filter(**completed_not_handled_params). \
+                exclude(index=BaseOrder.MARKET_INDEX). \
+                exclude(no_need_push=True). \
                 exists():
             logger.debug(f"3/4:Signal '{self}' has Completed not handled BUY orders")
             return False
         # TODO: change this and the filters above with get_order_exclude... but pay attention local_canceled
-        if self.sell_orders.filter(**completed_not_handled_params).\
+        if self.sell_orders.filter(**completed_not_handled_params). \
                 exclude(index=BaseOrder.MARKET_INDEX). \
-                exclude(no_need_push=True).\
+                exclude(no_need_push=True). \
                 exists():
             logger.debug(f"4/4:Signal '{self}' has Completed not handled SELL orders")
             return False
@@ -1584,7 +1594,7 @@ class Signal(BaseSignal):
         self._cancel_opened_orders(buy=True, sell=True)
         residual_quantity = self._get_residual_quantity(ignore_fee=ignore_fee)
         price = self._get_current_price()
-        if residual_quantity > 0 and\
+        if residual_quantity > 0 and \
                 self._check_if_quantity_enough_to_form_tp_order(quantity=residual_quantity, price=price):
             if self.is_position_short():
                 self.__form_buy_market_order(quantity=residual_quantity, price=price)
@@ -2361,7 +2371,7 @@ class Signal(BaseSignal):
         # For the next crossing
         old_value_of_price = 2 * sl_value - zero_value
         # For the first crossing of the threshold
-        old_value_of_price = zero_value + delta_from_zero_value if\
+        old_value_of_price = zero_value + delta_from_zero_value if \
             old_value_of_price < zero_value else old_value_of_price
         threshold = old_value_of_price + delta_from_zero_value
         msg = f"Check trailing_stop '{self}':" \
@@ -2529,7 +2539,6 @@ class Signal(BaseSignal):
         """
         CronTask.objects.update(current_balance=self._get_current_balance_of_main_coin())
 
-
     @debug_input_and_returned
     @refuse_if_busy
     def push_orders_by_one_signal(self):
@@ -2657,7 +2666,6 @@ class Signal(BaseSignal):
         if self._check_is_ready_to_spoil():
             self._spoil()
 
-
     @debug_input_and_returned
     @refuse_if_busy
     def try_to_close_by_one_signal(self):
@@ -2683,7 +2691,6 @@ class Signal(BaseSignal):
             return self._trail_stop_futures(fake_price=fake_price)
         else:
             return self._trail_stop_spot()
-
 
     # POINT MAIN FOR ALL SIGNALS
 
