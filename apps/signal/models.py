@@ -1210,8 +1210,8 @@ class Signal(BaseSignal):
         logger.debug(f"[SHORT] New copied BUY order custom_order_id = '{new_custom_order_id}'")
         # If EP2 achieved the new order with EP forms with the price of EP1 (TP1 recreated = TP1 + 1.5%)
         if techannel == 'di30':
-            new_order_price = order.price * (1 + conf_obj.first_profit_deviation_perc) / conf_obj.one_hundred_percent
-            new_trigger = order.trigger * (1 + conf_obj.first_profit_deviation_perc) / conf_obj.one_hundred_percent
+            new_order_price = order.price * (1 + conf_obj.first_profit_deviation_perc / conf_obj.one_hundred_percent)
+            new_trigger = order.trigger * (1 + conf_obj.first_profit_deviation_perc / conf_obj.one_hundred_percent)
         else:
             new_order_price = order.price
             new_trigger = order.trigger
