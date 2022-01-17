@@ -804,8 +804,8 @@ class Telegram(BaseTelegram):
                     if inserted_to_db == ('success', 'confirmed'):
                         await self.client.send_message(int(conf_obj.lucrative_channel), 'Confirmation')
                     else:
-                        await self.send_shared_message(int(conf_obj.token_fast_signals), signal,
-                                                       signal.current_price, signal.algorithm, signal.msg_id)
+                        await self.send_message_by_template(int(conf_obj.token_fast_signals), signal,
+                                                            message.date, signal.algorithm, message.id)
                         await self.send_message_by_template(int(conf_obj.lucrative_channel), signal,
                                                             message.date, signal.algorithm, message.id)
 
