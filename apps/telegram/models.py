@@ -177,7 +177,8 @@ class Telegram(BaseTelegram):
             if not exists and signal.pair:
                 urgent_action = signal.current_price
                 if urgent_action == 'activate' or urgent_action == 'cancel':
-                    await self._recreate_signal(urgent_action, signal, signal.algorithm, message)
+                    pass
+                    # await self._recreate_signal(urgent_action, signal, signal.algorithm, message)
                 else:
                     inserted_to_db = await self.write_signal_to_db(signal.algorithm, signal, signal.msg_id,
                                                                    signal.current_price)
@@ -799,8 +800,8 @@ class Telegram(BaseTelegram):
                 if signal.pair and not exists:
                     inserted_to_db = await self.write_signal_to_db(signal.algorithm, signal, message.id,
                                                                    message.date)
-                    if inserted_to_db != 'success' or inserted_to_db != ('success', 'confirmed'):
-                        await self.send_error_message_to_yourself(signal, inserted_to_db)
+                    # if inserted_to_db != 'success' or inserted_to_db != ('success', 'confirmed'):
+                    #     await self.send_error_message_to_yourself(signal, inserted_to_db)
                     if inserted_to_db == ('success', 'confirmed'):
                         await self.client.send_message(int(conf_obj.lucrative_channel), 'Confirmation')
                     else:
