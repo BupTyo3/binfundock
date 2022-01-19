@@ -800,10 +800,11 @@ class Telegram(BaseTelegram):
                 if signal.pair and not exists:
                     inserted_to_db = await self.write_signal_to_db(signal.algorithm, signal, message.id,
                                                                    message.date)
-                    # if inserted_to_db != 'success' or inserted_to_db != ('success', 'confirmed'):
-                    #     await self.send_error_message_to_yourself(signal, inserted_to_db)
-                    if inserted_to_db == ('success', 'confirmed'):
-                        await self.client.send_message(int(conf_obj.lucrative_channel), 'Confirmation')
+                    if inserted_to_db != 'success':
+                        # or inserted_to_db != ('success', 'confirmed'):
+                        await self.send_error_message_to_yourself(signal, inserted_to_db)
+                        #   if inserted_to_db == ('success', 'confirmed'):
+                        #      await self.client.send_message(int(conf_obj.lucrative_channel), 'Confirmation')
                     else:
                         await self.send_message_by_template(int(conf_obj.token_fast_signals), signal,
                                                             message.date, signal.algorithm, message.id)
@@ -1211,7 +1212,7 @@ class Telegram(BaseTelegram):
                      f" Algorithm: '{channel_abbr}'\n"
                      f" Message ID: '{message_id}'")
         try:
-            sm_obj, is_confirmed = SignalOrig.create_signal(techannel_name=channel_abbr,
+            sm_obj = SignalOrig.create_signal(techannel_name=channel_abbr,
                                                             leverage=signal.leverage,
                                                             symbol=signal.pair,
                                                             stop_loss=signal.stop_loss,
@@ -1221,9 +1222,8 @@ class Telegram(BaseTelegram):
                                                             message_date=message_date,
                                                             margin_type=signal.margin_type)
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
-            if is_confirmed:
-                return 'success', 'confirmed'
-            return 'success'
+            if sm_obj:
+                return 'success'
         except Exception as e:
             logger.error(f"Write into DB failed: {e}")
             return e

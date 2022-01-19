@@ -278,7 +278,7 @@ class SignalOrig(BaseSignalOrig):
         """
         Create signal
         """
-        sig_orig, is_confirmed = cls._create_signal(
+        sig_orig = cls._create_signal(
             symbol=symbol, techannel_name=techannel_name,
             stop_loss=stop_loss, outer_signal_id=outer_signal_id,
             entry_points=entry_points, take_profits=take_profits,
@@ -288,7 +288,7 @@ class SignalOrig(BaseSignalOrig):
         sig_market_list = sig_orig._create_into_markets_if_auto()
         logger.debug(f"SignalOrig created: '{sig_orig}' and next '{len(sig_market_list)}' "
                      f"Signals: '{sig_market_list}'")
-        return sig_orig, is_confirmed
+        return sig_orig
 
     @classmethod
     def update_shared_signal(cls, is_shared: Optional[bool] = False,
@@ -340,26 +340,26 @@ class SignalOrig(BaseSignalOrig):
             TakeProfitOrig.objects.create(signal=sm_obj, value=take_profit)
         logger.debug(f"SignalOrig '{sm_obj}' has been created successfully")
 
-        is_confirmed = cls._check_confirmation_signal(symbol, techannel_name, position)
-        if is_confirmed:
-            alg, created = Techannel.objects.get_or_create(name='firm_2h')
-            techannel_new = alg
-            sm_obj = cls.objects.create(
-                techannel=techannel_new,
-                symbol=symbol,
-                stop_loss=stop_loss,
-                outer_signal_id=outer_signal_id,
-                position=position,
-                leverage=leverage if leverage else cls._default_leverage,
-                message_date=message_date,
-                margin_type=margin_type if margin_type else cls._default_margin_type)
-            for entry_point in entry_points:
-                EntryPointOrig.objects.create(signal=sm_obj, value=entry_point)
-            for take_profit in take_profits:
-                TakeProfitOrig.objects.create(signal=sm_obj, value=take_profit)
-            logger.debug(f"Confirmed Signal '{sm_obj}' has been created successfully")
+        # is_confirmed = cls._check_confirmation_signal(symbol, techannel_name, position)
+        # if is_confirmed:
+        #     alg, created = Techannel.objects.get_or_create(name='firm_2h')
+        #     techannel_new = alg
+        #     sm_obj = cls.objects.create(
+        #         techannel=techannel_new,
+        #         symbol=symbol,
+        #         stop_loss=stop_loss,
+        #         outer_signal_id=outer_signal_id,
+        #         position=position,
+        #         leverage=leverage if leverage else cls._default_leverage,
+        #         message_date=message_date,
+        #         margin_type=margin_type if margin_type else cls._default_margin_type)
+        #     for entry_point in entry_points:
+        #         EntryPointOrig.objects.create(signal=sm_obj, value=entry_point)
+        #     for take_profit in take_profits:
+        #         TakeProfitOrig.objects.create(signal=sm_obj, value=take_profit)
+        #     logger.debug(f"Confirmed Signal '{sm_obj}' has been created successfully")
 
-        return sm_obj, is_confirmed
+        return sm_obj
 
     @transaction.atomic
     def create_market_signal(self, market: BaseMarket, force: bool = False) -> 'Signal':
@@ -427,7 +427,8 @@ class SignalOrig(BaseSignalOrig):
     @rounded_result()
     def _get_new_stop_loss_value(self):
         custom_stop_loss_perc = self.techannel.custom_stop_loss_perc
-        average_price_value = (self.entry_points.first().value + self.entry_points.last().value) / self.entry_points.count()
+        average_price_value = (
+                                          self.entry_points.first().value + self.entry_points.last().value) / self.entry_points.count()
         stop_loss_delta = (average_price_value * custom_stop_loss_perc) / self.conf.one_hundred_percent
         if self.is_position_short():
             new_stop_loss_value = average_price_value + stop_loss_delta
@@ -2703,7 +2704,8 @@ class Signal(BaseSignal):
         """Update current balance info in Cron table"""
         closed_params = {'_status': SignalStatus.CLOSED.value}
         closed_signal = Signal.objects.filter(**closed_params).first()
-        closed_signal.update_balance_info()
+        if closed_signal:
+            closed_signal.update_balance_info()
 
         """Handle all NEW signals: Step 2"""
         params = {'_status': SignalStatus.NEW.value}
