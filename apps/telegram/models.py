@@ -1212,18 +1212,17 @@ class Telegram(BaseTelegram):
                      f" Algorithm: '{channel_abbr}'\n"
                      f" Message ID: '{message_id}'")
         try:
-            sm_obj = SignalOrig.create_signal(techannel_name=channel_abbr,
-                                                            leverage=signal.leverage,
-                                                            symbol=signal.pair,
-                                                            stop_loss=signal.stop_loss,
-                                                            entry_points=signal.entry_points,
-                                                            take_profits=signal.take_profits,
-                                                            outer_signal_id=message_id,
-                                                            message_date=message_date,
-                                                            margin_type=signal.margin_type)
+            SignalOrig.create_signal(techannel_name=channel_abbr,
+                                     leverage=signal.leverage,
+                                     symbol=signal.pair,
+                                     stop_loss=signal.stop_loss,
+                                     entry_points=signal.entry_points,
+                                     take_profits=signal.take_profits,
+                                     outer_signal_id=message_id,
+                                     message_date=message_date,
+                                     margin_type=signal.margin_type)
             logger.debug(f"Signal '{message_id}':'{channel_abbr}' created successfully")
-            if sm_obj:
-                return 'success'
+            return 'success'
         except Exception as e:
             logger.error(f"Write into DB failed: {e}")
             return e
