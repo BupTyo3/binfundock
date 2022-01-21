@@ -1211,8 +1211,8 @@ class Signal(BaseSignal):
         logger.debug(f"[SHORT] New copied BUY order custom_order_id = '{new_custom_order_id}'")
         # If EP2 achieved the new order with EP forms with the price of EP1 (TP1 recreated = TP1 + 1.5%)
         if techannel == 'di30':
-            new_order_price = order.price * (1 + conf_obj.first_profit_deviation_perc / conf_obj.one_hundred_percent)
-            new_trigger = order.trigger * (1 + conf_obj.first_profit_deviation_perc / conf_obj.one_hundred_percent)
+            new_order_price = self._calculate_new_price(order.price)
+            new_trigger = self._calculate_new_price(order.trigger)
         else:
             new_order_price = order.price
             new_trigger = order.trigger
@@ -1224,6 +1224,12 @@ class Signal(BaseSignal):
             index=order.index,
             trigger_price=new_trigger)
         return new_buy_order
+
+    @rounded_result()
+    def _calculate_new_price(self, old_price):
+        calculated_price = old_price * (1 + conf_obj.first_profit_deviation_perc / conf_obj.one_hundred_percent)
+        pair = self._get_pair()
+        return self.get_not_fractional_price(calculated_price, pair.step_price)
 
     @debug_input_and_returned
     def _formation_copied_sell_orders_futures_long(self,
