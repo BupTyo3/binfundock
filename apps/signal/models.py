@@ -1228,8 +1228,7 @@ class Signal(BaseSignal):
     @rounded_result()
     def _calculate_new_price(self, old_price):
         calculated_price = old_price * (1 + conf_obj.first_profit_deviation_perc / conf_obj.one_hundred_percent)
-        pair = self._get_pair()
-        return self.get_not_fractional_price(calculated_price, pair.step_price)
+        return self.get_not_fractional_price(calculated_price)
 
     @debug_input_and_returned
     def _formation_copied_sell_orders_futures_long(self,
