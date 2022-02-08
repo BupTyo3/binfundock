@@ -238,7 +238,7 @@ class SignalOrig(BaseSignalOrig):
         started_signals = Signal.objects.filter(symbol=self.symbol,
                                                 _status__in=STARTED__SIG_STATS,
                                                 market=market)
-        if started_signals.count() > 2:
+        if started_signals.count() >= 2:
             raise SymbolAlreadyStartedError(signal=self, market=market)
 
     def _check_if_pair_does_not_exist_in_market(self, market: BaseMarket) -> None:
@@ -1209,7 +1209,7 @@ class Signal(BaseSignal):
         order = BuyOrder.objects.filter(id=original_order_id).first()
         new_custom_order_id = get_increased_leading_number(order.custom_order_id)
         logger.debug(f"[SHORT] New copied BUY order custom_order_id = '{new_custom_order_id}'")
-        # If EP2 achieved the new order with EP forms with the price of EP1 (TP1 recreated = TP1 + 1.5%)
+        # If EP2 achieved the new TP order forms with the price EP2 to get only 1.5% from entry and EP1 1.5% from entry.
         if techannel == 'di30':
             new_order_price = self._calculate_new_price(order.price)
             new_trigger = self._calculate_new_price(order.trigger)
@@ -2707,10 +2707,10 @@ class Signal(BaseSignal):
                            techannel_abbr: Optional[str] = None,
                            fake_balance: Optional[float] = None):
         """Update current balance info in Cron table"""
-        closed_params = {'_status': SignalStatus.CLOSED.value}
-        closed_signal = Signal.objects.filter(**closed_params).first()
-        if closed_signal:
-            closed_signal.update_balance_info()
+        # closed_params = {'_status': SignalStatus.CLOSED.value}
+        # closed_signal = Signal.objects.filter(**closed_params).first()
+        # if closed_signal:
+        #     closed_signal.update_balance_info()
 
         """Handle all NEW signals: Step 2"""
         params = {'_status': SignalStatus.NEW.value}
