@@ -1106,10 +1106,14 @@ class Signal(BaseSignal):
         Fraction by step
         """
         first_worked_buy_order = worked_buy_orders.order_by('price').first()
+        techannel_abbr = self.techannel.abbr
         # TODO: CHECK !!!!! Maybe need to change first_formation order
         if first_worked_buy_order.index == 0:
             # if the last buy order has worked, new stop_loss is a min of entry_points
-            res = self.entry_points.order_by('value').first().value
+            if techannel_abbr == 'di30':
+                res = self.entry_points.order_by('value').last().value
+            else:
+                res = self.entry_points.order_by('value').first().value
             # We decrease SL price by slip delta, because
             # to get more profit after getting the first take_profit
             # (more than break even)
