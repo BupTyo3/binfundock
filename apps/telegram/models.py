@@ -169,10 +169,10 @@ class Telegram(BaseTelegram):
                              leverage, entries, profits, stop_loss[0], message_id)
         return signal
 
-    async def parse_lucrative_recommend_channel(self):
+    async def parse_tokenfast_channel(self):
         chat_id = int(conf_obj.lucrative_channel)
         async for message in self.client.iter_messages(chat_id, limit=16):
-            signal = self.parse_lucrative_recommend_message(message.text)
+            signal = self.parse_tokenfast_message(message.text)
             exists = await self.is_signal_handled(signal.msg_id, signal.algorithm)
             if not exists and signal.pair:
                 urgent_action = signal.current_price
@@ -189,7 +189,7 @@ class Telegram(BaseTelegram):
         chat_id = int(conf_obj.Luck8414)
         async for message in self.client.iter_messages(chat_id, limit=6):
             if message.text:
-                signal = self.parse_lucrative_recommend_message(message.text)
+                signal = self.parse_tokenfast_message(message.text)
                 is_shared = await self.is_signal_shared(signal.msg_id, signal.algorithm)
                 if not is_shared:
                     await self.send_shared_message(int(conf_obj.lucrative_channel), signal,
@@ -203,7 +203,7 @@ class Telegram(BaseTelegram):
         is_updated = SignalOrig.update_shared_signal(is_shared=True, techannel_name=signal.algorithm,
                                                      outer_signal_id=signal.msg_id)
 
-    def parse_lucrative_recommend_message(self, message_text):
+    def parse_tokenfast_message(self, message_text):
         splitted_info = message_text.splitlines()
         buy_label = 'Entry Points: '
         pair_label = 'Pair:'
@@ -1272,7 +1272,7 @@ class Telegram(BaseTelegram):
             signal.leverage = 1
         if signal.margin_type != 'CROSSED':
             signal.margin_type = 'ISOLATED'
-        time_to_action = message_date.replace(tzinfo=None) + timedelta(hours=3) if not urgent_action else urgent_action
+        time_to_action = message_date.replace(tzinfo=None) + timedelta(hours=2) if not urgent_action else urgent_action
         message = f"Pair: '{signal.pair}'\n" \
                   f"Position: '{signal.position}'\n" \
                   f"Leverage: '{signal.leverage}'\n" \

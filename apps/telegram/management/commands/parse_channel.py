@@ -141,7 +141,7 @@ class Command(SystemCommand):
         logger.debug(f'Session {session_name} initialized')
         try:
             with self._client:
-                self._client.loop.run_until_complete(self._telegram.parse_lucrative_recommend_channel())
+                self._client.loop.run_until_complete(self._telegram.parse_tokenfast_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
@@ -271,7 +271,7 @@ class Command(SystemCommand):
         tca_leverage_matches = ["tca_leverage", "leverage"]
         tca_origin_matches = ["tca_origin", "origin"]
         white_bull_matches = ["white_bulls", "whitebull", "white"]
-        lucrative_recommendation_matches = ["recommend"]
+        tokenfast_matches = ["recommend"]
         luck_matches = ["luck"]
         wcse_matches = ["wcse"]
         klondike_margin_matches = ["klondike_margin"]
@@ -323,8 +323,8 @@ class Command(SystemCommand):
 
         if not get_or_create_crontask().lucrative_recommendations:
             pass
-        elif any(x in channel for x in lucrative_recommendation_matches):
-            self.collect_info_from_lucrative_recommend_channel()
+        elif any(x in channel for x in tokenfast_matches):
+            self.collect_info_from_tokenfast_channel()
 
         if not get_or_create_crontask().luck8414:
             pass
