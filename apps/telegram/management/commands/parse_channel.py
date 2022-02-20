@@ -135,7 +135,7 @@ class Command(SystemCommand):
         finally:
             self._client_luck.disconnect()
 
-    def collect_info_from_lucrative_recommend_channel(self):
+    def collect_info_from_tokenfast_channel(self):
         session_name = 'LucrativeRecommendations'
         self.init_telegram(session_name)
         logger.debug(f'Session {session_name} initialized')
