@@ -903,8 +903,8 @@ class Telegram(BaseTelegram):
             first_entry = current_price + delta_first_entry
             second_entry = high_price
             third_entry = low_price
-        entries.append(self._round_price(second_entry, step_quantity))
         entries.append(first_entry)
+        entries.append(self._round_price(second_entry, step_quantity))
 
         return entries
 
