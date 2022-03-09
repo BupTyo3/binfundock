@@ -1110,17 +1110,18 @@ class Signal(BaseSignal):
         # TODO: CHECK !!!!! Maybe need to change first_formation order
         if first_worked_buy_order.index == 0:
             # if the last buy order has worked, new stop_loss is a min of entry_points
-            from apps.order.utils import COMPLETED_ORDER_STATUSES
+            # from apps.order.utils import COMPLETED_ORDER_STATUSES
+            #
+            # params = {
+            #     '_status__in': COMPLETED_ORDER_STATUSES,
+            # }
+            # second_entry_completed = self.sell_orders.filter(**params)
+            #
+            # if techannel_abbr == 'di30' and second_entry_completed.index == 1:
+            #     res = self.entry_points.order_by('value').last().value
+            # else:
+            res = self.entry_points.order_by('value').first().value
 
-            params = {
-                '_status__in': COMPLETED_ORDER_STATUSES,
-            }
-            second_entry_completed = self.sell_orders.filter(**params)
-
-            if techannel_abbr == 'di30' and second_entry_completed.index == 1:
-                res = self.entry_points.order_by('value').last().value
-            else:
-                res = self.entry_points.order_by('value').first().value
             # We decrease SL price by slip delta, because
             # to get more profit after getting the first take_profit
             # (more than break even)
