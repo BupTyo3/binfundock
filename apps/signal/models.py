@@ -1108,10 +1108,12 @@ class Signal(BaseSignal):
         first_worked_buy_order = worked_buy_orders.order_by('price').first()
         second_worked_sell_order = worked_sell_orders.order_by('price').first()
         techannel_abbr = self.techannel.abbr
+        logger.debug(f"'{self}':second_worked_sell_order={second_worked_sell_order}")
 
         if techannel_abbr == 'di30' and second_worked_sell_order.index == 1 and first_worked_buy_order.index == 0:
             res = self.entry_points.order_by('value').last().value
             res = self.get_real_stop_price(res, lower=True)
+            logger.debug(f"'{self}':new_stop_loss_for_di30={res}")
 
         # TODO: CHECK !!!!! Maybe need to change first_formation order
         if techannel_abbr != 'di30' and second_worked_sell_order.index != 1 and first_worked_buy_order.index == 0:
@@ -1122,6 +1124,7 @@ class Signal(BaseSignal):
             # to get more profit after getting the first take_profit
             # (more than break even)
             res = self.get_real_stop_price(res, lower=True)
+            logger.debug(f"'{self}':get_real_stop_price={res}")
         else:
             # get price of previous order as a new stop_loss
             # TODO: CHECK !!!! Maybe: .last() -> .first()
@@ -2057,6 +2060,7 @@ class Signal(BaseSignal):
             self.__cancel_orders(opened_gl_sl_orders)
             if opened_buy_orders.exists():
                 new_stop_loss = self._get_new_stop_loss_futures_short(worked_tp_orders, worked_ep_orders)
+                logger.debug(f"'{self}':new_stop_loss={new_stop_loss}")
                 residual_quantity = self._get_residual_quantity(ignore_fee=True)
                 self.__form_gl_sl_order(price=new_stop_loss, quantity=residual_quantity,
                                         original_order_id=opened_gl_sl_orders_id)
