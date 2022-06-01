@@ -105,7 +105,38 @@ class BuyOrder(BaseBuyOrder):
         return order
 
     @classmethod
+    def _form_buy_limit_order(cls, market: 'BaseMarket',
+                               signal: Signal,
+                               quantity: float,
+                               price: float,
+                               custom_order_id: Optional[str]):
+        """Form BUY MARKET order"""
+        order = cls.objects.create(
+            market=market,
+            symbol=signal.symbol,
+            quantity=quantity,
+            price=price,
+            signal=signal,
+            custom_order_id=custom_order_id,
+            type=OrderType.STOP_MARKET.value,
+            index=cls.MARKET_INDEX)
+        return order
+
+    @classmethod
     def form_buy_market_order(cls, market: 'BaseMarket',
+                              signal: Signal,
+                              quantity: float,
+                              price: float,
+                              custom_order_id: Optional[str] = None):
+        """Form MARKET BUY order:
+        """
+        order = cls._form_buy_market_order(
+            market=market, signal=signal, quantity=quantity, price=price,
+            custom_order_id=custom_order_id)
+        return order
+
+    @classmethod
+    def form_buy_limit_order(cls, market: 'BaseMarket',
                               signal: Signal,
                               quantity: float,
                               price: float,

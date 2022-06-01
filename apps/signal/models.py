@@ -75,7 +75,7 @@ class SignalDesc(BaseSignalOrig):
     descriptions = models.TextField()
     techannel = models.ForeignKey(to=Techannel, related_name='signal_desc', on_delete=models.DO_NOTHING)
     symbol = models.CharField(max_length=24)
-    outer_signal_id = models.PositiveIntegerField()
+    outer_signal_id = models.IntegerField()
     main_coin = models.CharField(max_length=16)
     position = models.CharField(max_length=32,
                                 choices=SignalPosition.choices(),
@@ -144,7 +144,7 @@ class SignalOrig(BaseSignalOrig):
                                   related_name='signals_orig',
                                   on_delete=models.DO_NOTHING)
     symbol = models.CharField(max_length=24)
-    outer_signal_id = models.PositiveIntegerField()
+    outer_signal_id = models.IntegerField()
     main_coin = models.CharField(max_length=16)
     stop_loss = models.FloatField()
     is_shared = models.BooleanField(default=False)
@@ -452,7 +452,7 @@ class Signal(BaseSignal):
                                   related_name='signals',
                                   on_delete=models.DO_NOTHING)
     symbol = models.CharField(max_length=24)
-    outer_signal_id = models.PositiveIntegerField()
+    outer_signal_id = models.IntegerField()
     main_coin = models.CharField(max_length=16)
     stop_loss = models.FloatField()
     income = models.FloatField(help_text='Profit or Loss', default=0)
@@ -860,6 +860,21 @@ class Signal(BaseSignal):
         from apps.order.models import BuyOrder
         logger.debug(f"Form MARKET BUY ORDER for signal {self}")
         order = BuyOrder.form_buy_market_order(
+            market=self.market,
+            signal=self,
+            quantity=quantity,
+            price=price,
+        )
+        return order
+
+    @debug_input_and_returned
+    def __form_buy_limit_order(self, quantity: float, price: float) -> 'BuyOrder':
+        """
+        Form BUY LIMIT order for the signal
+        """
+        from apps.order.models import BuyOrder
+        logger.debug(f"Form LIMIT BUY ORDER for signal {self}")
+        order = BuyOrder.form_buy_limit_order(
             market=self.market,
             signal=self,
             quantity=quantity,

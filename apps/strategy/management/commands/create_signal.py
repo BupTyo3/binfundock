@@ -68,17 +68,16 @@ class Command(SystemCommand):
                 logger.debug("You typed No - The End")
                 quit()
         sm_obj = SignalOrig.create_signal(techannel_name=techannel,
-                                                        symbol=symbol,
-                                                        stop_loss=stop_loss,
-                                                        entry_points=entry_points,
-                                                        take_profits=take_profits,
-                                                        leverage=leverage,
-                                                        outer_signal_id=outer_signal_id)
+                                          symbol=symbol,
+                                          stop_loss=stop_loss,
+                                          entry_points=entry_points,
+                                          take_profits=take_profits,
+                                          leverage=leverage,
+                                          outer_signal_id=outer_signal_id)
         if sm_obj:
             self.log_success(f"SignalOrig '{sm_obj}' created successfully")
         else:
             self.log_error(f"SignalOrig '{outer_signal_id}':'{techannel}' has not been created")
-
 
 # This class is used to create Signal in the table SignalDesc
 

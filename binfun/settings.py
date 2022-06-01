@@ -356,6 +356,7 @@ class Config:
         self.token_fast_signals = telegram.get('TokenFastSignals', None)
         self.server = telegram.get('Server', None)
         self.fsvzo = telegram.get('fsvzo', None)
+        self.vege = telegram.get('vege', None)
 
 
 conf_obj = Config()

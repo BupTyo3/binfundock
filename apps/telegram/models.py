@@ -811,7 +811,6 @@ class Telegram(BaseTelegram):
                         await self.send_message_by_template(int(conf_obj.token_fast_signals), signal,
                                                             message.date, signal.algorithm, message.id)
 
-
     async def parse_alertatron_message(self, message_text, message_id):
         alg_diver = 'diver_'
         alg_corn = 'corn_'
@@ -1053,6 +1052,103 @@ class Telegram(BaseTelegram):
         signal = SignalModel(pair, action_price, margin_type, position,
                              leverage, entries, profits, stop_loss, message_id, channel_abbr)
         return signal
+
+    async def parse_vege_channel(self):
+        channel_abbr = 'vege'
+        chat_id = int(conf_obj.vege)
+        async for message in self.client.iter_messages(chat_id, limit=6):
+            exists = await self.is_signal_handled(message.id, channel_abbr)
+            if message.text and not exists:
+                signal = self.parse_vege_message(message.text, message.id, channel_abbr)
+                if signal[0].pair:
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal[0], '-' + message.id, message.date)
+                    if inserted_to_db != 'success':
+                        await self.send_error_message_to_yourself(signal[0], inserted_to_db)
+                    else:
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[0],
+                                                            message.date, channel_abbr, '-' + message.id)
+                if len(signal) > 1:
+                    inserted_to_db = await self.write_signal_to_db(channel_abbr, signal[1], '-' + message.id, message.date)
+                    if inserted_to_db != 'success':
+                        await self.send_error_message_to_yourself(signal[1], inserted_to_db)
+                    else:
+                        await self.send_message_by_template(int(conf_obj.lucrative_channel), signal[1],
+                                                            message.date, channel_abbr, message.id)
+
+    def parse_vege_message(self, message_text, message_id, channel_abbr):
+        splitted_info = message_text.splitlines()
+
+        buy_label = 'Покупка #'
+        possible_take_profits = 'Цели:'
+        stop_label = 'Стоп-лосс:'
+        action_price = 'Вход:'
+        margin_type = MarginType.ISOLATED.value
+        leverage = 5
+        entries = []
+        entries2 = []
+        position = ''
+        pair = ''
+        profits = []
+        profits2 = []
+        stop_loss = ''
+        stop_loss2 = ''
+        position2 = ''
+        signal_identification = ['#фьючерсы']
+        is_signal = signal_identification in splitted_info[0]
+        two_signals = True
+        if not is_signal:
+            signal = SignalModel(pair, action_price, margin_type, position,
+                                 leverage, entries, profits, stop_loss, message_id)
+            return [signal]
+
+        action_index = [i for i, s in enumerate(splitted_info) if action_price in s]
+        profits_index = [i for i, s in enumerate(splitted_info) if possible_take_profits in s]
+        stop_index = [i for i, s in enumerate(splitted_info) if stop_label in s]
+        if len(action_index) == 2:
+            two_signals = True
+        for i, line in splitted_info:
+            if buy_label in line:
+                possible_pair = line.split('#')[1]
+                pair = possible_pair.split(',')[0] + 'USDT'
+            if action_price in line and i == action_index[0]:
+                possible_entries = line.split(' ')[1]
+                if '—' in possible_entries:
+                    entries.append(possible_entries.split('—'))
+                else:
+                    entries.append(possible_entries)
+            if two_signals:
+                if action_price in line and i == action_index[1]:
+                    possible_entries = line.split(' ')[1]
+                    if '—' in possible_entries:
+                        entries2.append(possible_entries.split('—'))
+                    else:
+                        entries2.append(possible_entries)
+            if line.startswith(possible_take_profits) and i == profits_index[0]:
+                fake_profits = line.split(possible_take_profits)[1]
+                profits = fake_profits.split(', ')
+            if two_signals:
+                if line.startswith(possible_take_profits) and i == profits_index[1]:
+                    fake_profits = line.split(possible_take_profits)[1]
+                    profits2 = fake_profits.split(', ')
+            if line.startswith(stop_label) and i == stop_index[0]:
+                stop_loss = line.split('$')
+                stop_loss = stop_loss.split(' ')[1]
+            if two_signals:
+                if line.startswith(stop_label) and i == stop_index[1]:
+                    stop_loss2 = line.split('$')
+                    stop_loss2 = stop_loss2.split(' ')[1]
+        position = calculate_position(stop_loss, entries, profits)
+        if two_signals:
+            position2 = calculate_position(stop_loss2, entries2, profits2)
+        """ Take only first 4 take profits: """
+        profits = profits[:4]
+        signal1 = SignalModel(pair, action_price, margin_type, position,
+                              leverage, entries, profits, stop_loss, message_id, channel_abbr)
+        if two_signals:
+            signal2 = SignalModel(pair, action_price, margin_type, position2,
+                                  leverage, entries2, profits2, stop_loss2, message_id, channel_abbr)
+            return [signal1, signal2]
+        return [signal1]
 
     async def parse_margin_whale_channel(self):
         chat_id = int(conf_obj.margin_whales)

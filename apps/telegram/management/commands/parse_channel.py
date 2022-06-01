@@ -108,6 +108,20 @@ class Command(SystemCommand):
             self._client_luck.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
+    def collect_info_from_vege_channel(self):
+        session_name = 'VEGE'
+        self.init_telegram_luck(session_name)
+        logger.debug(f'Session {session_name} initialized')
+        try:
+            with self._client_luck:
+                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_vege_channel())
+        except Exception as e:
+            logger.error(f'Session {session_name} ERROR: {e}')
+            traceback.print_exc()
+        finally:
+            self._client_luck.disconnect()
+            logger.debug(f'Session {session_name} disconnected')
+
     def collect_info_from_cf_trader_channel(self):
         session_name = 'CF_Trader'
         self.init_telegram_luck(session_name)
@@ -269,6 +283,7 @@ class Command(SystemCommand):
         crypto_futures_matches = ["crypto_futures"]
         tca_altcoin_matches = ["tca_altcoin", "altcoin", "altcoins"]
         tca_leverage_matches = ["tca_leverage", "leverage"]
+        vege_matches = ["vege"]
         tca_origin_matches = ["tca_origin", "origin"]
         white_bull_matches = ["white_bulls", "whitebull", "white"]
         tokenfast_matches = ["recommend"]
@@ -310,6 +325,11 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in tca_leverage_matches):
             self.collect_info_from_tca_leverage_channel()
+
+        if not get_or_create_crontask().vege_channel:
+            pass
+        elif any(x in channel for x in vege_matches):
+            self.collect_info_from_vege_channel()
 
         if not get_or_create_crontask().assist_origin:
             pass
