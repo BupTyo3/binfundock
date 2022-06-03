@@ -520,6 +520,20 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         return response
 
     @api_logging
+    def _push_sell_stop_limit_order(self, symbol: str, quantity: float, price: float, custom_order_id: str):
+        """Send request to create SELL STOP LIMIT order"""
+        response = self.my_client.futures_create_order(
+            symbol=symbol,
+            side=self.my_client.SIDE_SELL,
+            type=self.order_type_stop_market,
+            quantity=quantity,
+            reduceOnly=False,
+            stopPrice=price_to_str(price),
+            newClientOrderId=custom_order_id,
+            timeInForce=self.my_client.TIME_IN_FORCE_GTC)
+        return response
+
+    @api_logging
     def _push_sell_tp_order(self, symbol: str,
                             quantity: float, price: float,
                             stop_trigger: float, custom_order_id: str):
@@ -553,6 +567,24 @@ class BiFuturesMarketLogic(BaseMarketLogic,
             newClientOrderId=custom_order_id,
             stopPrice=price_to_str(stop_trigger),
             stopLimitTimeInForce=self.my_client.TIME_IN_FORCE_GTC)
+        return response
+
+    @api_logging
+    def _push_buy_stop_limit_order(self,
+                                   symbol: str,
+                                   quantity: float,
+                                   stop_price: float,
+                                   custom_order_id: str):
+        """Send request to create STOP LIMIT order.
+        """
+        response = self.my_client.futures_create_order(
+            side=self.my_client.SIDE_BUY,
+            type=self.order_type_stop_market,
+            symbol=symbol,
+            reduceOnly=False,
+            stopPrice=price_to_str(stop_price),
+            quantity=quantity,
+            newClientOrderId=custom_order_id)
         return response
 
     @api_logging
@@ -650,11 +682,35 @@ class BiFuturesMarketLogic(BaseMarketLogic,
         order.update_order_api_history(status, executed_quantity, avg_executed_market_price)
         return response
 
+    def push_buy_stop_limit_order(self, order: 'BuyOrder'):
+        """Push BUY LIMIT order to Futures"""
+        self._push_preconditions(order=order)
+
+        response = self._push_buy_stop_limit_order(
+            symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
+        data = self._get_partially_order_data_from_response(response)
+        status, executed_quantity = data.get('status'), data.get('executed_quantity')
+        avg_executed_market_price = data.get('avg_executed_market_price')
+        order.update_order_api_history(status, executed_quantity, avg_executed_market_price)
+        return response
+
     def push_sell_limit_order(self, order: 'BuyOrder'):
         """Push SELL LIMIT order to Futures"""
         self._push_preconditions(order=order)
 
         response = self._push_sell_limit_order(
+            symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
+        data = self._get_partially_order_data_from_response(response)
+        status, executed_quantity = data.get('status'), data.get('executed_quantity')
+        avg_executed_market_price = data.get('avg_executed_market_price')
+        order.update_order_api_history(status, executed_quantity, avg_executed_market_price)
+        return response
+
+    def push_sell_stop_limit_order(self, order: 'BuyOrder'):
+        """Push SELL STOP LIMIT order to Futures"""
+        self._push_preconditions(order=order)
+
+        response = self._push_sell_stop_limit_order(
             symbol=order.symbol, quantity=order.quantity, price=order.price, custom_order_id=order.custom_order_id)
         data = self._get_partially_order_data_from_response(response)
         status, executed_quantity = data.get('status'), data.get('executed_quantity')

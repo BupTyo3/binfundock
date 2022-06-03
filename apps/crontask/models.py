@@ -80,6 +80,11 @@ class CronTask(CronTaskBase):
         help_text='Take profits or EPs will be deleted one by one if balance is not enough to form Signal'
     )
 
+    entry_with_stop_limit = models.BooleanField(
+        default=False,
+        help_text='Form Signal to make it possible to buy above or sell below the current level with worst price'
+    )
+
     objects = models.Manager()
 
     # def __str__(self):

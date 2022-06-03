@@ -1,14 +1,17 @@
 ### Example `.env` File
 Required
 ```dotenv
-SECRET_KEY=XXX
-
-DB_HOST=db
-DB_NAME=binfun_name
-DB_USER=binfun_user
-DB_PASSWORD=binfun_password_xxx
-
+SECRET_KEY=asdfasdfoi7yk23x2312c3413x12c
+DEBUG=True
 WEB_GLOB_PORT=8100
+DB_ENGINE=django.db.backends.sqlite3
+DB_HOST=localhost
+#DB_NAME=db.sqlite3
+
+#DB_HOST=db
+DB_NAME=postgres
+DB_USER=postgres
+DB_PASSWORD=postgres
 ```
 Optional
 ```dotenv
