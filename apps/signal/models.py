@@ -868,6 +868,21 @@ class Signal(BaseSignal):
         return order
 
     @debug_input_and_returned
+    def __form_buy_stop_limit_order(self, quantity: float, price: float) -> 'BuyOrder':
+        """
+        Form BUY STOP_LIMIT order for the signal
+        """
+        from apps.order.models import BuyOrder
+        logger.debug(f"Form MARKET BUY STOP LIMIT ORDER for signal {self}")
+        order = BuyOrder.form_buy_stop_limit_order(
+            market=self.market,
+            signal=self,
+            quantity=quantity,
+            price=price,
+        )
+        return order
+
+    @debug_input_and_returned
     def __form_buy_limit_order(self, quantity: float, price: float) -> 'BuyOrder':
         """
         Form BUY LIMIT order for the signal
@@ -955,6 +970,24 @@ class Signal(BaseSignal):
         from apps.order.models import SellOrder
         logger.debug(f"Form SELL LIMIT ORDER for signal {self}")
         order = SellOrder.form_sell_limit_order(
+            market=self.market,
+            signal=self,
+            quantity=quantity,
+            price=price,
+            index=index,
+            custom_order_id=custom_order_id,
+        )
+        return order
+
+    @debug_input_and_returned
+    def __form_sell_stop_limit_order(self, quantity: float, price: float, index: int,
+                                     custom_order_id: Optional[str] = None) -> 'SellOrder':
+        """
+        Form sell stop limit order for the signal
+        """
+        from apps.order.models import SellOrder
+        logger.debug(f"Form SELL STOP LIMIT ORDER for signal {self}")
+        order = SellOrder.form_sell_stop_limit_order(
             market=self.market,
             signal=self,
             quantity=quantity,
@@ -1655,7 +1688,11 @@ class Signal(BaseSignal):
                 logger.debug(f"Not enough amount for Signal: '{self}'")
                 return False
             # TODO: Form buy orders
-            self.__form_buy_order(distributed_toc=coin_quantity, entry_point=entry_point.value, index=index)
+
+            if get_or_create_crontask().entry_with_stop_limit():
+                self.__form_buy_stop_limit_order(distributed_toc=coin_quantity, entry_point=entry_point.value, index=index)
+            else:
+                self.__form_buy_order(distributed_toc=coin_quantity, entry_point=entry_point.value, index=index)
         # self.__form_futures_sl_order()
         # Create Global Stop_loss Order
         planned_executed_quantity = self.__get_planned_executed_quantity(self.buy_orders.all())
@@ -1671,7 +1708,10 @@ class Signal(BaseSignal):
                 logger.debug(f"Not enough amount for Signal: '{self}'")
                 return False
             # TODO: Form TP sell orders
-            self.__form_sell_limit_order(quantity=coin_quantity, price=entry_point.value, index=index)
+            if get_or_create_crontask().entry_with_stop_limit():
+                self.__form_sell_stop_limit_order(quantity=coin_quantity, price=entry_point.value, index=index)
+            else:
+                self.__form_sell_limit_order(quantity=coin_quantity, price=entry_point.value, index=index)
         planned_executed_quantity = self.__get_planned_executed_quantity(self.sell_orders.all())
         self.__form_gl_sl_order(quantity=planned_executed_quantity, price=self.stop_loss)
         return True

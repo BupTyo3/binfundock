@@ -57,6 +57,7 @@ class OrderType(Enum):
     STOP_LOSS = 'stop_loss'
     STOP_LOSS_LIMIT = 'stop_loss_limit'
     STOP_MARKET = 'stop_market'
+    STOP_LIMIT = 'stop_limit'
     TAKE_PROFIT_LIMIT = 'take_profit_limit'
     LIMIT_MAKER = 'limit_maker'
 
