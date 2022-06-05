@@ -67,13 +67,15 @@ class Command(SystemCommand):
             self._client.disconnect()
             logger.debug(f'Session {session_name} disconnected')
 
-    def collect_info_from_angel_channel(self):
-        session_name = 'CryptoAngel'
+    def list_channels(self):
+        session_name = 'List_channels'
         self.init_telegram_luck(session_name)
         logger.debug(f'Session {session_name} initialized')
         try:
             with self._client_luck:
-                self._client_luck.loop.run_until_complete(self._telegram_luck.parse_crypto_angel_channel())
+                dialogs = self._client_luck.get_dialogs()
+                print(dialogs)
+                # self._client_luck.loop.run_until_complete(self._telegram_luck.parse_crypto_angel_channel())
         except Exception as e:
             logger.error(f'Session {session_name} ERROR: {e}')
             traceback.print_exc()
@@ -279,7 +281,7 @@ class Command(SystemCommand):
         channel = options['channel']
         china_matches = ["China", "china"]
         china_chat_matches = ["sensei"]
-        angel_matches = ["angel", "Angel", 'cryptoangel', 'crypto_angel', 'CryptoAngel']
+        list_matches = ['list_channels']
         crypto_futures_matches = ["crypto_futures"]
         tca_altcoin_matches = ["tca_altcoin", "altcoin", "altcoins"]
         tca_leverage_matches = ["tca_leverage", "leverage"]
@@ -313,8 +315,8 @@ class Command(SystemCommand):
 
         if not get_or_create_crontask().crypto_passive:
             pass
-        elif any(x in channel for x in angel_matches):
-            self.collect_info_from_angel_channel()
+        elif any(x in channel for x in list_matches):
+            self.list_channels()
 
         if not get_or_create_crontask().assist_altcoin:
             pass
@@ -351,7 +353,7 @@ class Command(SystemCommand):
         elif any(x in channel for x in luck_matches):
             # self.collect_info_from_luck_channel()
             pass
-        
+
         if not get_or_create_crontask().wcse:
             pass
         elif any(x in channel for x in wcse_matches):
@@ -386,3 +388,6 @@ class Command(SystemCommand):
             pass
         elif any(x in channel for x in fsvzo_matches):
             self.collect_info_from_alertatron_channel()
+
+# command = Command()
+# command.collect_info_from_angel_channel()
